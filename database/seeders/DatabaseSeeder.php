@@ -21,13 +21,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // ─── 1. Create Core Roles ───────────────────────────────────
-        $admin = User::factory()->create([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
-            'role' => 'admin',
-        ]);
+        // ─── 1. Ensure Admin User Exists ────────────────────────────
+        $this->call(AdminUserSeeder::class);
 
+        // ─── 2. Create Additional Roles ─────────────────────────────
         $drafter = User::factory()->create([
             'name' => 'Drafter User',
             'email' => 'drafter@example.com',
