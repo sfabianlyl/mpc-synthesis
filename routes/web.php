@@ -1,13 +1,8 @@
 <?php
 
-use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DrafterController;
 use App\Http\Controllers\ResponseController;
 use App\Http\Controllers\SynthesisController;
-use App\Models\Conversation;
-use App\Models\Event;
-use App\Models\Group;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/login', 'auth/login')->name('login');
@@ -50,16 +45,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('export/{document}', [DrafterController::class, 'export'])->name('export');
         Route::get('export/{document}/pdf', [DrafterController::class, 'downloadPdf'])->name('export.pdf');
-    });
-
-    // ─── Admin ───────────────────────────────────────────────────────
-    Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
-        Route::get('/', [AdminController::class, 'index'])->name('dashboard');
-        Route::post('groups', [AdminController::class, 'storeGroup'])->name('groups.store');
-        Route::delete('groups/{group}', [AdminController::class, 'deleteGroup'])->name('groups.destroy');
-        Route::patch('users/{user}/role', [AdminController::class, 'updateUserRole'])->name('users.role');
-        Route::patch('groups/{group}/synthesis', [AdminController::class, 'assignSynthesis'])->name('groups.synthesis');
-        Route::patch('groups/{group}/facilitator', [AdminController::class, 'assignFacilitator'])->name('groups.facilitator');
     });
 });
 

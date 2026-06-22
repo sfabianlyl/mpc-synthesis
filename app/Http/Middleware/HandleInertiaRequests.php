@@ -35,6 +35,11 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        // Skip Inertia for Filament admin panel routes
+        if ($request->is('admin/*')) {
+            return [];
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),

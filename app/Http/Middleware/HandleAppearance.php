@@ -16,6 +16,11 @@ class HandleAppearance
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Skip for Filament admin panel routes
+        if ($request->is('admin/*')) {
+            return $next($request);
+        }
+
         View::share('appearance', $request->cookie('appearance') ?? 'system');
 
         return $next($request);
