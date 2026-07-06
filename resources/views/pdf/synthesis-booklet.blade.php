@@ -116,8 +116,8 @@
 
     @foreach($reports as $report)
         <div class="group-report">
-            <h3>{{ $report->group->name }}</h3>
-            <p><em>Prepared by: {{ $report->facilitator->name }}</em></p>
+            <h3>{{ $report->conversation->title ?? 'Report #' . $report->id }}</h3>
+            <p><em>Prepared by: {{ $report->synthesis->name ?? 'Unknown' }}</em></p>
 
             <div class="section">
                 <span class="category-label convergence">Convergence</span>

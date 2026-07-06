@@ -1,30 +1,29 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle2, XCircle, Loader2, Sparkles, ClipboardEdit, FileCheck } from 'lucide-react';
+import { CheckCircle2, FileCheck, Users, XCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import AppLayout from '@/layouts/app-layout';
-import { Conversation, Group, SynthesisReport } from '@/types/models';
+import { Conversation, ConsensusSubmission, Group, SynthesisReport } from '@/types/models';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface PageProps {
     conversations: Conversation[];
     groups: Group[];
     report: SynthesisReport | null;
     selectedConversationId: number | null;
+    consensusSubmissions: Record<number, ConsensusSubmission[]>;
 }
 
-export default function Dashboard({ conversations, groups, report, selectedConversationId }: PageProps) {
+export default function Dashboard({ conversations, groups, report, selectedConversationId, consensusSubmissions }: PageProps) {
     const { flash } = usePage().props as any;
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     // Calculate responses stats
     const totalGroups = groups.length;
     const submittedResponsesCount = groups.filter(g => g.responses && g.responses.length > 0).length;
-    const allSubmitted = totalGroups > 0 && submittedResponsesCount === totalGroups;
 
     useEffect(() => {
         if (flash?.success) {
@@ -43,22 +42,6 @@ export default function Dashboard({ conversations, groups, report, selectedConve
         router.get('/synthesis', { conversation_id: value }, { preserveState: true });
     };
 
-    const handleStartSynthesis = () => {
-        if (!selectedConversationId) return;
-        setIsAnalyzing(true);
-        setStatusMessage(null);
-        
-        router.post(`/synthesis/analyze/${selectedConversationId}`, {}, {
-            onSuccess: () => {
-                setIsAnalyzing(false);
-            },
-            onError: (errs) => {
-                setIsAnalyzing(false);
-                setStatusMessage({ type: 'error', text: errs.analysis || 'Analysis failed. Please try again.' });
-            },
-        });
-    };
-
     return (
         <>
             <Head title="Synthesis Dashboard" />
@@ -68,7 +51,7 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Synthesis Dashboard</h1>
                         <p className="text-muted-foreground mt-1">
-                            Synthesize consensus responses from your assigned groups into consolidated session reports.
+                            Synthesize consensus responses from your assigned conversations into consolidated session reports.
                         </p>
                     </div>
 
@@ -111,9 +94,85 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                     </div>
                 )}
 
+                {/* Consensus Submission Status Card */}
+                {selectedConversationId && (
+                    <Card className="border-sidebar-border/50">
+                        <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 flex flex-row items-center justify-between pb-4">
+                            <div>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Users className="size-5" />
+                                    Consensus Submission Status
+                                </CardTitle>
+                                <CardDescription>Track which facilitators have submitted their group's consensus response.</CardDescription>
+                            </div>
+                            <Badge variant="outline" className="h-6">
+                                {Object.values(consensusSubmissions).flat().filter(s => s.is_submitted).length} / {Object.values(consensusSubmissions).flat().length} Submitted
+                            </Badge>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            {Object.keys(consensusSubmissions).length === 0 ? (
+                                <div className="text-center py-8 text-muted-foreground text-sm">
+                                    <Users className="size-10 mx-auto text-muted-foreground/30 mb-2" />
+                                    <p>No consensus submissions received for this session yet.</p>
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Group</TableHead>
+                                            <TableHead>Facilitator</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Submitted At</TableHead>
+                                            <TableHead>Consensus Text Preview</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {Object.entries(consensusSubmissions).map(([groupId, submissions]) => (
+                                            submissions.map((submission) => (
+                                                <TableRow key={submission.id}>
+                                                    <TableCell className="font-semibold">
+                                                        Group #{groupId}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {submission.facilitator_name ? (
+                                                            <span className="flex items-center gap-2">
+                                                                <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                                                                    {submission.facilitator_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                                                </div>
+                                                                {submission.facilitator_name}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground italic">Unassigned</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={submission.is_submitted ? 'default' : 'secondary'} className={submission.is_submitted ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/10' : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/10'}>
+                                                            {submission.is_submitted ? (
+                                                                <><CheckCircle2 className="size-3.5 mr-1" /> Submitted</>
+                                                            ) : (
+                                                                <><XCircle className="size-3.5 mr-1" /> Pending</>
+                                                            )}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground text-sm">
+                                                        {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : '—'}
+                                                    </TableCell>
+                                                    <TableCell className="max-w-[300px] truncate text-muted-foreground text-xs font-normal">
+                                                        {submission.consensus_text || '—'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Main Content Split Grid */}
                 <div className="grid gap-6 lg:grid-cols-3">
-                    
+
                     {/* Synthesis Report Status Card (Takes 1 Col) */}
                     <Card className="border-sidebar-border/50 lg:col-span-1 flex flex-col">
                         <CardHeader className="bg-muted/15 border-b border-sidebar-border/30">
@@ -142,7 +201,7 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                                     </div>
                                 ) : (
                                     <div className="text-center py-6">
-                                        <Sparkles className="size-10 mx-auto text-primary/30 mb-2" />
+                                        <FileCheck className="size-10 mx-auto text-primary/30 mb-2" />
                                         <p className="text-sm text-muted-foreground">
                                             No synthesis report has been generated yet for this session.
                                         </p>
@@ -154,40 +213,14 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                             </div>
 
                             <div className="mt-auto pt-4 border-t border-sidebar-border/30 flex flex-col gap-2">
-                                {report ? (
-                                    <Link href={`/synthesis/review/${selectedConversationId}`} className="w-full">
-                                        <Button className="w-full flex items-center justify-center gap-2" variant={report.status === 'submitted' ? 'outline' : 'default'}>
-                                            {report.status === 'submitted' ? (
-                                                <>
-                                                    <FileCheck className="size-4" /> View Report
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <ClipboardEdit className="size-4" /> Review & Edit Report
-                                                </>
-                                            )}
-                                        </Button>
-                                    </Link>
-                                ) : (
-                                    <Button
-                                        onClick={handleStartSynthesis}
-                                        disabled={submittedResponsesCount === 0 || isAnalyzing}
-                                        className="w-full flex items-center justify-center gap-2"
-                                    >
-                                        {isAnalyzing ? (
-                                            <>
-                                                <Loader2 className="size-4 animate-spin" /> Generating...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Sparkles className="size-4" /> Trigger AI Synthesis
-                                            </>
-                                        )}
+                                <Link href={`/synthesis/review/${selectedConversationId}`} className="w-full">
+                                    <Button className="w-full flex items-center justify-center gap-2" variant={report && report.status === 'submitted' ? 'outline' : 'default'}>
+                                        <FileCheck className="size-4" /> View Synthesis
                                     </Button>
-                                )}
+                                </Link>
                                 {!report && submittedResponsesCount === 0 && (
                                     <p className="text-[11px] text-center text-destructive">
-                                        At least 1 consensus response is required to start synthesis.
+                                        At least 1 consensus response is required before viewing synthesis.
                                     </p>
                                 )}
                             </div>
@@ -198,8 +231,8 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                     <Card className="border-sidebar-border/50 lg:col-span-2">
                         <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 flex flex-row items-center justify-between pb-4">
                             <div>
-                                <CardTitle className="text-lg">Assigned Groups</CardTitle>
-                                <CardDescription>Monitor which groups have submitted their responses.</CardDescription>
+                                <CardTitle className="text-lg">All Groups for Session</CardTitle>
+                                <CardDescription>Monitor which groups have submitted their responses for this session.</CardDescription>
                             </div>
                             <Badge variant="outline" className="h-6">
                                 {submittedResponsesCount} / {totalGroups} Submitted
@@ -208,7 +241,7 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                         <CardContent className="pt-6">
                             {groups.length === 0 ? (
                                 <div className="text-center py-8 text-muted-foreground text-sm">
-                                    No groups assigned to your account.
+                                    No groups with responses in your assigned conversations.
                                 </div>
                             ) : (
                                 <Table>
@@ -249,4 +282,4 @@ export default function Dashboard({ conversations, groups, report, selectedConve
     );
 }
 
-Dashboard.layout = (page: React.ReactNode) => <AppLayout breadcrumb="Synthesis Dashboard">{page}</AppLayout>;
+Dashboard.layout = (page: React.ReactNode) => <AppLayout breadcrumbs={[{ title: 'Synthesis Dashboard', href: '/synthesis' }]}>{page}</AppLayout>;

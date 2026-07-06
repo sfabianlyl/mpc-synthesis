@@ -26,7 +26,7 @@ import type { NavItem } from '@/types';
 
 function useNavItems(): NavItem[] {
     const { auth } = usePage().props;
-    const role = auth.user?.role;
+    const role = auth?.user?.role;
 
     const items: NavItem[] = [
         {

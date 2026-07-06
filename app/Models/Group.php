@@ -28,6 +28,9 @@ class Group extends Model
 
     /**
      * Get the synthesis team member assigned to this group.
+     *
+     * @deprecated Synthesis is now assigned at conversation level via conversation_members pivot table.
+     * Use User::assignedConversations() instead.
      */
     public function synthesis(): BelongsTo
     {

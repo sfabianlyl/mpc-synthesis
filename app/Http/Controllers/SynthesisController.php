@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Conversation;
 use App\Models\Group;
+use App\Models\Response;
 use App\Models\SynthesisReport;
 use App\Services\LlmService;
 use Illuminate\Http\Request;
@@ -13,21 +14,29 @@ use Inertia\Inertia;
 class SynthesisController extends Controller
 {
     /**
-     * Show the synthesis team dashboard with assigned groups and their responses for the selected session.
+     * Show the synthesis team dashboard with assigned conversations and their responses for the selected session.
      */
     public function index(Request $request)
     {
         $user = $request->user();
 
-        // Get all conversations (sessions) to populate select dropdown
-        $conversations = Conversation::orderBy('created_at', 'desc')->get(['id', 'title', 'status']);
-        
+        // Get all conversations (sessions) to populate select dropdown - filtered by assignment
+        if ($user->isAdmin()) {
+            $conversations = Conversation::orderBy('created_at', 'desc')->get(['id', 'title', 'status']);
+        } else {
+            $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+            $conversations = Conversation::whereIn('id', $conversationIds)
+                ->orderBy('created_at', 'desc')
+                ->get(['id', 'title', 'status']);
+        }
+
         if ($conversations->isEmpty()) {
             return Inertia::render('synthesis/dashboard', [
                 'conversations' => [],
                 'groups' => [],
                 'report' => null,
                 'selectedConversationId' => null,
+                'consensusSubmissions' => [],
             ]);
         }
 
@@ -39,23 +48,64 @@ class SynthesisController extends Controller
         }
         $selectedConversationId = (int) $selectedConversationId;
 
-        // Fetch groups assigned to this synthesis member
-        $groups = Group::where('synthesis_id', $user->id)
-            ->with(['responses' => function ($query) use ($selectedConversationId) {
-                $query->where('conversation_id', $selectedConversationId);
-            }])
-            ->get();
+        // Validate user has access to selected conversation
+        if (!$user->isAdmin()) {
+            $allowedIds = $user->assignedConversations()->pluck('conversations.id');
+            abort_unless($allowedIds->contains($selectedConversationId), 403, 'Access denied to this conversation.');
+        }
+        
+        // Get all groups for the selected conversation (not just assigned groups)
+        $allGroupsForConversation = Group::whereHas('responses', function ($query) use ($selectedConversationId) {
+            $query->where('conversation_id', $selectedConversationId);
+        })->with(['responses' => function ($query) use ($selectedConversationId) {
+            $query->where('conversation_id', $selectedConversationId);
+        }, 'facilitator'])->get();
+
+        // Build groups structure with responses from ALL synthesis members assigned to this conversation
+        $groups = $allGroupsForConversation->map(function ($group) {
+            return (object)[
+                'id' => $group->id,
+                'name' => $group->name,
+                'responses' => $group->responses,
+                'facilitator' => $group->facilitator,
+            ];
+        });
 
         // Fetch the synthesis report for this session and synthesis member
         $report = SynthesisReport::where('conversation_id', $selectedConversationId)
             ->where('synthesis_id', $user->id)
             ->first();
 
+        // Fetch consensus submission status from facilitators for the selected conversation
+        $consensusSubmissions = [];
+        if ($allGroupsForConversation->isNotEmpty()) {
+            $groupIds = $allGroupsForConversation->pluck('id');
+            $responses = Response::whereIn('group_id', $groupIds)
+                ->where('conversation_id', $selectedConversationId)
+                ->with(['facilitator', 'group'])
+                ->get();
+
+            // Group submissions by group_id
+            $consensusSubmissions = $responses->groupBy('group_id')->map(function ($groupResponses) {
+                return $groupResponses->map(function ($response) {
+                    return [
+                        'id' => $response->id,
+                        'facilitator_id' => $response->facilitator_id,
+                        'facilitator_name' => $response->facilitator?->name,
+                        'submitted_at' => $response->submitted_at?->toIso8601String(),
+                        'consensus_text' => $response->consensus_text,
+                        'is_submitted' => !is_null($response->submitted_at),
+                    ];
+                })->values()->toArray();
+            })->toArray();
+        }
+
         return Inertia::render('synthesis/dashboard', [
             'conversations' => $conversations,
             'groups' => $groups,
             'report' => $report,
             'selectedConversationId' => $selectedConversationId,
+            'consensusSubmissions' => $consensusSubmissions,
         ]);
     }
 
@@ -66,22 +116,67 @@ class SynthesisController extends Controller
     {
         $user = $request->user();
 
-        // Fetch the 5 groups assigned to this synthesis member, and their responses for this session
-        $groups = Group::where('synthesis_id', $user->id)
-            ->with(['responses' => function ($query) use ($conversation) {
-                $query->where('conversation_id', $conversation->id);
-            }, 'responses.facilitator'])
-            ->get();
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        // Fetch ALL groups for this conversation (not just assigned groups)
+        $allGroupsForConversation = Group::whereHas('responses', function ($query) use ($conversation) {
+            $query->where('conversation_id', $conversation->id);
+        })->with(['responses' => function ($query) use ($conversation) {
+            $query->where('conversation_id', $conversation->id);
+        }, 'responses.facilitator', 'facilitator'])->get();
+
+        // Build groups structure with responses from ALL synthesis members assigned to this conversation
+        $groups = $allGroupsForConversation->map(function ($group) {
+            return (object)[
+                'id' => $group->id,
+                'name' => $group->name,
+                'responses' => $group->responses,
+                'facilitator' => $group->facilitator,
+            ];
+        });
 
         $report = SynthesisReport::where('conversation_id', $conversation->id)
             ->where('synthesis_id', $user->id)
             ->first();
 
+        // Fetch consensus submission status from all facilitators for this conversation
+        $consensusSubmissions = [];
+        if ($allGroupsForConversation->isNotEmpty()) {
+            $groupIds = $allGroupsForConversation->pluck('id');
+            $responses = Response::whereIn('group_id', $groupIds)
+                ->where('conversation_id', $conversation->id)
+                ->with(['facilitator', 'group'])
+                ->get();
+
+            // Group submissions by group_id
+            $consensusSubmissions = $responses->groupBy('group_id')->map(function ($groupResponses) {
+                return $groupResponses->map(function ($response) {
+                    return [
+                        'id' => $response->id,
+                        'facilitator_id' => $response->facilitator_id,
+                        'facilitator_name' => $response->facilitator?->name,
+                        'submitted_at' => $response->submitted_at?->toIso8601String(),
+                        'consensus_text' => $response->consensus_text,
+                        'is_submitted' => !is_null($response->submitted_at),
+                    ];
+                })->values()->toArray();
+            })->toArray();
+        }
+
         return Inertia::render('synthesis/review', [
             'conversation' => $conversation,
+            'group' => (object)[
+                'id' => $conversation->id,
+                'name' => $conversation->title,
+            ],
             'groups' => $groups,
             'responses' => $groups->flatMap->responses,
             'report' => $report,
+            'consensusSubmissions' => $consensusSubmissions,
         ]);
     }
 
@@ -92,16 +187,28 @@ class SynthesisController extends Controller
     {
         $user = $request->user();
 
-        // Find assigned groups
-        $groupIds = Group::where('synthesis_id', $user->id)->pluck('id');
-
-        if ($groupIds->isEmpty()) {
-            return back()->withErrors(['analysis' => 'No groups are assigned to you.']);
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
         }
 
-        // Fetch responses from these groups for this session
-        $responses = \App\Models\Response::where('conversation_id', $conversation->id)
-            ->whereIn('group_id', $groupIds)
+        // Check if user has any assigned conversations
+        if ($user->assignedConversations()->isEmpty()) {
+            return back()->withErrors(['analysis' => 'No conversations are assigned to you.']);
+        }
+
+        // Get all group IDs that have responses in ANY of the user's assigned conversations
+        $assignedConversationIds = $user->assignedConversations()->pluck('conversations.id');
+        
+        // Get all responses from the selected conversation that belong to groups in assigned conversations
+        $responses = Response::where('conversation_id', $conversation->id)
+            ->whereIn('group_id', function ($query) use ($assignedConversationIds) {
+                $query->select('group_id')
+                    ->from('responses')
+                    ->whereIn('conversation_id', $assignedConversationIds)
+                    ->distinct();
+            })
             ->with('group')
             ->get();
 
@@ -164,7 +271,9 @@ class SynthesisController extends Controller
             ]
         );
 
-        return back()->with('success', 'LLM analysis completed successfully using '.$result['provider'].' provider.');
+        // Re-render the review page with updated report data
+        return Inertia::route('synthesis.review', [$conversation])
+            ->with('success', 'LLM analysis completed successfully using '.$result['provider'].' provider.');
     }
 
     /**
@@ -174,8 +283,10 @@ class SynthesisController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->isAdmin() && $report->synthesis_id !== $user->id) {
-            abort(403, 'You do not own this report.');
+        // Authorization: check if user owns the report or is admin, OR is assigned to the conversation
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && $report->synthesis_id !== $user->id && !$conversationIds->contains($report->conversation_id)) {
+            abort(403, 'You do not have access to this report.');
         }
 
         $validated = $request->validate([
@@ -197,8 +308,10 @@ class SynthesisController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->isAdmin() && $report->synthesis_id !== $user->id) {
-            abort(403, 'You do not own this report.');
+        // Authorization: check if user owns the report or is admin, OR is assigned to the conversation
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && $report->synthesis_id !== $user->id && !$conversationIds->contains($report->conversation_id)) {
+            abort(403, 'You do not have access to this report.');
         }
 
         $report->update(['status' => 'submitted']);
@@ -212,7 +325,7 @@ class SynthesisController extends Controller
     private function extractJsonFromLlmResponse(string $content): ?array
     {
         $stripped = preg_replace('/^```(?:json)?\s*/', '', $content);
-        $stripped = preg_replace('/\s*```$/', '', $stripped);
+        $stripped = preg_replace('/\s*`$/', '', $stripped);
 
         $decoded = json_decode($stripped, true);
         if ($decoded !== null && is_array($decoded)) {

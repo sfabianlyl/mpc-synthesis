@@ -2,176 +2,188 @@
 
 namespace Database\Seeders;
 
+use App\Models\Event;
 use App\Models\Conversation;
-use App\Models\FinalDocument;
+use App\Models\User;
 use App\Models\Group;
 use App\Models\Response;
 use App\Models\SynthesisReport;
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
-     * Seed the application's database.
+     * Seed the application's database with demo data for Malaysian Pastoral Convention.
      */
     public function run(): void
     {
-        // ─── 1. Ensure Admin User Exists ────────────────────────────
+        // ─── 1. Admin User ──────────────────────────────────────────
         $this->call(AdminUserSeeder::class);
 
-        // ─── 2. Create Additional Roles ─────────────────────────────
-        $drafter = User::factory()->create([
-            'name' => 'Drafter User',
-            'email' => 'drafter@example.com',
-            'role' => 'drafter',
+        // ─── 2. Create Event: Malaysian Pastoral Convention (MPC) ───
+        $event = Event::create([
+            'title' => 'Malaysian Pastoral Convention (MPC)',
+            'description' => 'A national pastoral convention for discernment and synodality.',
+            'start_date' => now()->subDays(30),
+            'end_date' => now()->subDays(28),
+            'location' => 'Kuala Lumpur, Malaysia',
+            'status' => 'active',
         ]);
 
-        // Create 20 Synthesis Team Members
-        $synthesisUsers = [];
-        for ($i = 1; $i <= 20; $i++) {
-            $synthesisUsers[] = User::factory()->create([
-                'name' => "Synthesis Member {$i}",
-                'email' => "synthesis{$i}@example.com",
-                'role' => 'synthesis',
-            ]);
-        }
+        // ─── 3. Create 3 Conversations (CIS 1, CIS 2, CIS 3) ───────
+        $conversations = [
+            Conversation::create([
+                'event_id' => $event->id,
+                'title' => 'CIS 1',
+                'description' => 'First session of discernment.',
+                'status' => 'completed',
+            ]),
+            Conversation::create([
+                'event_id' => $event->id,
+                'title' => 'CIS 2',
+                'description' => 'Second session of discernment.',
+                'status' => 'active',
+            ]),
+            Conversation::create([
+                'event_id' => $event->id,
+                'title' => 'CIS 3',
+                'description' => 'Third session of discernment.',
+                'status' => 'active',
+            ]),
+        ];
 
-        // Create 100 Facilitator Users
+        // ─── 4. Create 7 Group Facilitators (Users with role 'facilitator') ──
         $facilitators = [];
-        for ($i = 1; $i <= 100; $i++) {
+        for ($i = 1; $i <= 7; $i++) {
             $facilitators[] = User::factory()->create([
                 'name' => "Facilitator {$i}",
-                'email' => "facilitator{$i}@example.com",
+                'email' => "facilitator{$i}@mpc.demo",
                 'role' => 'facilitator',
             ]);
         }
 
-        // ─── 2. Create 100 Groups ───────────────────────────────────
-        $groups = [];
-        for ($i = 1; $i <= 100; $i++) {
-            // Each synthesis member gets 5 groups (100 / 20 = 5 groups per synthesis member)
-            $synthesisIndex = (int) (($i - 1) / 5);
-            $synthesisId = $synthesisUsers[$synthesisIndex]->id;
-            $facilitatorId = $facilitators[$i - 1]->id;
+        // ─── 5. Create 2 Synthesis Team Members (Users with role 'synthesis') ──
+        $synthesisMembers = [
+            User::factory()->create([
+                'name' => 'Synthesis Member A',
+                'email' => 'synthesis1@mpc.demo',
+                'role' => 'synthesis',
+            ]),
+            User::factory()->create([
+                'name' => 'Synthesis Member B',
+                'email' => 'synthesis2@mpc.demo',
+                'role' => 'synthesis',
+            ]),
+        ];
 
+        User::factory()->create([
+                'name' => 'Drafter 1',
+                'email' => 'drafter1@mpc.demo',
+                'role' => 'drafter',
+            ]);
+
+        // ─── 6. Create 7 Groups (one per facilitator) ───────────────
+        $groups = [];
+        for ($i = 1; $i <= 7; $i++) {
             $groups[] = Group::create([
-                'name' => "Group " . str_pad((string)$i, 3, '0', STR_PAD_LEFT),
-                'synthesis_id' => $synthesisId,
-                'facilitator_id' => $facilitatorId,
+                'name' => "Group {$i}",
+                'facilitator_id' => $facilitators[$i - 1]->id,
             ]);
         }
 
-        // ─── 3. Create Conversations (Sessions) ─────────────────────
-        $conv1 = Conversation::create([
-            'title' => 'Session 1: Communion & Digital Outreach',
-            'description' => 'Discerning how the parish can build communion and extend its outreach digitally.',
-            'status' => 'completed',
-        ]);
+        // ─── 6b. Assign conversations to synthesis members via pivot table ──
+        // Synthesis Member A gets CIS 1 and CIS 2
+        $conversations[0]->synthesisMembers()->attach($synthesisMembers[0]->id); // CIS 1 -> A
 
-        $conv2 = Conversation::create([
-            'title' => 'Session 2: Co-responsibility in Mission',
-            'description' => 'Fostering participation and co-responsibility among lay members and clergy.',
-            'status' => 'active',
-        ]);
+        // Synthesis Member B gets CIS 2 and CIS 3
+        $conversations[1]->synthesisMembers()->attach($synthesisMembers[1]->id); // CIS 2 -> B
 
-        $conv3 = Conversation::create([
-            'title' => 'Session 3: Future Governance & Discernment',
-            'description' => 'Reviewing governance structures and paths for collective discernment.',
-            'status' => 'active',
-        ]);
+        // ─── 7. Create Responses for CIS 2 (7 group consensus paragraphs) ──
+        $cis2 = $conversations[1]; // CIS 2
 
-        // ─── 4. Seed Data for Session 1 (Completed) ──────────────────
-        // 100 responses (1 per group)
-        $responsesSession1 = [];
-        $communionTemplates = [
-            'Our group highlighted the vital role of welcoming environments and clear communication in building parish communion. We suggest creating digital welcoming packages for new residents and utilising social media channels to stream services.',
-            'We consensus that digital outreach should support, rather than replace, physical gatherings. Parishioners appreciate hybrid prayer meetings, but urge caution about digital isolation.',
-            'Digital ministries require training and support. Our group proposes establishing a dedicated IT and media ministry team to assist elderly members in accessing online parish resources.',
-            'We discussed the beauty of online liturgy broadcasts, which kept homebound members connected. We believe parish newsletters should be modernised and distributed via email listservs.',
-            'A strong communion is built on mutual support. Digital forums can help coordinate parish care networks, connecting volunteers with those in need of assistance.',
+        $consensusTexts = [
+            // Group 1 → Consensus 1
+            'As a group we have discerned that as an institutional church we are not providing enough pastoral accompaniment for families. Efforts to support families are mainly event based or once off. We lack the courage to speak of irregular family situations. The complexity of the modern family requires collaborative ministries for pastoral accompaniment and support. We recommend action for the possibility of our parishes to become hubs for family support such as counselling, after school programmes to keep children in irregular family situations away from questionable company, grief and survivor groups. More initiative must be made towards regular visits to families who are going through difficult moments.',
+
+            // Group 2 → Consensus 2
+            'Our consensus for CIS-2 is that we agreed that Catholic families in general are losing their way in maintaining and defending their identity as a catholic family. The counter identity which has become a regular occupant in mainstream media, social media and the online gaming world poses a threat to the nurturing minds of our young and sometimes even old. The institutional church needs to create a more dialogue-able approach when preaching on related matters. The neighbourhood church (BEC) needs to be supportive to each other. But for a more sustainable effort, the mission requires a full time and dedicated person to accompany families in irregular circumstances. The dioceses and parishes need to redefine their monetary priority to provide for just wages to bring on board people for the mission.',
+
+            // Group 3 → Consensus 3
+            'We agreed collectively that more learning is required among our church\'s leadership. There needs to be more understanding of the current realities, more understanding of the culture and traditions in sabah, sarawak and semenanjung. Perhaps some clergy should be working beyond the parish or diocese boundaries such as in NGOs, schools, community centres in order to be relevant and to be first responders. As a church we need to overhaul our way of reaching out. Regardless if we are planning to be the first responders to the specialised help, we must be trained, qualified and certified for the mission. Much of our services in church are executed by caring and dedicated people who fall into burnt out or into blunder simply because they were not trained for the mission. We need to relook at our priorities and spend money for the mission.',
+
+            // Group 4 → Consensus 4
+            'We unanimously agree that it is time for more young people to take up leadership in our parishes and dioceses. Young people around the ages of 25 to 45 have better insights and are exposed to newer ways of managing and executing plans. The ever fast moving world we live in does not stop for the older generation to catch up and so the younger generation have an upper hand in responding quickly. That being said, we do not recommend removing the older generation from the equation but to redefine roles, so that both the young generation and the older generation may work together in tandem and not in competition for the greater glory of the mission.',
+
+            // Group 5 → Consensus 5
+            'As a group we divided on opposing points in regards to listening to the voices of the "excluded". A strong minority of the group believes that we need to be talking about what is regarded as taboo such as LGBTQIA+, alcoholism, rape, sex, bullying and even improper sexual behaviours. Giving people an outlet to name their demons, and a language to articulate themself is both ways towards justice and healing. Our church communities should be safe havens for victims and survivors not only for their benefit but also for the benefit of others who are being groomed, abused or suffering in any kind of way. The opposing concern in the group is that this may lead to the questioning of ingenuity and integrity of the victims and survivors. This may lead them into another conflict and crisis. We as a group however do agree that we as a church need to send more priests, religious and laity to training and studies on this matter before establishing a mission or commission.',
+
+            // Group 6 → Consensus 6
+            'Our group is unanimous in our discernment that if we want a whole sustainable plan for the mission of the church, we need more employed lay workers. The only hold back that this group recognizes is funding. We propose that we must deep dive into the cost and funding that goes into our clergy, existing employed workforce, pastoral and otherwise. Are we holding back to satisfy and accommodate our selfish desires and to stay within our comfort zone?',
+
+            // Group 7 → Consensus 7
+            'As a group we have discerned that the job description of the parish priest must be listed out in detail and made available to the public. The role of the parish priest can not and should be vague nor up to each parish priest to decide for himself. In order to uphold the integrity of the priesthood and the transparency and accountability of the priest, priests too must be reviewed formally, of their work by the bishop and the parish community. Methods and processes driven by each parish priest must also be evaluated to identify if synodality is resisted or incorporated in their ministry. Our group does present this consensus as an attack on the clergy but as a safeguarding measure against some bad apples in the bunch.',
         ];
 
         foreach ($groups as $index => $group) {
-            $text = $communionTemplates[$index % count($communionTemplates)] . ' (Group ' . ($index + 1) . ')';
-            $responsesSession1[] = Response::create([
-                'conversation_id' => $conv1->id,
+            Response::create([
+                'conversation_id' => $cis2->id,
                 'group_id' => $group->id,
                 'facilitator_id' => $group->facilitator_id,
-                'consensus_text' => $text,
+                'consensus_text' => $consensusTexts[$index],
                 'submitted_at' => now()->subDays(5),
             ]);
         }
 
-        // 20 Synthesis reports (1 per synthesis member, compiling their 5 assigned groups)
-        foreach ($synthesisUsers as $index => $synthesisMember) {
-            SynthesisReport::create([
-                'conversation_id' => $conv1->id,
-                'synthesis_id' => $synthesisMember->id,
-                'convergence_text' => "Convergence from groups " . (($index * 5) + 1) . " to " . (($index * 5) + 5) . ":\n- Unanimous support for leveraging digital platforms to keep homebound parishioners connected.\n- Agreement that digital tools should enhance real communion, not replace face-to-face interaction.",
-                'consideration_text' => "Matters for Consideration:\n- Concerns regarding digital exclusion of the elderly who may lack internet literacy.\n- Risk of superficial online engagement substituting for deep community involvement.",
-                'proposals_text' => "Proposals:\n1. Establish digital training workshops for seniors.\n2. Create a hybrid system of physical and online newsletters.\n3. Form a digital media ministry to manage communications.",
-                'llm_generated' => true,
-                'status' => 'submitted',
-            ]);
-        }
-
-        // Seed a booklet for Session 1
-        $booklet = FinalDocument::create([
-            'title' => 'Synthesis Booklet — Session 1: Communion & Digital Outreach',
-            'content_json' => [
-                'emerging_themes' => 'Major themes identified include the digital divide, hybrid parish life, and training requirements.',
-                'key_convergences' => 'General consensus that online tools are a blessing for outreach but require pastoral coordination.',
-                'critical_considerations' => 'Fears of creating a two-tier parish (tech-savvy vs. offline).',
-                'priority_proposals' => 'Forming tech guilds and parish email circulars.',
-            ],
-            'emerging_themes' => 'Major themes identified include the digital divide, hybrid parish life, and training requirements.',
-            'created_by' => $drafter->id,
+        // ─── 8. Create Synthesis Reports for CIS 2 ──────────────────
+        // Synthesis Member A: reports for Groups 1-4 (4 responses)
+        SynthesisReport::create([
+            'conversation_id' => $cis2->id,
+            'synthesis_id' => $synthesisMembers[0]->id,
+            'convergence_text' => "Convergence from Groups 1-4:\n- Strong concern about lack of pastoral accompaniment for families and irregular situations.\n- Recognition that Catholic families are losing their identity in a secular media landscape.\n- Call for more leadership training and cultural understanding across Sabah, Sarawak, and Semenanjung.\n- Urgent need for young people (ages 25-45) to take up leadership roles alongside the older generation.",
+            'consideration_text' => "Matters for Consideration:\n- Need for trained, qualified, and certified personnel for pastoral work to prevent burnout.\n- Funding challenges for employing more lay workers and redefining monetary priorities.\n- Tension between addressing taboo topics and protecting victims from further harm.",
+            'proposals_text' => "Proposals:\n1. Establish parish hubs for family support (counselling, after-school programmes, grief groups).\n2. Deploy full-time dedicated persons to accompany families in irregular circumstances.\n3. Redefine roles to enable young and older generations to work together in tandem.\n4. Train, qualify, and certify clergy and laity for specialised pastoral missions.",
+            'llm_generated' => true,
+            'status' => 'submitted',
         ]);
-        $booklet->conversations()->attach($conv1->id);
 
-        // ─── 5. Seed Data for Session 2 (Active) ─────────────────────
-        // 80 responses submitted, 20 pending
-        $coresponsibilityTemplates = [
-            'Our group discussed lay participation. There is a strong feeling that laity should have a greater voice in decision-making bodies like parish finance committees.',
-            'Clergy and laity need to work in close partnership. We propose regular joint reflection days to build trust and shared vision for our parish mission.',
-            'Laity are eager to offer their professional skills (management, finance, teaching) to the parish. We need structured channels to onboard volunteer talents.',
-            'Co-responsibility means empowering youth. The group suggests establishing a parish youth council with direct representation on the main council.',
-            'Tensions sometimes arise between traditional clerical roles and lay leadership. We need clear guidelines defining responsibilities and authority.',
-        ];
+        // Synthesis Member B: reports for Groups 5-7 (3 responses)
+        SynthesisReport::create([
+            'conversation_id' => $cis2->id,
+            'synthesis_id' => $synthesisMembers[1]->id,
+            'convergence_text' => "Convergence from Groups 5-7:\n- Divided but earnest discussion on listening to the voices of the 'excluded', including taboo topics.\n- Unanimous agreement on the need for more employed lay workers, with funding as a key concern.\n- Call for clear job descriptions for parish priests and formal review mechanisms for accountability and synodality.",
+            'consideration_text' => "Matters for Consideration:\n- Risk of questioning the integrity of victims and survivors if taboo topics are opened.\n- Funding constraints and whether current priorities reflect true mission commitment.\n- Balancing transparency/accountability with pastoral sensitivity for clergy.",
+            'proposals_text' => "Proposals:\n1. Create safe havens and outlets for victims and survivors, with proper training for church responders.\n2. Conduct a deep dive into cost and funding allocation for clergy vs. lay workforce.\n3. Publish detailed job descriptions for parish priests and establish formal review processes.",
+            'llm_generated' => true,
+            'status' => 'submitted',
+        ]);
 
-        for ($i = 0; $i < 80; $i++) {
-            $group = $groups[$i];
-            $text = $coresponsibilityTemplates[$i % count($coresponsibilityTemplates)] . ' (Group ' . ($i + 1) . ')';
-            Response::create([
-                'conversation_id' => $conv2->id,
-                'group_id' => $group->id,
-                'facilitator_id' => $group->facilitator_id,
-                'consensus_text' => $text,
-                'submitted_at' => now()->subDays(1),
-            ]);
-        }
+        // ─── 9. Seed minimal data for CIS 1 and CIS 3 (placeholder) ─
+        $cis1 = $conversations[0];
+        $cis3 = $conversations[2];
 
-        // 20 Synthesis reports (some draft, some submitted, some pending)
-        // Let's create reports for the first 16 synthesis members (covering groups 1-80)
-        for ($index = 0; $index < 16; $index++) {
-            $synthesisMember = $synthesisUsers[$index];
-            // Synthesis 0-10 will be submitted, 11-15 will be draft
-            $status = $index < 10 ? 'submitted' : 'draft';
-            
-            SynthesisReport::create([
-                'conversation_id' => $conv2->id,
-                'synthesis_id' => $synthesisMember->id,
-                'convergence_text' => "Convergence on Co-responsibility (groups " . (($index * 5) + 1) . " to " . (($index * 5) + 5) . "):\n- Broad desire for lay involvement in administrative roles.\n- Recognition of lay professionals as an untapped parish asset.",
-                'consideration_text' => "Matters for Consideration:\n- Need for clear boundary lines between clerical decision-making and lay advisory roles.\n- Risk of lay burnout if responsibilities are transferred without adequate support.",
-                'proposals_text' => "Proposals:\n1. Open finance committee positions to qualified lay professionals.\n2. Standardise volunteer onboarding and training.\n3. Implement annual joint clergy-lay retreats.",
-                'llm_generated' => $status === 'submitted',
-                'status' => $status,
-            ]);
-        }
+        // CIS 1: one sample response from Group 1
+        Response::create([
+            'conversation_id' => $cis1->id,
+            'group_id' => $groups[0]->id,
+            'facilitator_id' => $groups[0]->facilitator_id,
+            'consensus_text' => '[Placeholder] Our group discerned the importance of building communion through digital outreach and welcoming environments for all parishioners.',
+            'submitted_at' => now()->subDays(25),
+        ]);
+
+        // CIS 3: one sample response from Group 1
+        Response::create([
+            'conversation_id' => $cis3->id,
+            'group_id' => $groups[0]->id,
+            'facilitator_id' => $groups[0]->facilitator_id,
+            'consensus_text' => '[Placeholder] Our group reflected on the future governance of the church and the need for inclusive discernment processes.',
+            'submitted_at' => now()->subDays(20),
+        ]);
+
+        $this->command->info('Demo data seeded successfully!');
+        $this->command->info('Event: Malaysian Pastoral Convention (MPC)');
+        $this->command->info('Conversations: CIS 1, CIS 2, CIS 3');
+        $this->command->info('Groups: 7 (Group 1-7)');
+        $this->command->info('Synthesis Member A: CIS 1, CIS 2 | Synthesis Member B: CIS 2, CIS 3');
+        $this->command->info('CIS 2 has 7 group responses with full consensus texts.');
     }
 }

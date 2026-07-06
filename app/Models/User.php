@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Conversation> $assignedConversations
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Group> $assignedGroups
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisReport> $synthesisReports
  * @property-read Group|null $facilitatorGroup
@@ -118,5 +120,28 @@ class User extends Authenticatable
     public function synthesisReports(): HasMany
     {
         return $this->hasMany(SynthesisReport::class, 'synthesis_id');
+    }
+    
+    /**
+     * Get the conversations this user is assigned to as a synthesis member.
+     */
+    public function assignedConversations(): BelongsToMany
+    {
+        return $this->belongsToMany(Conversation::class, 'conversation_members', 'user_id', 'conversation_id')
+            ->withTimestamps();
+    }
+    
+    /**
+     * Get all accessible responses for this user.
+     * Admins get all responses; synthesis members get responses from assigned conversations.
+     */
+    public function getAccessibleResponses(): \Illuminate\Database\Eloquent\Collection
+    {
+        if ($this->isAdmin()) {
+            return \App\Models\Response::all();
+        }
+        
+        $conversationIds = $this->assignedConversations()->pluck('conversations.id');
+        return \App\Models\Response::whereIn('conversation_id', $conversationIds)->get();
     }
 }

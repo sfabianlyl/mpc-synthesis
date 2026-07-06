@@ -245,4 +245,42 @@ Return your analysis as a JSON object:
 Be analytical and thorough. This analysis will inform a final synthesis document.
 PROMPT;
     }
+
+    /**
+     * Generate text using the LLM with a default system prompt.
+     * Convenience wrapper around query() for single-turn text generation.
+     *
+     * @param  string  $userPrompt  The user-supplied content/prompt
+     * @return string The LLM's response content
+     */
+    public function generateText(string $userPrompt): string
+    {
+        $result = $this->query(
+            'You are a helpful, informative assistant. Respond with accurate, well-structured information.',
+            $userPrompt
+        );
+
+        return $result['content'];
+    }
+
+    /**
+     * Generate a chat response based on user message and context from submitted consensus responses.
+     *
+     * @param  string  $userMessage  The admin's question/message
+     * @param  string  $context  All submitted consensus responses formatted as text
+     * @return string The LLM's response
+     */
+    public function generateChatResponse(string $userMessage, string $context): string
+    {
+        $prompt = 'You are a helpful assistant analyzing public consultation responses. You have been provided with the following consensus submissions from various groups during a consultation session.'."\n\n"
+            .'=== SUBMITTED CONSENSUS RESPONSES ==='."\n\n"
+            .$context."\n\n"
+            .'=== END OF SUBMISSIONS ==='."\n\n"
+            .'Based on the submitted responses above, please answer the following question:'."\n\n"
+            .$userMessage."\n\n"
+            .'Please provide a helpful, informative response that synthesizes the relevant information from the submissions. Be specific and reference key points where appropriate.';
+
+        // Use existing generateText() method with the built prompt
+        return $this->generateText($prompt);
+    }
 }

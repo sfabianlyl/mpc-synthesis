@@ -21,6 +21,10 @@ class ConversationsTable
                     ->searchable()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('synthesisMembersCount')
+                    ->label('Synthesis Members')
+                    ->counts('synthesisMembers')
+                    ->toggleable(),
                 TextColumn::make('status')
                     ->badge()
                     ->searchable()

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleAppearance;
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,10 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
-        // Remove HandleInertiaRequests from global middleware to avoid conflict with Filament admin panel.
-        // Inertia is only used by the frontend routes defined in routes/web.php.
+        // Apply HandleInertiaRequests to share Inertia data (auth, flash, etc.) with frontend.
+        // The admin/* exclusion in HandleInertiaRequests prevents conflicts with Filament.
         $middleware->web(append: [
             HandleAppearance::class,
+            HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 

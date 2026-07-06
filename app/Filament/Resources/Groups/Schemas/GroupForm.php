@@ -14,8 +14,6 @@ class GroupForm
             ->components([
                 TextInput::make('name')
                     ->required(),
-                Select::make('synthesis_id')
-                    ->relationship('synthesis', 'name'),
                 Select::make('facilitator_id')
                     ->relationship('facilitator', 'name'),
             ]);

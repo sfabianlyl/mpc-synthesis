@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DrafterController;
 use App\Http\Controllers\ResponseController;
 use App\Http\Controllers\SynthesisController;
@@ -32,19 +33,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('report/{report}/submit', [SynthesisController::class, 'submit'])->name('report.submit');
     });
 
-    // ─── Drafter Dashboard & Drafting ──────────────────────────────────
+    // ─── Drafter Dashboard & Drafting ─────────────────────���────────────
     Route::middleware('role:drafter')->prefix('drafter')->name('drafter.')->group(function () {
         Route::get('/', [DrafterController::class, 'index'])->name('dashboard');
         Route::get('report/{report}', [DrafterController::class, 'show'])->name('report.show');
         Route::post('global-synthesis', [DrafterController::class, 'globalSynthesis'])->name('global-synthesis');
 
-        // Export Page Route
-        Route::get('export', function () {
-            return inertia('drafter/export');
-        })->name('export.page');
-
+        // Export Page Routes
+        Route::get('export', [DrafterController::class, 'export'])->name('export.page');
         Route::get('export/{document}', [DrafterController::class, 'export'])->name('export');
         Route::get('export/{document}/pdf', [DrafterController::class, 'downloadPdf'])->name('export.pdf');
+    });
+
+    // ─── Admin Chat Routes ────────────────────────────────────────────
+    Route::middleware('role:admin')->prefix('admin/chat')->name('admin.chat.')->group(function () {
+        Route::get('/', [AdminController::class, 'chat'])->name('/');
+        Route::get('/details', [AdminController::class, 'chatDetails'])->name('.details');
+        Route::post('/message', [AdminController::class, 'chatMessage'])->name('.message');
     });
 });
 

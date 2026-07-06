@@ -2,20 +2,29 @@ import { Head, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface PageProps {
-    group: any; // Current group details
+    conversation: any;
+    groups: any[];
     responses: any[];
     report: any;
     success?: string;
     errors?: Record<string, string>;
+    consensusSubmissions: Record<number, any[]>;
 }
 
-export default function Review({ group, responses, report, success: initialSuccess, errors: initialErrors }: PageProps) {
+export default function Review({
+    conversation,
+    groups,
+    responses,
+    report,
+    success: initialSuccess,
+    errors: initialErrors,
+    consensusSubmissions = {},
+}: PageProps) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [analysisMessage, setAnalysisMessage] = useState('');
@@ -27,7 +36,6 @@ export default function Review({ group, responses, report, success: initialSucce
         if (initialSuccess) {
             setAnalysisStatus('success');
             setAnalysisMessage(initialSuccess);
-            // Refresh report data from props if available via page reload
             setTimeout(() => {
                 setAnalysisStatus('idle');
                 setAnalysisMessage('');
@@ -47,88 +55,135 @@ export default function Review({ group, responses, report, success: initialSucce
         setIsAnalyzing(true);
         setAnalysisStatus('idle');
         setAnalysisMessage('');
-        router.post(`/synthesis/analyze/${group.id}`, {}, {
-            onSuccess: (page: any) => {
-                const newReport = page.props.report;
-                if (newReport) {
-                    setConvergenceText((newReport.convergence_text as string) ?? '');
-                    setConsiderationText((newReport.consideration_text as string) ?? '');
-                    setProposalsText((newReport.proposals_text as string) ?? '');
-                }
-                setIsAnalyzing(false);
-                setAnalysisStatus('success');
-                setAnalysisMessage('LLM analysis completed successfully using ' + (page.props?.provider || 'unknown') + ' provider.');
-            },
-            onError: (errors) => {
-                setIsAnalyzing(false);
-                setAnalysisStatus('error');
-                setAnalysisMessage(errors.analysis || 'Analysis failed. Please try again.');
-            },
-        });
+        router.post(
+            `/synthesis/analyze/${conversation.id}`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: (page: any) => {
+                    const newReport = page.props.report;
+                    if (newReport) {
+                        setConvergenceText((prev: string) => {
+                            const newText = newReport.convergence_text ?? '';
+                            return newText ? (prev ? prev + '\n\n' + newText : newText) : prev;
+                        });
+                        setConsiderationText((prev: string) => {
+                            const newText = newReport.consideration_text ?? '';
+                            return newText ? (prev ? prev + '\n\n' + newText : newText) : prev;
+                        });
+                        setProposalsText((prev: string) => {
+                            const newText = newReport.proposals_text ?? '';
+                            return newText ? (prev ? prev + '\n\n' + newText : newText) : prev;
+                        });
+                    }
+                    setIsAnalyzing(false);
+                    setAnalysisStatus('success');
+                    setAnalysisMessage(
+                        'LLM analysis completed successfully using ' + (page.props?.provider || 'unknown') + ' provider.'
+                    );
+                },
+                onError: (errors) => {
+                    setIsAnalyzing(false);
+                    setAnalysisStatus('error');
+                    setAnalysisMessage(errors.analysis || 'Analysis failed. Please try again.');
+                },
+            }
+        );
     };
 
     const handleSaveReport = () => {
         if (!report?.id) return;
-        router.patch(`/synthesis/report/${report.id}`, {
-            convergence_text: convergenceText,
-            consideration_text: considerationText,
-            proposals_text: proposalsText,
-        }, {
-            onSuccess: () => {
-                setAnalysisStatus('success');
-                setAnalysisMessage('Report saved successfully.');
-                setTimeout(() => {
-                    setAnalysisStatus('idle');
-                    setAnalysisMessage('');
-                }, 3000);
+        router.patch(
+            `/synthesis/report/${report.id}`,
+            {
+                convergence_text: convergenceText,
+                consideration_text: considerationText,
+                proposals_text: proposalsText,
             },
-            onError: () => {
-                setAnalysisStatus('error');
-                setAnalysisMessage('Failed to save report. Please try again.');
-            },
-        });
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setAnalysisStatus('success');
+                    setAnalysisMessage('Report saved successfully.');
+                    setTimeout(() => {
+                        setAnalysisStatus('idle');
+                        setAnalysisMessage('');
+                    }, 3000);
+                },
+                onError: () => {
+                    setAnalysisStatus('error');
+                    setAnalysisMessage('Failed to save report. Please try again.');
+                },
+            }
+        );
     };
 
     const handleStatusUpdate = (status: 'draft' | 'reviewed' | 'submitted') => {
         if (!report?.id) return;
-        router.patch(`/synthesis/report/${report.id}`, { status }, {
-            onSuccess: () => {
-                setAnalysisStatus('success');
-                setAnalysisMessage(`Report marked as ${status}.`);
-                setTimeout(() => {
-                    setAnalysisStatus('idle');
-                    setAnalysisMessage('');
-                }, 3000);
-            },
-            onError: () => {
-                setAnalysisStatus('error');
-                setAnalysisMessage(`Failed to update status.`);
-            },
-        });
+        router.patch(
+            `/synthesis/report/${report.id}`,
+            { status },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setAnalysisStatus('success');
+                    setAnalysisMessage(`Report marked as ${status}.`);
+                    setTimeout(() => {
+                        setAnalysisStatus('idle');
+                        setAnalysisMessage('');
+                    }, 3000);
+                },
+                onError: () => {
+                    setAnalysisStatus('error');
+                    setAnalysisMessage('Failed to update status.');
+                },
+            }
+        );
     };
+
+    // Collect all consensus submissions from the groups
+    const allConsensusSubmissions: any[] = [];
+    for (const group of groups) {
+        const submissions = consensusSubmissions[group.id] || [];
+        for (const submission of submissions) {
+            allConsensusSubmissions.push({
+                ...submission,
+                groupName: group.name,
+                groupId: group.id,
+            });
+        }
+    }
 
     return (
         <>
-            <Head title={`Review - ${group?.name}`} />
-            <div className="p-8 max-w-6xl mx-auto">
+            <Head title={`Review - ${conversation?.title || 'Synthesis Review'}`} />
+            <div className="p-8 max-w-[1920px] mx-auto">
+                {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold">{group?.name}</h1>
-                    <p className="text-muted-foreground">Group ID: {group?.id}</p>
+                    <h1 className="text-3xl font-bold">{conversation?.title}</h1>
+                    <p className="text-muted-foreground mt-1">Conversation ID: {conversation?.id}</p>
                     {report && (
-                        <Badge variant={report.status === 'submitted' ? 'default' : 'secondary'} className="mt-2">
+                        <Badge
+                            variant={report.status === 'submitted' ? 'default' : 'secondary'}
+                            className="mt-2"
+                        >
                             Status: {report.status}
-                            {report.llm_generated && <span className="ml-1 text-xs">(LLM Generated)</span>}
+                            {report.llm_generated && (
+                                <span className="ml-1 text-xs">(LLM Generated)</span>
+                            )}
                         </Badge>
                     )}
                 </div>
 
                 {/* Analysis Status Indicator */}
                 {analysisStatus !== 'idle' && (
-                    <div className={`mb-6 flex items-center gap-2 p-4 rounded-lg border ${
-                        analysisStatus === 'success'
-                            ? 'bg-green-50 border-green-200 text-green-800'
-                            : 'bg-red-50 border-red-200 text-red-800'
-                    }`}>
+                    <div
+                        className={`mb-6 flex items-center gap-2 p-4 rounded-lg border ${
+                            analysisStatus === 'success'
+                                ? 'bg-green-50 border-green-200 text-green-800'
+                                : 'bg-red-50 border-red-200 text-red-800'
+                        }`}
+                    >
                         {analysisStatus === 'success' ? (
                             <CheckCircle2 className="h-5 w-5" />
                         ) : (
@@ -138,90 +193,177 @@ export default function Review({ group, responses, report, success: initialSucce
                     </div>
                 )}
 
-                <Tabs defaultValue="responses" className="w-full">
-                    <TabsList>
-                        <TabsTrigger value="responses">Responses</TabsTrigger>
-                        <TabsTrigger value="synthesis">Synthesis Review</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="responses">
+                {/* 2-Column Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Left Column - Submitted Consensus */}
+                    <div className="space-y-4">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Submitted Responses</CardTitle>
+                                <CardTitle className="flex items-center gap-2">
+                                    <FileText className="h-5 w-5" />
+                                    Submitted Consensus
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent>
-                                {responses.length > 0 ? (
-                                    responses.map((res: any) => (
-                                        <div key={res.id} className="border-b pb-4 mb-4 last:border-0">
-                                            <div className="flex justify-between text-sm text-muted-foreground mb-2">
-                                                <span>{res.submitter?.name || 'Anonymous'}</span>
-                                                <span>{new Date(res.submitted_at).toLocaleDateString()}</span>
+                            <CardContent className="space-y-4">
+                                {allConsensusSubmissions.length > 0 ? (
+                                    allConsensusSubmissions.map((submission: any, index: number) => (
+                                        <div
+                                            key={`${submission.facilitator_id}-${index}`}
+                                            className="border rounded-lg p-4 bg-card"
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <p className="font-medium text-sm">
+                                                        {submission.facilitator_name || 'Anonymous'}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Group: {submission.groupName}
+                                                    </p>
+                                                </div>
+                                                <Badge
+                                                    variant={submission.is_submitted ? 'default' : 'secondary'}
+                                                    className="text-xs"
+                                                >
+                                                    {submission.is_submitted ? (
+                                                        <span className="flex items-center gap-1">
+                                                            <CheckCircle2 className="h-3 w-3" /> Submitted
+                                                        </span>
+                                                    ) : (
+                                                        <span className="flex items-center gap-1">
+                                                            <XCircle className="h-3 w-3" /> Pending
+                                                        </span>
+                                                    )}
+                                                </Badge>
                                             </div>
-                                            <p className="whitespace-pre-wrap">{res.consensus_text}</p>
+                                            {submission.submitted_at && (
+                                                <p className="text-xs text-muted-foreground mb-2">
+                                                    Submitted: {new Date(submission.submitted_at).toLocaleString()}
+                                                </p>
+                                            )}
+                                            <p className="text-sm whitespace-pre-wrap bg-muted/50 p-3 rounded-md">
+                                                {submission.consensus_text}
+                                            </p>
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-muted-foreground">No responses submitted yet.</p>
+                                    <p className="text-muted-foreground text-center py-8">
+                                        No consensus submissions received from any group in your assigned conversations.
+                                    </p>
                                 )}
                             </CardContent>
                         </Card>
-                    </TabsContent>
 
-                    <TabsContent value="synthesis">
+                        {/* Submission Status Summary */}
                         <Card>
                             <CardHeader>
-                                <CardTitle>LLM Analysis & Manual Review</CardTitle>
+                                <CardTitle className="text-lg">Submission Status</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex gap-2">
-                                    <Button onClick={handleTriggerLLM} disabled={isAnalyzing}>
-                                        {isAnalyzing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {isAnalyzing ? 'Analyzing...' : 'Trigger LLM Synthesis'}
-                                    </Button>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">Convergence (A)</label>
-                                        <Textarea
-                                                value={convergenceText}
-                                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setConvergenceText(e.target.value)}
-                                                rows={5}
-                                                placeholder="Points of agreement..."
-                                            />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">Matters for Consideration (B)</label>
-                                        <Textarea
-                                                value={considerationText}
-                                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setConsiderationText(e.target.value)}
-                                                rows={5}
-                                                placeholder="Areas of concern or unresolved questions..."
-                                            />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">Proposals (C)</label>
-                                        <Textarea
-                                                value={proposalsText}
-                                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setProposalsText(e.target.value)}
-                                                rows={5}
-                                                placeholder="Concrete suggestions or recommendations..."
-                                            />
-                                    </div>
-                                </div>
-                                
-                                <div className="flex justify-between items-center">
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" onClick={() => handleStatusUpdate('draft')}>Mark Draft</Button>
-                                        <Button variant="outline" onClick={() => handleStatusUpdate('reviewed')}>Mark Reviewed</Button>
-                                        <Button variant="outline" onClick={() => handleStatusUpdate('submitted')}>Submit Report</Button>
-                                    </div>
-                                    <Button onClick={handleSaveReport}>Save Report</Button>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    {groups.map((group: any) => {
+                                        const submissions = consensusSubmissions[group.id] || [];
+                                        const hasSubmitted = submissions.some(
+                                            (s: any) => s.is_submitted
+                                        );
+                                        return (
+                                            <div key={group.id} className="flex items-center justify-between">
+                                                <span className="text-sm">{group.name}</span>
+                                                <Badge variant={hasSubmitted ? 'default' : 'secondary'} className="text-xs">
+                                                    {hasSubmitted ? 'Submitted' : 'Pending'}
+                                                </Badge>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </CardContent>
                         </Card>
-                    </TabsContent>
-                </Tabs>
+                    </div>
+
+                    {/* Right Column - Synthesis Editor */}
+                    <div className="space-y-4">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle>Synthesis Editor</CardTitle>
+                                    <Button
+                                        onClick={handleTriggerLLM}
+                                        disabled={isAnalyzing}
+                                        variant="outline"
+                                        size="sm"
+                                    >
+                                        {isAnalyzing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        {isAnalyzing ? 'Processing...' : 'Trigger LLM Synthesis'}
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-sm font-medium mb-1 block">
+                                            Convergence (A)
+                                        </label>
+                                        <Textarea
+                                            value={convergenceText}
+                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                                                setConvergenceText(e.target.value)
+                                            }
+                                            rows={6}
+                                            placeholder="Points of agreement..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium mb-1 block">
+                                            Matters for Consideration (B)
+                                        </label>
+                                        <Textarea
+                                            value={considerationText}
+                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                                                setConsiderationText(e.target.value)
+                                            }
+                                            rows={6}
+                                            placeholder="Areas of concern or unresolved questions..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium mb-1 block">
+                                            Proposals (C)
+                                        </label>
+                                        <Textarea
+                                            value={proposalsText}
+                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                                                setProposalsText(e.target.value)
+                                            }
+                                            rows={6}
+                                            placeholder="Concrete suggestions or recommendations..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
+                                    <Button onClick={handleSaveReport} className="flex-1">
+                                        Save Draft
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => handleStatusUpdate('reviewed')}
+                                        disabled={!report?.id}
+                                        className="flex-1"
+                                    >
+                                        Mark Reviewed
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => handleStatusUpdate('submitted')}
+                                        disabled={!report?.id}
+                                        className="flex-1"
+                                    >
+                                        Submit Synthesis
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
             </div>
         </>
     );

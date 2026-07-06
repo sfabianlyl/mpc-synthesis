@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Response> $responses
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisReport> $synthesisReports
  * @property-read \Illuminate\Database\Eloquent\Collection<int, FinalDocument> $finalDocuments
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, User> $synthesisMembers
  */
 class Conversation extends Model
 {
@@ -58,5 +59,14 @@ class Conversation extends Model
     public function finalDocuments(): BelongsToMany
     {
         return $this->belongsToMany(FinalDocument::class, 'conversation_final_document');
+    }
+    
+    /**
+     * Get the synthesis members assigned to this conversation.
+     */
+    public function synthesisMembers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'conversation_members', 'conversation_id', 'user_id')
+            ->withTimestamps();
     }
 }

@@ -32,7 +32,7 @@ export interface Response {
     group_id: number;
     facilitator_id: number;
     consensus_text: string;
-    submitted_at: string;
+    submitted_at: string | null;
     created_at: string;
     updated_at: string;
     group?: Group;
@@ -70,6 +70,15 @@ export interface FinalDocument {
     updated_at: string;
     conversations?: Conversation[];
     creator?: User;
+}
+
+export interface ConsensusSubmission {
+    id: number;
+    facilitator_id: number;
+    facilitator_name: string | null;
+    submitted_at: string | null;
+    consensus_text: string;
+    is_submitted: boolean;
 }
 
 export type Stats = {

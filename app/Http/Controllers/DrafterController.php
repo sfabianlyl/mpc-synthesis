@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Conversation;
 use App\Models\Event;
 use App\Models\FinalDocument;
-use App\Models\Group;
 use App\Models\Response;
 use App\Models\SynthesisReport;
 use App\Services\LlmService;
@@ -86,12 +85,8 @@ class DrafterController extends Controller
     {
         $report->load(['synthesis', 'conversation']);
 
-        // Find the groups assigned to this synthesis member
-        $groups = Group::where('synthesis_id', $report->synthesis_id)->get();
-
-        // Fetch the responses of these groups for this conversation
+        // Fetch ALL responses for this conversation (draughters have access to all)
         $responses = Response::where('conversation_id', $report->conversation_id)
-            ->whereIn('group_id', $groups->pluck('id'))
             ->with(['group', 'facilitator'])
             ->get();
 
@@ -175,18 +170,34 @@ class DrafterController extends Controller
     /**
      * Show the export page for a final document (booklet).
      */
-    public function export(Request $request, FinalDocument $document)
+    public function export(Request $request, FinalDocument $document = null)
     {
-        $document->load(['conversations', 'event']);
+        if ($document) {
+            $document->load(['conversations', 'event']);
 
-        $reports = SynthesisReport::where('status', 'submitted')
-            ->whereIn('conversation_id', $document->conversations->pluck('id'))
-            ->with(['synthesis', 'conversation'])
-            ->get();
+            $reports = SynthesisReport::where('status', 'submitted')
+                ->whereIn('conversation_id', $document->conversations->pluck('id'))
+                ->with(['synthesis', 'conversation'])
+                ->get();
+
+            return Inertia::render('drafter/export', [
+                'document' => $document,
+                'reports' => $reports,
+            ]);
+        }
+
+        // For global synthesis: pass available conversations and events
+        $conversations = Conversation::with('event')
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'title', 'status', 'event_id', 'created_at']);
+
+        $events = Event::orderBy('start_date', 'desc')->get(['id', 'title', 'start_date']);
 
         return Inertia::render('drafter/export', [
-            'document' => $document,
-            'reports' => $reports,
+            'document' => null,
+            'reports' => [],
+            'conversations' => $conversations,
+            'events' => $events,
         ]);
     }
 

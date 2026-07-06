@@ -4,10 +4,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Download, Loader2 } from 'lucide-react';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useEffect, useState } from 'react';
 
 interface User {
     id: number;
     name: string;
+}
+
+interface Event {
+    id: number;
+    title: string;
+    start_date: string;
+}
+
+interface Conversation {
+    id: number;
+    title: string;
+    status: string;
+    event_id: number | null;
+    created_at: string;
+    event?: Event;
 }
 
 interface Document {
@@ -32,15 +50,30 @@ interface SynthesisReport {
 }
 
 interface PageProps {
-    document?: Document;
+    document?: Document | null;
     reports?: SynthesisReport[];
+    conversations?: Conversation[];
+    events?: Event[];
 }
 
-export default function Export({ document: initialDocument, reports: initialReports = [] }: PageProps) {
+export default function Export({ document: initialDocument, reports: initialReports = [], conversations: availableConversations = [], events: availableEvents = [] }: PageProps) {
     const { data, setData, post, processing } = useForm({
         format: 'pdf',
         documentId: initialDocument?.id ?? null,
     });
+
+    // State for global synthesis dialog
+    const [showSynthesisDialog, setShowSynthesisDialog] = useState(false);
+    const [selectedConversationIds, setSelectedConversationIds] = useState<number[]>([]);
+    const [synthesisTitle, setSynthesisTitle] = useState('');
+    const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+
+    // Auto-select all conversations when dialog opens
+    useEffect(() => {
+        if (showSynthesisDialog && availableConversations.length > 0 && selectedConversationIds.length === 0) {
+            setSelectedConversationIds(availableConversations.map(c => c.id));
+        }
+    }, [showSynthesisDialog]);
 
     const handleGenerateDownload = () => {
         if (!initialDocument?.id) {
@@ -54,16 +87,55 @@ export default function Export({ document: initialDocument, reports: initialRepo
     };
 
     const handleGlobalSynthesis = () => {
-        router.post('/drafter/global-synthesis', {}, {
+        setShowSynthesisDialog(true);
+        setSelectedConversationIds([]);
+        setSynthesisTitle('');
+        setSelectedEventId(availableEvents.length > 0 ? availableEvents[0].id : null);
+    };
+
+    const handleSelectAllConversations = () => {
+        if (selectedConversationIds.length === availableConversations.length) {
+            setSelectedConversationIds([]);
+        } else {
+            setSelectedConversationIds(availableConversations.map(c => c.id));
+        }
+    };
+
+    const handleSubmitSynthesis = () => {
+        if (selectedConversationIds.length === 0) {
+            alert('Please select at least one conversation');
+            return;
+        }
+
+        router.post('/drafter/global-synthesis', {
+            conversation_ids: selectedConversationIds,
+            title: synthesisTitle || `Global Synthesis - ${new Date().toLocaleDateString()}`,
+            event_id: selectedEventId,
+        }, {
             onSuccess: () => {
                 alert('Global synthesis completed! Refreshing dashboard...');
                 window.location.href = '/drafter';
             },
             onError: (errors) => {
-                alert('Global synthesis failed: ' + (errors.synthesis || 'Unknown error'));
+                // Show actual validation errors for debugging
+                const errorMessages = Object.entries(errors)
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join('\n');
+                alert('Global synthesis failed:\n' + errorMessages);
             },
         });
     };
+
+    // Group conversations by event for the dialog
+    const conversationsByEvent: Record<number, Conversation[]> = {};
+    availableConversations.forEach(conv => {
+        if (conv.event_id) {
+            if (!conversationsByEvent[conv.event_id]) {
+                conversationsByEvent[conv.event_id] = [];
+            }
+            conversationsByEvent[conv.event_id].push(conv);
+        }
+    });
 
     return (
         <>
@@ -186,6 +258,125 @@ export default function Export({ document: initialDocument, reports: initialRepo
                         )}
                     </>
                 )}
+
+                {/* Global Synthesis Dialog */}
+                <Dialog open={showSynthesisDialog} onOpenChange={setShowSynthesisDialog}>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Generate Global Synthesis</DialogTitle>
+                            <DialogDescription>
+                                Select the conversations (sessions) to include in the global synthesis.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-4">
+                            {/* Event Selection */}
+                            {availableEvents.length > 1 && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="event">Event</Label>
+                                    <select
+                                        id="event"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                        value={selectedEventId ?? ''}
+                                        onChange={(e) => setSelectedEventId(e.target.value ? Number(e.target.value) : null)}
+                                    >
+                                        {availableEvents.map((event) => (
+                                            <option key={event.id} value={event.id}>
+                                                {event.title} ({new Date(event.start_date).toLocaleDateString()})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Select All Button */}
+                            <div className="flex items-center justify-between p-3 rounded-md border bg-muted/50">
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id="select-all"
+                                        checked={selectedConversationIds.length === availableConversations.length}
+                                        onCheckedChange={handleSelectAllConversations}
+                                    />
+                                    <Label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+                                        Select All Conversations ({availableConversations.length})
+                                    </Label>
+                                </div>
+                            </div>
+
+                            {/* Conversation List */}
+                            <div className="space-y-2">
+                                <Label>Conversations</Label>
+                                <div className="max-h-60 overflow-y-auto rounded-md border space-y-1 p-2">
+                                    {availableConversations.map((conv) => (
+                                        <div
+                                            key={conv.id}
+                                            className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                                            onClick={() => {
+                                                setSelectedConversationIds(prev =>
+                                                    prev.includes(conv.id)
+                                                        ? prev.filter(id => id !== conv.id)
+                                                        : [...prev, conv.id]
+                                                );
+                                            }}
+                                        >
+                                            <Checkbox
+                                                checked={selectedConversationIds.includes(conv.id)}
+                                                onCheckedChange={() => {
+                                                    setSelectedConversationIds(prev =>
+                                                        prev.includes(conv.id)
+                                                            ? prev.filter(id => id !== conv.id)
+                                                            : [...prev, conv.id]
+                                                    );
+                                                }}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium truncate">{conv.title}</p>
+                                                {conv.event && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {conv.event.title}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded text-xs ${
+                                                conv.status === 'submitted' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                            }`}>
+                                                {conv.status}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Title Input */}
+                            <div className="space-y-2">
+                                <Label htmlFor="synthesis-title">Document Title (optional)</Label>
+                                <input
+                                    id="synthesis-title"
+                                    type="text"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    placeholder="Leave empty for auto-generated title"
+                                    value={synthesisTitle}
+                                    onChange={(e) => setSynthesisTitle(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Selection Summary */}
+                            <div className="text-sm text-muted-foreground p-3 rounded-md bg-muted/50">
+                                {selectedConversationIds.length} conversation{selectedConversationIds.length !== 1 ? 's' : ''} selected
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button variant="outline">Cancel</Button>
+                            </DialogClose>
+                            <Button onClick={handleSubmitSynthesis} disabled={processing || selectedConversationIds.length === 0}>
+                                {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Generate Synthesis
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 <div className="text-center text-sm text-muted-foreground">
                     <Link href="/drafter" className="underline hover:text-primary">

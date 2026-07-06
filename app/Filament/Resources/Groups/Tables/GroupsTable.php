@@ -16,8 +16,6 @@ class GroupsTable
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
-                TextColumn::make('synthesis.name')
-                    ->searchable(),
                 TextColumn::make('facilitator.name')
                     ->searchable(),
                 TextColumn::make('created_at')
