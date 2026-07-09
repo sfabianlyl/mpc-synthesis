@@ -40,16 +40,22 @@ return [
     | LLM Inference Services
     |--------------------------------------------------------------------------
     |
-    | Configuration for the LLM failover service. The local endpoint (Ollama)
-    | is tried first. If it fails or times out, the request is rerouted to
-    | Google Gemini API.
+    | Configuration for the LLM failover service. The local endpoint (llama.cpp)
+    | is tried first using the OpenAI-compatible API format. If it fails or
+    | times out, the request is rerouted to Google Gemini API.
+    |
+    | Note: llama.cpp serves a fixed model (e.g., qwen3.6:35b) configured
+    | at server startup time, so no model selection is needed in requests.
     |
     */
 
     'llm' => [
-        'local_url' => env('LLM_LOCAL_URL', 'http://localhost:11434'),
-        'local_model' => env('LLM_LOCAL_MODEL', 'llama3.1'),
-        'local_timeout' => env('LLM_LOCAL_TIMEOUT', 60),
+        'local_url' => env('LLM_LOCAL_URL', 'http://localhost:8080'),
+        'local_max_tokens' => env('LLM_LOCAL_MAX_TOKENS', 4096),
+        'local_timeout' => env('LLM_LOCAL_TIMEOUT', 120),
+        'local_temperature' => env('LLM_LOCAL_TEMPERATURE', 0.7),
+        'local_max_completion_tokens' => env('LLM_LOCAL_MAX_COMPLETION_TOKENS', 4096),
+        'local_reasoning' => env('LLM_LOCAL_REASONING', false),
         'gemini_api_key' => env('GEMINI_API_KEY', ''),
         'gemini_model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
     ],

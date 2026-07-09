@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+// \Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -30,7 +30,6 @@ use Illuminate\Support\Carbon;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Conversation> $assignedConversations
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Group> $assignedGroups
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisReport> $synthesisReports
- * @property-read Group|null $facilitatorGroup
  */
 #[Fillable(['name', 'email', 'password', 'role'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -58,17 +57,6 @@ class User extends Authenticatable
     public function hasRole(string $role): bool
     {
         return $this->role === $role;
-    }
-
-    /**
-     * Check if user is a facilitator.
-     *
-     * Deprecated: Previously included 'responder' as a fallback for backward compatibility.
-     * The 'responder' role has been migrated to 'facilitator'.
-     */
-    public function isFacilitator(): bool
-    {
-        return $this->hasRole('facilitator');
     }
 
     /**
@@ -104,14 +92,6 @@ class User extends Authenticatable
     public function assignedGroups(): HasMany
     {
         return $this->hasMany(Group::class, 'synthesis_id');
-    }
-
-    /**
-     * Get the group assigned to this facilitator.
-     */
-    public function facilitatorGroup(): HasOne
-    {
-        return $this->hasOne(Group::class, 'facilitator_id');
     }
 
     /**

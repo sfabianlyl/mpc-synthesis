@@ -12,11 +12,9 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $name
  * @property int|null $synthesis_id
- * @property int|null $facilitator_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User|null $synthesis
- * @property-read User|null $facilitator
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Response> $responses
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisReport> $synthesisReports
  */
@@ -24,7 +22,7 @@ class Group extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'synthesis_id', 'facilitator_id'];
+    protected $fillable = ['name', 'synthesis_id'];
 
     /**
      * Get the synthesis team member assigned to this group.
@@ -35,14 +33,6 @@ class Group extends Model
     public function synthesis(): BelongsTo
     {
         return $this->belongsTo(User::class, 'synthesis_id');
-    }
-
-    /**
-     * Get the facilitator assigned to this group.
-     */
-    public function facilitator(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'facilitator_id');
     }
 
     /**

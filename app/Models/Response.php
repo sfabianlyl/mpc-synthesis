@@ -11,20 +11,18 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $conversation_id
  * @property int $group_id
- * @property int|null $facilitator_id
  * @property string $consensus_text
  * @property Carbon $submitted_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Conversation $conversation
  * @property-read Group $group
- * @property-read User|null $facilitator
  */
 class Response extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['conversation_id', 'group_id', 'facilitator_id', 'consensus_text', 'submitted_at'];
+    protected $fillable = ['conversation_id', 'group_id', 'consensus_text', 'submitted_at'];
 
     protected function casts(): array
     {
@@ -47,13 +45,5 @@ class Response extends Model
     public function group(): BelongsTo
     {
         return $this->belongsTo(Group::class);
-    }
-
-    /**
-     * Get the facilitator who submitted this response.
-     */
-    public function facilitator(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'facilitator_id');
     }
 }

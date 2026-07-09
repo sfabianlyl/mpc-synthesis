@@ -18,8 +18,6 @@ class ResponsesTable
                     ->searchable(),
                 TextColumn::make('group.name')
                     ->searchable(),
-                TextColumn::make('facilitator.name')
-                    ->searchable(),
                 TextColumn::make('submitted_at')
                     ->dateTime()
                     ->sortable(),

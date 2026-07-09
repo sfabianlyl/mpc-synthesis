@@ -17,8 +17,7 @@ class AdminController extends Controller
     public function index()
     {
         $users = User::orderBy('name')->get(['id', 'name', 'email', 'role']);
-        $groups = Group::with(['facilitator:id,name'])
-            ->withCount('responses')
+        $groups = Group::withCount('responses')
             ->orderBy('name')
             ->get();
 
@@ -35,7 +34,6 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'facilitator_id' => 'nullable|exists:users,id',
         ]);
 
         Group::create($validated);
@@ -49,7 +47,7 @@ class AdminController extends Controller
     public function updateUserRole(Request $request, User $user)
     {
         $validated = $request->validate([
-            'role' => 'required|in:facilitator,synthesis,drafter,admin',
+            'role' => 'required|in:synthesis,drafter,admin',
         ]);
 
         $user->update($validated);
@@ -85,20 +83,6 @@ class AdminController extends Controller
         $conversation->synthesisMembers()->detach([$user->id]);
 
         return back()->with('success', "Synthesis member removed from conversation {$conversation->title}.");
-    }
-
-    /**
-     * Assign a facilitator to a group.
-     */
-    public function assignFacilitator(Request $request, Group $group)
-    {
-        $validated = $request->validate([
-            'facilitator_id' => 'required|exists:users,id',
-        ]);
-
-        $group->update($validated);
-
-        return back()->with('success', 'Facilitator assigned to group.');
     }
 
     /**
@@ -156,7 +140,6 @@ class AdminController extends Controller
         // Get all submitted consensus responses
         $responses = Response::where('conversation_id', $conversationId)
             ->whereNotNull('consensus_text')
-            ->with(['group.facilitator'])
             ->get();
 
         return response()->json([
@@ -165,7 +148,6 @@ class AdminController extends Controller
             'responses' => $responses->map(fn($r) => [
                 'id' => $r->id,
                 'group_name' => $r->group->name,
-                'facilitator' => $r->group->facilitator?->name,
                 'consensus_text' => $r->consensus_text,
             ]),
         ]);
@@ -187,13 +169,11 @@ class AdminController extends Controller
         // Get all submitted consensus for this conversation
         $responses = Response::where('conversation_id', $validated['conversation_id'])
             ->whereNotNull('consensus_text')
-            ->with(['group.facilitator'])
             ->get();
 
         // Build context from all responses
         $context = $responses->map(function ($r) {
-            $facilitatorName = $r->group->facilitator?->name ?? 'Unknown';
-            return "## Group: {$r->group->name} (Facilitator: {$facilitatorName})\n{$r->consensus_text}";
+            return "## Group: {$r->group->name}\n{$r->consensus_text}";
         })->join("\n\n---\n\n");
 
         // Use LLM service to generate response

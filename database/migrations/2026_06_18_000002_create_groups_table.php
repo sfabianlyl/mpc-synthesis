@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->foreignId('synthesis_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('facilitator_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
     }

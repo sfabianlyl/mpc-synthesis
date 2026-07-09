@@ -18,13 +18,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('/', 'home')->name('home');
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 
-    // ─── Facilitator Portal ────────────────────────────────────────────
-    Route::middleware('role:facilitator,synthesis,drafter')->group(function () {
-        Route::get('respond', [ResponseController::class, 'create'])->name('respond.create');
-        Route::post('respond', [ResponseController::class, 'store'])->name('respond.store');
-    });
-
-    // ─── Synthesis Dashboard ─────────────────────────────────────────
+    // ─── Synthesis Dashboard ───────────────────────────────��─────────
     Route::middleware('role:synthesis')->prefix('synthesis')->name('synthesis.')->group(function () {
         Route::get('/', [SynthesisController::class, 'index'])->name('dashboard');
         Route::get('review/{conversation}', [SynthesisController::class, 'review'])->name('review');
@@ -33,7 +27,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('report/{report}/submit', [SynthesisController::class, 'submit'])->name('report.submit');
     });
 
-    // ─── Drafter Dashboard & Drafting ─────────────────────���────────────
+    // ─── Drafter Dashboard & Drafting ────────────────────────────────
     Route::middleware('role:drafter')->prefix('drafter')->name('drafter.')->group(function () {
         Route::get('/', [DrafterController::class, 'index'])->name('dashboard');
         Route::get('report/{report}', [DrafterController::class, 'show'])->name('report.show');
@@ -52,5 +46,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/message', [AdminController::class, 'chatMessage'])->name('.message');
     });
 });
+
+// ─── Public Anonymous Response Routes (No Auth Required) ─────────────────
+Route::get('respond/{event_id}/{group_id}', [ResponseController::class, 'showPublicForm'])
+    ->name('respond.public.form');
+Route::post('respond/{event_id}/{group_id}', [ResponseController::class, 'storePublicResponse'])
+    ->name('respond.public.store');
 
 require __DIR__.'/settings.php';

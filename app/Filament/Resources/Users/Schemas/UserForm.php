@@ -20,12 +20,11 @@ class UserForm
                     ->required(),
                 Select::make('role')
                     ->required()
-                    ->default('facilitator')
+                    ->default('admin')
                     ->options([
                         'admin' => 'Admin',
                         'drafter' => 'Drafter',
                         'synthesis' => 'Synthesis',
-                        'facilitator' => 'Facilitator',
                     ]),
                 TextInput::make('password')
                     ->password()

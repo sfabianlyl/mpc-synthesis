@@ -87,7 +87,7 @@ class DrafterController extends Controller
 
         // Fetch ALL responses for this conversation (draughters have access to all)
         $responses = Response::where('conversation_id', $report->conversation_id)
-            ->with(['group', 'facilitator'])
+            ->with('group')
             ->get();
 
         return Inertia::render('drafter/report-detail', [

@@ -42,6 +42,12 @@ export default function Dashboard({ conversations, groups, report, selectedConve
         router.get('/synthesis', { conversation_id: value }, { preserveState: true });
     };
 
+    // Helper to get display name with fallback
+    const getDisplayName = (submission: ConsensusSubmission): string => {
+        const anySub = submission as any;
+        return anySub.group_name || anySub.facilitator_name || '';
+    };
+
     return (
         <>
             <Head title="Synthesis Dashboard" />
@@ -103,7 +109,7 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                                     <Users className="size-5" />
                                     Consensus Submission Status
                                 </CardTitle>
-                                <CardDescription>Track which facilitators have submitted their group's consensus response.</CardDescription>
+                                <CardDescription>Track which groups have submitted their group's consensus response.</CardDescription>
                             </div>
                             <Badge variant="outline" className="h-6">
                                 {Object.values(consensusSubmissions).flat().filter(s => s.is_submitted).length} / {Object.values(consensusSubmissions).flat().length} Submitted
@@ -120,7 +126,7 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Group</TableHead>
-                                            <TableHead>Facilitator</TableHead>
+                                            <TableHead>Group Name</TableHead>
                                             <TableHead>Status</TableHead>
                                             <TableHead>Submitted At</TableHead>
                                             <TableHead>Consensus Text Preview</TableHead>
@@ -128,40 +134,47 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                                     </TableHeader>
                                     <TableBody>
                                         {Object.entries(consensusSubmissions).map(([groupId, submissions]) => (
-                                            submissions.map((submission) => (
-                                                <TableRow key={submission.id}>
-                                                    <TableCell className="font-semibold">
-                                                        Group #{groupId}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {submission.facilitator_name ? (
-                                                            <span className="flex items-center gap-2">
-                                                                <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                                                                    {submission.facilitator_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                                                                </div>
-                                                                {submission.facilitator_name}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-muted-foreground italic">Unassigned</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant={submission.is_submitted ? 'default' : 'secondary'} className={submission.is_submitted ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/10' : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/10'}>
-                                                            {submission.is_submitted ? (
-                                                                <><CheckCircle2 className="size-3.5 mr-1" /> Submitted</>
+                                            submissions.map((submission) => {
+                                                const anySub = submission as any;
+                                                const displayName = getDisplayName(submission);
+                                                const initials = displayName
+                                                    ? displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2)
+                                                    : '';
+                                                return (
+                                                    <TableRow key={submission.id}>
+                                                        <TableCell className="font-semibold">
+                                                            Group #{groupId}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {displayName ? (
+                                                                <span className="flex items-center gap-2">
+                                                                    <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                                                                        {initials}
+                                                                    </div>
+                                                                    {displayName}
+                                                                </span>
                                                             ) : (
-                                                                <><XCircle className="size-3.5 mr-1" /> Pending</>
+                                                                <span className="text-muted-foreground italic">Unassigned</span>
                                                             )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground text-sm">
-                                                        {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : '—'}
-                                                    </TableCell>
-                                                    <TableCell className="max-w-[300px] truncate text-muted-foreground text-xs font-normal">
-                                                        {submission.consensus_text || '—'}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant={submission.is_submitted ? 'default' : 'secondary'} className={submission.is_submitted ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/10' : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/10'}>
+                                                                {submission.is_submitted ? (
+                                                                    <><CheckCircle2 className="size-3.5 mr-1" /> Submitted</>
+                                                                ) : (
+                                                                    <><XCircle className="size-3.5 mr-1" /> Pending</>
+                                                                )}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-muted-foreground text-sm">
+                                                            {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : '—'}
+                                                        </TableCell>
+                                                        <TableCell className="max-w-[300px] truncate text-muted-foreground text-xs font-normal">
+                                                            {submission.consensus_text || '—'}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
                                         ))}
                                     </TableBody>
                                 </Table>

@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('conversation_id')->constrained()->cascadeOnDelete();
             $table->foreignId('group_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('facilitator_id')->nullable()->constrained('users')->nullOnDelete();
             $table->text('consensus_text');
             $table->timestamp('submitted_at')->useCurrent();
             $table->timestamps();

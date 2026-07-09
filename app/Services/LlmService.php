@@ -9,23 +9,29 @@ use Illuminate\Support\Facades\Log;
 class LlmService
 {
     private string $localUrl;
-    private string $localModel;
+    private int $localMaxTokens;
     private int $localTimeout;
+    private float $localTemperature;
+    private int $localMaxCompletionTokens;
+    private bool $localReasoning;
     private string $geminiApiKey;
     private string $geminiModel;
 
     public function __construct()
     {
-        $this->localUrl = config('services.llm.local_url', 'http://localhost:11434');
-        $this->localModel = config('services.llm.local_model', 'llama3.1');
-        $this->localTimeout = (int) config('services.llm.local_timeout', 10);
+        $this->localUrl = config('services.llm.local_url', 'http://localhost:8080');
+        $this->localMaxTokens = (int) config('services.llm.local_max_tokens', 1024);
+        $this->localTimeout = (int) config('services.llm.local_timeout', 60);
+        $this->localTemperature = (float) config('services.llm.local_temperature', 0.7);
+        $this->localMaxCompletionTokens = (int) config('services.llm.local_max_completion_tokens', 4096);
+        $this->localReasoning = (bool) config('services.llm.local_reasoning', false);
         $this->geminiApiKey = config('services.llm.gemini_api_key', '');
         $this->geminiModel = config('services.llm.gemini_model', 'gemini-2.5-flash');
     }
 
     /**
      * Send a prompt to the LLM with automatic failover.
-     * Primary: local Ollama instance. Failover: Google Gemini API.
+     * Primary: local llama.cpp instance (OpenAI-compatible API). Failover: Google Gemini API.
      *
      * @param  string  $systemPrompt  The system/instruction prompt
      * @param  string  $userPrompt  The user-supplied content
@@ -80,24 +86,66 @@ class LlmService
     }
 
     /**
-     * Query the local Ollama instance.
+     * Query the local llama.cpp instance using OpenAI-compatible API format.
      */
     private function queryLocal(string $systemPrompt, string $userPrompt): array
     {
         try {
+            Log::info('LLM: Sending request to local llama.cpp.', [
+                'url' => $this->localUrl.'/v1/chat/completions',
+                'max_tokens' => $this->localMaxTokens,
+                'system_prompt_length' => strlen($systemPrompt),
+                'user_prompt_length' => strlen($userPrompt),
+                'reasoning_enabled' => $this->localReasoning,
+            ]);
+
+            $payload = [
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+                'max_tokens' => $this->localMaxTokens,
+                'temperature' => $this->localTemperature,
+                'stream' => false,
+            ];
+
+            // Use max_completion_tokens for models that support it (e.g., Qwen3.x)
+            if ($this->localMaxCompletionTokens > 0) {
+                $payload['max_completion_tokens'] = $this->localMaxCompletionTokens;
+            }
+
+            // Explicitly control thinking/reasoning mode for Ollama/llama.cpp
+            // Qwen3.6 and similar models have thinking enabled by default - must explicitly disable
+            if ($this->localReasoning) {
+                $payload['thinking'] = [
+                    'enabled' => true,
+                    'max_tokens' => $this->localMaxCompletionTokens,
+                ];
+            } else {
+                // Explicitly disable thinking to prevent token waste on reasoning_content
+                $payload['thinking'] = [
+                    'enabled' => false,
+                ];
+            }
+
             $response = Http::timeout($this->localTimeout)
-                ->post($this->localUrl.'/api/chat', [
-                    'model' => $this->localModel,
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => $userPrompt],
-                    ],
-                    'stream' => false,
-                ]);
+                ->post($this->localUrl.'/v1/chat/completions', $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
-                $content = $data['message']['content'] ?? '';
+
+                // Log the full response structure for debugging
+                Log::info('LLM: Local response received.', [
+                    'choices_count' => count($data['choices'] ?? []),
+                    'finish_reason' => $data['choices'][0]['finish_reason'] ?? null,
+                    'content_length' => strlen($data['choices'][0]['message']['content'] ?? ''),
+                    'content_preview' => substr($data['choices'][0]['message']['content'] ?? '', 0, 200),
+                    'has_reasoning_content' => isset($data['choices'][0]['message']['reasoning_content']),
+                    'reasoning_content_length' => strlen($data['choices'][0]['message']['reasoning_content'] ?? ''),
+                    'full_response' => json_encode($data, JSON_PRETTY_PRINT),
+                ]);
+
+                $content = $data['choices'][0]['message']['content'] ?? '';
 
                 return [
                     'content' => $content,
@@ -107,6 +155,11 @@ class LlmService
                 ];
             }
 
+            Log::error('LLM: Local HTTP error.', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
             return [
                 'content' => '',
                 'provider' => 'local',
@@ -114,6 +167,10 @@ class LlmService
                 'error' => 'HTTP '.$response->status().': '.$response->body(),
             ];
         } catch (ConnectionException $e) {
+            Log::error('LLM: Local connection failed.', [
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'content' => '',
                 'provider' => 'local',
@@ -121,6 +178,10 @@ class LlmService
                 'error' => 'Connection refused: '.$e->getMessage(),
             ];
         } catch (\Exception $e) {
+            Log::error('LLM: Local exception.', [
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'content' => '',
                 'provider' => 'local',
@@ -162,6 +223,7 @@ class LlmService
                 ],
                 'generationConfig' => [
                     'responseMimeType' => 'application/json',
+                    'maxOutputTokens' => $this->localMaxTokens,
                 ],
             ]);
 
@@ -201,21 +263,42 @@ class LlmService
         return <<<'PROMPT'
 You are a synthesis assistant for a consultative process. You will receive one or more consensus paragraphs from group discussions.
 
-Your task is to analyze the text and extract information into exactly three categories:
+Your task is to analyze the text and extract information into exactly three categories. For each category, provide the content as bullet points using dashes (-) with concise phrases (not full sentences).
 
-1. **Convergence (A)**: Points of agreement, shared perspectives, and common ground found across the input.
-2. **Matters for Consideration (B)**: Areas of concern, tension, unresolved questions, or topics needing further discussion.
-3. **Proposals (C)**: Concrete suggestions, recommendations, or actionable items proposed by the groups.
+CRITICAL JSON FORMAT REQUIREMENTS:
+- Return a RAW JSON object with exactly these three keys: "convergence", "consideration", "proposals"
+- Each value must be a SINGLE LINE string (no actual newlines inside the string values)
+- Use \n (backslash-n escape sequence) to separate bullet points within each value
+- Keep the entire JSON on multiple lines for readability, but each value must be on one line
 
-IMPORTANT: Return your analysis as a RAW JSON object with exactly these three keys. Do NOT wrap the response in markdown code blocks (no ```json or ```). Do NOT include any explanatory text before or after the JSON. The response must be valid JSON only.
-
+Example of CORRECT format:
 {
-  "convergence": "...",
-  "consideration": "...",
-  "proposals": "..."
+  "convergence": "- phrase one\n- phrase two\n- phrase three",
+  "consideration": "- concern one\n- concern two",
+  "proposals": "- suggestion one\n- suggestion two"
 }
 
-Each value should be a well-structured paragraph or set of bullet points. Be thorough but concise. Preserve the original meaning and intent of the participants.
+WRONG format (do NOT do this):
+{
+  "convergence": "- phrase one
+- phrase two
+- phrase three"
+}
+
+Categories:
+
+1. **Convergence (A)**: Points of agreement, shared perspectives, and common ground found across the input.
+   Example: "- agreement on core principles\n- need for clear guidelines\n- structured approaches emphasized"
+
+2. **Matters for Consideration (B)**: Areas of concern, tension, unresolved questions, or topics needing further discussion.
+   Example: "- resource allocation concerns\n- timeline feasibility questions\n- stakeholder engagement gaps"
+
+3. **Proposals (C)**: Concrete suggestions, recommendations, or actionable items proposed by the groups.
+   Example: "- establish working group\n- develop phased implementation\n- schedule follow-up consultations"
+
+IMPORTANT: Do NOT wrap the response in markdown code blocks (no ```json or ```). Do NOT include any explanatory text before or after the JSON. The response must be valid JSON only. Each value string must contain \n escape sequences, not actual newlines.
+
+Be concise but thorough. Use short phrases, not full sentences. Preserve the original meaning and intent of the participants.
 PROMPT;
     }
 

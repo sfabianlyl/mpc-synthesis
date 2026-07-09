@@ -19,8 +19,6 @@ class ResponseForm
                 Select::make('group_id')
                     ->relationship('group', 'name')
                     ->required(),
-                Select::make('facilitator_id')
-                    ->relationship('facilitator', 'name'),
                 Textarea::make('consensus_text')
                     ->required()
                     ->columnSpanFull(),

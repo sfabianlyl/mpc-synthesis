@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Groups\Schemas;
 
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 
@@ -14,8 +13,6 @@ class GroupForm
             ->components([
                 TextInput::make('name')
                     ->required(),
-                Select::make('facilitator_id')
-                    ->relationship('facilitator', 'name'),
             ]);
     }
 }

@@ -36,8 +36,8 @@ function useNavItems(): NavItem[] {
         },
     ];
 
-    // Facilitators (and everyone above) can submit responses
-    if (role === 'facilitator' || role === 'synthesis' || role === 'drafter' || role === 'admin') {
+    // Authenticated users can submit responses
+    if (role === 'synthesis' || role === 'drafter' || role === 'admin') {
         items.push({
             title: 'Submit Response',
             href: '/respond',

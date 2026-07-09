@@ -59,7 +59,7 @@ class SynthesisController extends Controller
             $query->where('conversation_id', $selectedConversationId);
         })->with(['responses' => function ($query) use ($selectedConversationId) {
             $query->where('conversation_id', $selectedConversationId);
-        }, 'facilitator'])->get();
+        }])->get();
 
         // Build groups structure with responses from ALL synthesis members assigned to this conversation
         $groups = $allGroupsForConversation->map(function ($group) {
@@ -67,7 +67,6 @@ class SynthesisController extends Controller
                 'id' => $group->id,
                 'name' => $group->name,
                 'responses' => $group->responses,
-                'facilitator' => $group->facilitator,
             ];
         });
 
@@ -76,13 +75,13 @@ class SynthesisController extends Controller
             ->where('synthesis_id', $user->id)
             ->first();
 
-        // Fetch consensus submission status from facilitators for the selected conversation
+        // Fetch consensus submission status from groups for the selected conversation
         $consensusSubmissions = [];
         if ($allGroupsForConversation->isNotEmpty()) {
             $groupIds = $allGroupsForConversation->pluck('id');
             $responses = Response::whereIn('group_id', $groupIds)
                 ->where('conversation_id', $selectedConversationId)
-                ->with(['facilitator', 'group'])
+                ->with('group')
                 ->get();
 
             // Group submissions by group_id
@@ -90,8 +89,8 @@ class SynthesisController extends Controller
                 return $groupResponses->map(function ($response) {
                     return [
                         'id' => $response->id,
-                        'facilitator_id' => $response->facilitator_id,
-                        'facilitator_name' => $response->facilitator?->name,
+                        'group_id' => $response->group_id,
+                        'group_name' => $response->group?->name,
                         'submitted_at' => $response->submitted_at?->toIso8601String(),
                         'consensus_text' => $response->consensus_text,
                         'is_submitted' => !is_null($response->submitted_at),
@@ -127,7 +126,7 @@ class SynthesisController extends Controller
             $query->where('conversation_id', $conversation->id);
         })->with(['responses' => function ($query) use ($conversation) {
             $query->where('conversation_id', $conversation->id);
-        }, 'responses.facilitator', 'facilitator'])->get();
+        }])->get();
 
         // Build groups structure with responses from ALL synthesis members assigned to this conversation
         $groups = $allGroupsForConversation->map(function ($group) {
@@ -135,7 +134,6 @@ class SynthesisController extends Controller
                 'id' => $group->id,
                 'name' => $group->name,
                 'responses' => $group->responses,
-                'facilitator' => $group->facilitator,
             ];
         });
 
@@ -143,13 +141,13 @@ class SynthesisController extends Controller
             ->where('synthesis_id', $user->id)
             ->first();
 
-        // Fetch consensus submission status from all facilitators for this conversation
+        // Fetch consensus submission status from all groups for this conversation
         $consensusSubmissions = [];
         if ($allGroupsForConversation->isNotEmpty()) {
             $groupIds = $allGroupsForConversation->pluck('id');
             $responses = Response::whereIn('group_id', $groupIds)
                 ->where('conversation_id', $conversation->id)
-                ->with(['facilitator', 'group'])
+                ->with('group')
                 ->get();
 
             // Group submissions by group_id
@@ -157,8 +155,8 @@ class SynthesisController extends Controller
                 return $groupResponses->map(function ($response) {
                     return [
                         'id' => $response->id,
-                        'facilitator_id' => $response->facilitator_id,
-                        'facilitator_name' => $response->facilitator?->name,
+                        'group_id' => $response->group_id,
+                        'group_name' => $response->group?->name,
                         'submitted_at' => $response->submitted_at?->toIso8601String(),
                         'consensus_text' => $response->consensus_text,
                         'is_submitted' => !is_null($response->submitted_at),
@@ -181,7 +179,7 @@ class SynthesisController extends Controller
     }
 
     /**
-     * Trigger LLM analysis for all responses of groups assigned to this synthesis member in a session.
+     * Trigger LLM analysis for selected responses of groups in a session.
      */
     public function analyze(Request $request, Conversation $conversation, LlmService $llm)
     {
@@ -194,23 +192,40 @@ class SynthesisController extends Controller
         }
 
         // Check if user has any assigned conversations
-        if ($user->assignedConversations()->isEmpty()) {
+        if ($user->assignedConversations()->get()->isEmpty()) {
             return back()->withErrors(['analysis' => 'No conversations are assigned to you.']);
         }
+
+        // Validate selected_group_ids if provided
+        $validated = $request->validate([
+            'selected_group_ids' => 'nullable|array',
+            'selected_group_ids.*' => 'exists:groups,id',
+        ]);
+
+        // Get selected group IDs from request
+        $selectedGroupIds = $validated['selected_group_ids'] ?? null;
 
         // Get all group IDs that have responses in ANY of the user's assigned conversations
         $assignedConversationIds = $user->assignedConversations()->pluck('conversations.id');
         
-        // Get all responses from the selected conversation that belong to groups in assigned conversations
-        $responses = Response::where('conversation_id', $conversation->id)
-            ->whereIn('group_id', function ($query) use ($assignedConversationIds) {
-                $query->select('group_id')
-                    ->from('responses')
-                    ->whereIn('conversation_id', $assignedConversationIds)
-                    ->distinct();
-            })
-            ->with('group')
-            ->get();
+        // Collect responses, filtered by selected groups if provided
+        if ($selectedGroupIds && count($selectedGroupIds) > 0) {
+            $responses = Response::where('conversation_id', $conversation->id)
+                ->whereIn('group_id', $selectedGroupIds)
+                ->with('group')
+                ->get();
+        } else {
+            // Get all responses from the selected conversation that belong to groups in assigned conversations
+            $responses = Response::where('conversation_id', $conversation->id)
+                ->whereIn('group_id', function ($query) use ($assignedConversationIds) {
+                    $query->select('group_id')
+                        ->from('responses')
+                        ->whereIn('conversation_id', $assignedConversationIds)
+                        ->distinct();
+                })
+                ->with('group')
+                ->get();
+        }
 
         if ($responses->isEmpty()) {
             return back()->withErrors(['analysis' => 'No responses have been submitted by your assigned groups for this session.']);
@@ -271,9 +286,69 @@ class SynthesisController extends Controller
             ]
         );
 
-        // Re-render the review page with updated report data
-        return Inertia::route('synthesis.review', [$conversation])
-            ->with('success', 'LLM analysis completed successfully using '.$result['provider'].' provider.');
+        // Calculate group count for feedback
+        $groupCount = $selectedGroupIds ? count($selectedGroupIds) : $responses->count();
+
+        Log::info('LLM analysis: report created/updated.', [
+            'report_id' => $report->id,
+            'convergence_text_length' => strlen($report->convergence_text),
+            'consideration_text_length' => strlen($report->consideration_text),
+            'proposals_text_length' => strlen($report->proposals_text),
+            'llm_generated' => $report->llm_generated,
+            'status' => $report->status,
+            'group_count' => $groupCount,
+        ]);
+
+        // Fetch groups and consensus submissions for the review page (same as review() method)
+        $allGroupsForConversation = Group::whereHas('responses', function ($query) use ($conversation) {
+            $query->where('conversation_id', $conversation->id);
+        })->with(['responses' => function ($query) use ($conversation) {
+            $query->where('conversation_id', $conversation->id);
+        }])->get();
+
+        $groups = $allGroupsForConversation->map(function ($group) {
+            return (object)[
+                'id' => $group->id,
+                'name' => $group->name,
+                'responses' => $group->responses,
+            ];
+        });
+
+        $consensusSubmissions = [];
+        if ($allGroupsForConversation->isNotEmpty()) {
+            $groupIds = $allGroupsForConversation->pluck('id');
+            $submissionResponses = Response::whereIn('group_id', $groupIds)
+                ->where('conversation_id', $conversation->id)
+                ->with('group')
+                ->get();
+
+            $consensusSubmissions = $submissionResponses->groupBy('group_id')->map(function ($groupResponses) {
+                return $groupResponses->map(function ($response) {
+                    return [
+                        'id' => $response->id,
+                        'group_id' => $response->group_id,
+                        'group_name' => $response->group?->name,
+                        'submitted_at' => $response->submitted_at?->toIso8601String(),
+                        'consensus_text' => $response->consensus_text,
+                        'is_submitted' => !is_null($response->submitted_at),
+                    ];
+                })->values()->toArray();
+            })->toArray();
+        }
+
+        // Re-render the review page with complete data (same as review() method)
+        return Inertia::render('synthesis/review', [
+            'conversation' => $conversation,
+            'group' => (object)[
+                'id' => $conversation->id,
+                'name' => $conversation->title,
+            ],
+            'groups' => $groups,
+            'responses' => $groups->flatMap->responses,
+            'report' => $report,
+            'consensusSubmissions' => $consensusSubmissions,
+        ])
+            ->with('success', 'LLM analysis completed successfully for '.$groupCount.' group(s) using '.$result['provider'].' provider.');
     }
 
     /**

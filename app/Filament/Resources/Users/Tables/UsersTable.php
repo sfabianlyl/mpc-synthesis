@@ -26,14 +26,12 @@ class UsersTable
                         'admin' => 'Admin',
                         'drafter' => 'Drafter',
                         'synthesis' => 'Synthesis',
-                        'facilitator' => 'Facilitator',
                         default => $state,
                     })
                     ->colors([
                         'primary' => 'admin',
                         'warning' => 'drafter',
                         'success' => 'synthesis',
-                        'info' => 'facilitator',
                     ]),
                 TextColumn::make('created_at')
                     ->dateTime()

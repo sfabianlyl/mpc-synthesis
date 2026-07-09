@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, XCircle, Loader2, FileText } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { CheckCircle2, XCircle, Loader2, FileText, Users } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 
 interface PageProps {
     conversation: any;
@@ -31,6 +31,12 @@ export default function Review({
     const [convergenceText, setConvergenceText] = useState(report?.convergence_text ?? '');
     const [considerationText, setConsiderationText] = useState(report?.consideration_text ?? '');
     const [proposalsText, setProposalsText] = useState(report?.proposals_text ?? '');
+    const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(
+        new Set(groups.map(g => g.id))
+    );
+
+    // Refs for batch checkbox indeterminate state
+    const batchCheckboxRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
     useEffect(() => {
         if (initialSuccess) {
@@ -51,30 +57,68 @@ export default function Review({
         }
     }, [initialSuccess, initialErrors]);
 
+    // Sync local state when report prop changes (e.g., after Inertia re-render)
+    useEffect(() => {
+        if (report) {
+            console.log('[Review] Report prop changed:', {
+                id: report.id,
+                convergence_text_length: report.convergence_text?.length ?? 0,
+                consideration_text_length: report.consideration_text?.length ?? 0,
+                proposals_text_length: report.proposals_text?.length ?? 0,
+                llm_generated: report.llm_generated,
+            });
+            setConvergenceText(report.convergence_text ?? '');
+            setConsiderationText(report.consideration_text ?? '');
+            setProposalsText(report.proposals_text ?? '');
+        } else {
+            console.log('[Review] Report prop is null');
+        }
+    }, [report]);
+
+    // Update indeterminate state for batch checkboxes when selectedGroupIds changes
+    useEffect(() => {
+        const groupIds = getUniqueGroupIds();
+        const batches = [];
+        for (let i = 0; i < groupIds.length; i += 5) {
+            batches.push(groupIds.slice(i, i + 5));
+        }
+
+        batches.forEach((batchGroupIds, batchIndex) => {
+            const ref = batchCheckboxRefs.current.get(batchIndex);
+            if (ref) {
+                const allInBatchSelected = batchGroupIds.every(id => selectedGroupIds.has(id));
+                const someInBatchSelected = batchGroupIds.some(id => selectedGroupIds.has(id));
+                ref.indeterminate = someInBatchSelected && !allInBatchSelected;
+            }
+        });
+    }, [selectedGroupIds]);
+
     const handleTriggerLLM = () => {
         setIsAnalyzing(true);
         setAnalysisStatus('idle');
         setAnalysisMessage('');
+        console.log('[Review] Triggering LLM analysis for conversation:', conversation.id);
         router.post(
             `/synthesis/analyze/${conversation.id}`,
-            {},
+            {
+                selected_group_ids: Array.from(selectedGroupIds),
+            },
             {
                 preserveScroll: true,
                 onSuccess: (page: any) => {
                     const newReport = page.props.report;
+                    console.log('[Review] POST onSuccess - newReport:', newReport);
                     if (newReport) {
-                        setConvergenceText((prev: string) => {
-                            const newText = newReport.convergence_text ?? '';
-                            return newText ? (prev ? prev + '\n\n' + newText : newText) : prev;
+                        console.log('[Review] Setting textareas with new report data:', {
+                            convergence_text_length: newReport.convergence_text?.length ?? 0,
+                            consideration_text_length: newReport.consideration_text?.length ?? 0,
+                            proposals_text_length: newReport.proposals_text?.length ?? 0,
                         });
-                        setConsiderationText((prev: string) => {
-                            const newText = newReport.consideration_text ?? '';
-                            return newText ? (prev ? prev + '\n\n' + newText : newText) : prev;
-                        });
-                        setProposalsText((prev: string) => {
-                            const newText = newReport.proposals_text ?? '';
-                            return newText ? (prev ? prev + '\n\n' + newText : newText) : prev;
-                        });
+                        setConvergenceText(newReport.convergence_text ?? '');
+                        setConsiderationText(newReport.consideration_text ?? '');
+                        setProposalsText(newReport.proposals_text ?? '');
+                    } else {
+                        console.warn('[Review] newReport is null or undefined');
                     }
                     setIsAnalyzing(false);
                     setAnalysisStatus('success');
@@ -83,6 +127,7 @@ export default function Review({
                     );
                 },
                 onError: (errors) => {
+                    console.error('[Review] POST onError:', errors);
                     setIsAnalyzing(false);
                     setAnalysisStatus('error');
                     setAnalysisMessage(errors.analysis || 'Analysis failed. Please try again.');
@@ -141,9 +186,57 @@ export default function Review({
         );
     };
 
-    // Collect all consensus submissions from the groups
+    // Toggle a single group selection
+    const toggleGroup = (groupId: number) => {
+        setSelectedGroupIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(groupId)) {
+                newSet.delete(groupId);
+            } else {
+                newSet.add(groupId);
+            }
+            return newSet;
+        });
+    };
+
+    // Toggle all groups in a batch
+    const toggleBatch = (batchGroupIds: number[]) => {
+        setSelectedGroupIds(prev => {
+            const newSet = new Set(prev);
+            const allSelected = batchGroupIds.every(id => newSet.has(id));
+            if (allSelected) {
+                batchGroupIds.forEach(id => newSet.delete(id));
+            } else {
+                batchGroupIds.forEach(id => newSet.add(id));
+            }
+            return newSet;
+        });
+    };
+
+    // Check if all groups are selected
+    const isAllSelected = () => {
+        return groups.every(g => selectedGroupIds.has(g.id));
+    };
+
+    // Get unique group IDs sorted
+    const getUniqueGroupIds = () => {
+        return [...new Set(groups.map(g => g.id))].sort((a, b) => a - b);
+    };
+
+    // Group batches of 5
+    const getGroupBatches = () => {
+        const groupIds = getUniqueGroupIds();
+        const batches = [];
+        for (let i = 0; i < groupIds.length; i += 5) {
+            batches.push(groupIds.slice(i, i + 5));
+        }
+        return batches;
+    };
+
+    // Collect all consensus submissions from the groups (filtered by selectedGroupIds)
     const allConsensusSubmissions: any[] = [];
     for (const group of groups) {
+        if (!selectedGroupIds.has(group.id)) continue;
         const submissions = consensusSubmissions[group.id] || [];
         for (const submission of submissions) {
             allConsensusSubmissions.push({
@@ -205,16 +298,76 @@ export default function Review({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
+                                {/* Group Selection Checkboxes */}
+                                <div className="border-b pb-4">
+                                    <label className="text-sm font-medium mb-3 block flex items-center gap-2">
+                                        <Users className="h-4 w-4 text-muted-foreground" />
+                                        Filter by Groups
+                                    </label>
+                                    <div className="space-y-2">
+                                        {/* Select All checkbox */}
+                                        <div className="flex items-center gap-2 pb-2 border-b">
+                                            <input
+                                                type="checkbox"
+                                                checked={isAllSelected()}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedGroupIds(new Set(getUniqueGroupIds()));
+                                                    } else {
+                                                        setSelectedGroupIds(new Set());
+                                                    }
+                                                }}
+                                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm font-medium">Select All Groups</span>
+                                            <Badge variant="secondary" className="text-xs ml-auto">
+                                                {selectedGroupIds.size} / {groups.length}
+                                            </Badge>
+                                        </div>
+                                        {/* Batch checkboxes */}
+                                        {getGroupBatches().map((batchGroupIds, batchIndex) => {
+                                            const allInBatchSelected = batchGroupIds.every(id => selectedGroupIds.has(id));
+                                            const firstGroupId = batchGroupIds[0];
+                                            const lastGroupId = batchGroupIds[batchGroupIds.length - 1];
+                                            const count = batchGroupIds.length;
+
+                                            return (
+                                                <div key={`batch-${batchIndex}`} className="flex items-center gap-2 py-1">
+                                                    <input
+                                                        ref={(el) => {
+                                                            if (el) {
+                                                                batchCheckboxRefs.current.set(batchIndex, el);
+                                                            } else {
+                                                                batchCheckboxRefs.current.delete(batchIndex);
+                                                            }
+                                                        }}
+                                                        type="checkbox"
+                                                        checked={allInBatchSelected}
+                                                        onChange={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleBatch(batchGroupIds);
+                                                        }}
+                                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <span className="text-sm">
+                                                        Group {firstGroupId}-{lastGroupId} ({count})
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
                                 {allConsensusSubmissions.length > 0 ? (
                                     allConsensusSubmissions.map((submission: any, index: number) => (
                                         <div
-                                            key={`${submission.facilitator_id}-${index}`}
+                                            key={`${submission.group_id || submission.id}-${index}`}
                                             className="border rounded-lg p-4 bg-card"
                                         >
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
                                                     <p className="font-medium text-sm">
-                                                        {submission.facilitator_name || 'Anonymous'}
+                                                        {submission.group_name || submission.facilitator_name || 'Anonymous'}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
                                                         Group: {submission.groupName}
@@ -247,7 +400,7 @@ export default function Review({
                                     ))
                                 ) : (
                                     <p className="text-muted-foreground text-center py-8">
-                                        No consensus submissions received from any group in your assigned conversations.
+                                        No consensus submissions from selected groups.
                                     </p>
                                 )}
                             </CardContent>
@@ -265,9 +418,18 @@ export default function Review({
                                         const hasSubmitted = submissions.some(
                                             (s: any) => s.is_submitted
                                         );
+                                        const isSelected = selectedGroupIds.has(group.id);
                                         return (
                                             <div key={group.id} className="flex items-center justify-between">
-                                                <span className="text-sm">{group.name}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleGroup(group.id)}
+                                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                    />
+                                                    <span className="text-sm">{group.name}</span>
+                                                </div>
                                                 <Badge variant={hasSubmitted ? 'default' : 'secondary'} className="text-xs">
                                                     {hasSubmitted ? 'Submitted' : 'Pending'}
                                                 </Badge>
@@ -287,7 +449,7 @@ export default function Review({
                                     <CardTitle>Synthesis Editor</CardTitle>
                                     <Button
                                         onClick={handleTriggerLLM}
-                                        disabled={isAnalyzing}
+                                        disabled={isAnalyzing || selectedGroupIds.size === 0}
                                         variant="outline"
                                         size="sm"
                                     >

@@ -7,15 +7,6 @@ export default function Dashboard() {
     const role = auth.user?.role;
 
     const roleCards: Record<string, { title: string; description: string; icon: React.ReactNode; href: string; gradient: string }[]> = {
-        facilitator: [
-            {
-                title: 'Submit Response',
-                description: 'Submit your group\'s consensus paragraph for synthesis.',
-                icon: <Send className="size-6" />,
-                href: '/respond',
-                gradient: 'from-emerald-500/20 to-teal-500/20',
-            },
-        ],
         synthesis: [
             {
                 title: 'Submit Response',
@@ -80,16 +71,15 @@ export default function Dashboard() {
         ],
     };
 
-    const cards = roleCards[role || 'facilitator'] || roleCards.facilitator;
+    const cards = roleCards[role || 'admin'] || roleCards.admin;
 
     const roleLabels: Record<string, { label: string; color: string }> = {
-        facilitator: { label: 'Group Facilitator', color: 'text-emerald-400' },
         synthesis: { label: 'Synthesis Team', color: 'text-blue-400' },
         drafter: { label: 'Drafting Team', color: 'text-violet-400' },
         admin: { label: 'Administrator', color: 'text-amber-400' },
     };
 
-    const roleInfo = roleLabels[role || 'facilitator'] || roleLabels.facilitator;
+    const roleInfo = roleLabels[role || 'admin'] || roleLabels.admin;
 
     return (
         <>

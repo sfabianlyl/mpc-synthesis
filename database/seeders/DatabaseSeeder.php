@@ -36,7 +36,7 @@ class DatabaseSeeder extends Seeder
                 'event_id' => $event->id,
                 'title' => 'CIS 1',
                 'description' => 'First session of discernment.',
-                'status' => 'completed',
+                'status' => 'active',
             ]),
             Conversation::create([
                 'event_id' => $event->id,
@@ -52,53 +52,57 @@ class DatabaseSeeder extends Seeder
             ]),
         ];
 
-        // ─── 4. Create 7 Group Facilitators (Users with role 'facilitator') ──
-        $facilitators = [];
-        for ($i = 1; $i <= 7; $i++) {
-            $facilitators[] = User::factory()->create([
-                'name' => "Facilitator {$i}",
-                'email' => "facilitator{$i}@mpc.demo",
-                'role' => 'facilitator',
+        // ─── 4. Create 18 Synthesis Team Members (Users with role 'synthesis') ──
+        $synthesisMembers = [];
+        for ($i = 1; $i <= 18; $i++) {
+            $synthesisMembers[] = User::factory()->create([
+                'name' => "Synthesis Member {$i}",
+                'email' => "synthesis{$i}@mpc.demo",
+                'role' => 'synthesis',
             ]);
         }
 
-        // ─── 5. Create 2 Synthesis Team Members (Users with role 'synthesis') ──
-        $synthesisMembers = [
+        // ─── 4b. Create 10 Admin Users ──
+        for ($i = 1; $i <= 10; $i++) {
             User::factory()->create([
-                'name' => 'Synthesis Member A',
-                'email' => 'synthesis1@mpc.demo',
-                'role' => 'synthesis',
-            ]),
-            User::factory()->create([
-                'name' => 'Synthesis Member B',
-                'email' => 'synthesis2@mpc.demo',
-                'role' => 'synthesis',
-            ]),
-        ];
+                'name' => "Admin {$i}",
+                'email' => "admin{$i}@mpc.demo",
+                'role' => 'admin',
+            ]);
+        }
 
         User::factory()->create([
-                'name' => 'Drafter 1',
-                'email' => 'drafter1@mpc.demo',
-                'role' => 'drafter',
-            ]);
+            'name' => 'Drafter 1',
+            'email' => 'drafter1@mpc.demo',
+            'role' => 'drafter',
+        ]);
 
-        // ─── 6. Create 7 Groups (one per facilitator) ───────────────
+        // ─── 5. Create 94 Groups (without facilitator) ──────────────
         $groups = [];
-        for ($i = 1; $i <= 7; $i++) {
+        for ($i = 1; $i <= 94; $i++) {
             $groups[] = Group::create([
                 'name' => "Group {$i}",
-                'facilitator_id' => $facilitators[$i - 1]->id,
             ]);
         }
 
-        // ─── 6b. Assign conversations to synthesis members via pivot table ──
-        // Synthesis Member A gets CIS 1 and CIS 2
-        $conversations[0]->synthesisMembers()->attach($synthesisMembers[0]->id); // CIS 1 -> A
+        // ─── 5b. Assign conversations to synthesis members via pivot table ──
+        // Each conversation gets 6 synthesis members assigned
+        // CIS 1: Synthesis Members 1-6
+        $cis1Members = array_slice($synthesisMembers, 0, 6);
+        $cis1MemberIds = array_column($cis1Members, 'id');
+        $conversations[0]->synthesisMembers()->attach($cis1MemberIds);
 
-        // Synthesis Member B gets CIS 2 and CIS 3
-        $conversations[1]->synthesisMembers()->attach($synthesisMembers[1]->id); // CIS 2 -> B
+        // CIS 2: Synthesis Members 7-12
+        $cis2Members = array_slice($synthesisMembers, 6, 6);
+        $cis2MemberIds = array_column($cis2Members, 'id');
+        $conversations[1]->synthesisMembers()->attach($cis2MemberIds);
 
-        // ─── 7. Create Responses for CIS 2 (7 group consensus paragraphs) ──
+        // CIS 3: Synthesis Members 13-18
+        $cis3Members = array_slice($synthesisMembers, 12, 6);
+        $cis3MemberIds = array_column($cis3Members, 'id');
+        $conversations[2]->synthesisMembers()->attach($cis3MemberIds);
+
+        // ─── 6. Create Responses for CIS 2 (7 group consensus paragraphs) ──
         $cis2 = $conversations[1]; // CIS 2
 
         $consensusTexts = [
@@ -125,16 +129,17 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($groups as $index => $group) {
+            // Cycle through available consensus texts for groups beyond 7
+            $textIndex = $index % count($consensusTexts);
             Response::create([
-                'conversation_id' => $cis2->id,
+                'conversation_id' => $conversations[0]->id,
                 'group_id' => $group->id,
-                'facilitator_id' => $group->facilitator_id,
-                'consensus_text' => $consensusTexts[$index],
+                'consensus_text' => $consensusTexts[$textIndex],
                 'submitted_at' => now()->subDays(5),
             ]);
         }
 
-        // ─── 8. Create Synthesis Reports for CIS 2 ──────────────────
+        // ─── 7. Create Synthesis Reports for CIS 2 ──────────────────
         // Synthesis Member A: reports for Groups 1-4 (4 responses)
         SynthesisReport::create([
             'conversation_id' => $cis2->id,
@@ -157,24 +162,22 @@ class DatabaseSeeder extends Seeder
             'status' => 'submitted',
         ]);
 
-        // ─── 9. Seed minimal data for CIS 1 and CIS 3 (placeholder) ─
+        // ─── 8. Seed minimal data for CIS 1 and CIS 3 (placeholder) ─
         $cis1 = $conversations[0];
         $cis3 = $conversations[2];
 
-        // CIS 1: one sample response from Group 1
+        // CIS 1: one sample response from Group 2 (Group 1 already has a response from the loop above)
         Response::create([
             'conversation_id' => $cis1->id,
-            'group_id' => $groups[0]->id,
-            'facilitator_id' => $groups[0]->facilitator_id,
-            'consensus_text' => '[Placeholder] Our group discerned the importance of building communion through digital outreach and welcoming environments for all parishioners.',
+            'group_id' => $groups[1]->id,
+            'consensus_text' => 'Our group discerned the importance of building communion through digital outreach and welcoming environments for all parishioners.',
             'submitted_at' => now()->subDays(25),
         ]);
 
-        // CIS 3: one sample response from Group 1
+        // CIS 3: one sample response from Group 2 (Group 1 already has a response from the loop above)
         Response::create([
             'conversation_id' => $cis3->id,
-            'group_id' => $groups[0]->id,
-            'facilitator_id' => $groups[0]->facilitator_id,
+            'group_id' => $groups[1]->id,
             'consensus_text' => '[Placeholder] Our group reflected on the future governance of the church and the need for inclusive discernment processes.',
             'submitted_at' => now()->subDays(20),
         ]);
@@ -182,8 +185,9 @@ class DatabaseSeeder extends Seeder
         $this->command->info('Demo data seeded successfully!');
         $this->command->info('Event: Malaysian Pastoral Convention (MPC)');
         $this->command->info('Conversations: CIS 1, CIS 2, CIS 3');
-        $this->command->info('Groups: 7 (Group 1-7)');
-        $this->command->info('Synthesis Member A: CIS 1, CIS 2 | Synthesis Member B: CIS 2, CIS 3');
-        $this->command->info('CIS 2 has 7 group responses with full consensus texts.');
+        $this->command->info('Groups: 94 (Group 1-94)');
+        $this->command->info('Synthesis Members: 18 total (6 per conversation)');
+        $this->command->info('CIS 1: Synthesis Members 1-6 | CIS 2: Synthesis Members 7-12 | CIS 3: Synthesis Members 13-18');
+        $this->command->info('Admin Users: 10');
     }
 }

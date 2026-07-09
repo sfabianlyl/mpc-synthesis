@@ -2,7 +2,7 @@ export interface User {
     id: number;
     name: string;
     email: string;
-    role: 'facilitator' | 'synthesis' | 'drafter' | 'admin';
+    role: 'synthesis' | 'drafter' | 'admin';
     created_at: string;
 }
 
@@ -19,10 +19,8 @@ export interface Group {
     id: number;
     name: string;
     synthesis_id?: number;
-    facilitator_id?: number;
     responses_count?: number;
     synthesis?: User;
-    facilitator?: User;
     responses?: Response[];
 }
 
@@ -30,13 +28,11 @@ export interface Response {
     id: number;
     conversation_id: number;
     group_id: number;
-    facilitator_id: number;
     consensus_text: string;
     submitted_at: string | null;
     created_at: string;
     updated_at: string;
     group?: Group;
-    facilitator?: User;
 }
 
 export interface SynthesisReport {
@@ -74,8 +70,8 @@ export interface FinalDocument {
 
 export interface ConsensusSubmission {
     id: number;
-    facilitator_id: number;
-    facilitator_name: string | null;
+    group_id?: number;
+    group_name: string | null;
     submitted_at: string | null;
     consensus_text: string;
     is_submitted: boolean;

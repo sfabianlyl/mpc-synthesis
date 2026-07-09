@@ -23,7 +23,6 @@ interface SubmissionStats {
     responses: Array<{
         id: number;
         group_name: string;
-        facilitator: string | null;
         consensus_text: string;
     }>;
 }
