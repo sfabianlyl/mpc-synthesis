@@ -39,15 +39,69 @@ export interface SynthesisReport {
     id: number;
     conversation_id: number;
     synthesis_id: number;
+    submission_number?: number;
     convergence_text?: string;
     consideration_text?: string;
     proposals_text?: string;
+    other_text?: string;
+    ai_convergence_text?: string | null;
+    ai_consideration_text?: string | null;
+    ai_proposals_text?: string | null;
+    ai_other_text?: string | null;
+    is_llm_assisted?: boolean;
     llm_generated: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
+    submitted_at?: string | null;
     created_at: string;
     updated_at: string;
     synthesis?: User;
     conversation?: Conversation;
+}
+
+export interface SynthesisSubmission {
+    id: number;
+    submission_number: number;
+    user: { id: number; name: string; email: string };
+    convergence_text: string | null;
+    consideration_text: string | null;
+    proposals_text: string | null;
+    other_text: string | null;
+    ai_convergence_text: string | null;
+    ai_consideration_text: string | null;
+    ai_proposals_text: string | null;
+    ai_other_text: string | null;
+    is_llm_assisted: boolean;
+    status: 'draft' | 'reviewed' | 'submitted';
+    submitted_at: string | null;
+    custom_queries: Array<{
+        id: number;
+        prompt: string;
+        response: string[];
+        provider: string | null;
+        created_at: string;
+    }>;
+}
+
+export interface MasterSynthesisReport {
+    id: number | null;
+    conversation_id: number;
+    convergence_text: string | null;
+    consideration_text: string | null;
+    proposals_text: string | null;
+    other_text: string | null;
+    llm_generated: boolean;
+    status: 'draft' | 'reviewed' | 'submitted';
+    created_at: string;
+    updated_at: string;
+}
+
+export interface SynthesisCustomQuery {
+    id: number;
+    synthesis_report_id: number;
+    prompt: string;
+    response: string[];
+    provider: string | null;
+    created_at: string;
 }
 
 export interface FinalDocument {

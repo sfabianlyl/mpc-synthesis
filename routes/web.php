@@ -22,9 +22,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:synthesis')->prefix('synthesis')->name('synthesis.')->group(function () {
         Route::get('/', [SynthesisController::class, 'index'])->name('dashboard');
         Route::get('review/{conversation}', [SynthesisController::class, 'review'])->name('review');
+        
+        // Collaborative Review Page (with real-time updates)
+        Route::get('review-page/{conversation}', [SynthesisController::class, 'reviewPage'])->name('review-page');
+        
+        // Submit Synthesis (new submission)
+        Route::post('submit-synthesis/{conversation}', [SynthesisController::class, 'submitSynthesis'])->name('submit-synthesis');
+        
+        // Generate AI-assisted synthesis for current user's draft
+        Route::post('ai-synthesis/{conversation}', [SynthesisController::class, 'generateAiAssistedSynthesis'])->name('ai-synthesis');
+        
+        // Update master synthesis (drafter/admin only)
+        Route::patch('master-synthesis/{conversation}', [SynthesisController::class, 'updateMasterSynthesis'])->name('master-synthesis.update');
+        
         Route::post('analyze/{conversation}', [SynthesisController::class, 'analyze'])->name('analyze');
         Route::patch('report/{report}', [SynthesisController::class, 'update'])->name('report.update');
         Route::post('report/{report}/submit', [SynthesisController::class, 'submit'])->name('report.submit');
+        Route::post('custom-query/{conversation}', [SynthesisController::class, 'customQuery'])->name('custom-query');
+        Route::delete('custom-query/{query}', [SynthesisController::class, 'deleteCustomQuery'])->name('custom-query.delete');
     });
 
     // ─── Drafter Dashboard & Drafting ────────────────────────────────

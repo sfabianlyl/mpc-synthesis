@@ -1,13 +1,13 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { CheckCircle2, FileCheck, Users, XCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Conversation, ConsensusSubmission, Group, SynthesisReport } from '@/types/models';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import type { Conversation, ConsensusSubmission, Group, SynthesisReport } from '@/types/models';
 
 interface PageProps {
     conversations: Conversation[];
@@ -29,11 +29,14 @@ export default function Dashboard({ conversations, groups, report, selectedConve
         if (flash?.success) {
             setStatusMessage({ type: 'success', text: flash.success });
             const timer = setTimeout(() => setStatusMessage(null), 5000);
+
             return () => clearTimeout(timer);
         }
+
         if (flash?.errors?.analysis) {
             setStatusMessage({ type: 'error', text: flash.errors.analysis });
             const timer = setTimeout(() => setStatusMessage(null), 5000);
+
             return () => clearTimeout(timer);
         }
     }, [flash]);
@@ -45,6 +48,7 @@ export default function Dashboard({ conversations, groups, report, selectedConve
     // Helper to get display name with fallback
     const getDisplayName = (submission: ConsensusSubmission): string => {
         const anySub = submission as any;
+
         return anySub.group_name || anySub.facilitator_name || '';
     };
 
@@ -140,6 +144,7 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                                                 const initials = displayName
                                                     ? displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2)
                                                     : '';
+
                                                 return (
                                                     <TableRow key={submission.id}>
                                                         <TableCell className="font-semibold">
@@ -231,6 +236,11 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                                         <FileCheck className="size-4" /> View Synthesis
                                     </Button>
                                 </Link>
+                                <Link href={`/synthesis/review-page/${selectedConversationId}`} className="w-full">
+                                    <Button variant="outline" className="w-full flex items-center justify-center gap-2">
+                                        <Users className="size-4" /> Collaborative Review
+                                    </Button>
+                                </Link>
                                 {!report && submittedResponsesCount === 0 && (
                                     <p className="text-[11px] text-center text-destructive">
                                         At least 1 consensus response is required before viewing synthesis.
@@ -269,6 +279,7 @@ export default function Dashboard({ conversations, groups, report, selectedConve
                                         {groups.map((group) => {
                                             const hasSubmitted = group.responses && group.responses.length > 0;
                                             const responseText = hasSubmitted ? group.responses![0].consensus_text : '';
+
                                             return (
                                                 <TableRow key={group.id}>
                                                     <TableCell className="font-semibold">{group.name}</TableCell>

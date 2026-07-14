@@ -1,16 +1,39 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import { CheckCircle2, XCircle, Loader2, FileText, Users, Bot, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, XCircle, Loader2, FileText, Users } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+
+interface SynthesisCustomQuery {
+    id: number;
+    prompt: string;
+    response: string[];
+    provider: string | null;
+    created_at: string;
+}
+
+interface SynthesisReport {
+    id: number;
+    convergence_text: string | null;
+    consideration_text: string | null;
+    proposals_text: string | null;
+    ai_convergence_text: string | null;
+    ai_consideration_text: string | null;
+    ai_proposals_text: string | null;
+    ai_source_group_ids: number[] | null;
+    ai_generated_at: string | null;
+    llm_generated: boolean;
+    status: string;
+    custom_queries: SynthesisCustomQuery[];
+}
 
 interface PageProps {
     conversation: any;
     groups: any[];
     responses: any[];
-    report: any;
+    report: SynthesisReport | null;
     success?: string;
     errors?: Record<string, string>;
     consensusSubmissions: Record<number, any[]>;
@@ -34,6 +57,9 @@ export default function Review({
     const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(
         new Set(groups.map(g => g.id))
     );
+    // New state for custom prompt
+    const [customPrompt, setCustomPrompt] = useState('');
+    const [isCustomQuerying, setIsCustomQuerying] = useState(false);
 
     // Refs for batch checkbox indeterminate state
     const batchCheckboxRefs = useRef<Map<number, HTMLInputElement>>(new Map());
@@ -47,6 +73,7 @@ export default function Review({
                 setAnalysisMessage('');
             }, 5000);
         }
+
         if (initialErrors?.analysis) {
             setAnalysisStatus('error');
             setAnalysisMessage(initialErrors.analysis);
@@ -60,18 +87,9 @@ export default function Review({
     // Sync local state when report prop changes (e.g., after Inertia re-render)
     useEffect(() => {
         if (report) {
-            console.log('[Review] Report prop changed:', {
-                id: report.id,
-                convergence_text_length: report.convergence_text?.length ?? 0,
-                consideration_text_length: report.consideration_text?.length ?? 0,
-                proposals_text_length: report.proposals_text?.length ?? 0,
-                llm_generated: report.llm_generated,
-            });
             setConvergenceText(report.convergence_text ?? '');
             setConsiderationText(report.consideration_text ?? '');
             setProposalsText(report.proposals_text ?? '');
-        } else {
-            console.log('[Review] Report prop is null');
         }
     }, [report]);
 
@@ -79,12 +97,14 @@ export default function Review({
     useEffect(() => {
         const groupIds = getUniqueGroupIds();
         const batches = [];
+
         for (let i = 0; i < groupIds.length; i += 5) {
             batches.push(groupIds.slice(i, i + 5));
         }
 
         batches.forEach((batchGroupIds, batchIndex) => {
             const ref = batchCheckboxRefs.current.get(batchIndex);
+
             if (ref) {
                 const allInBatchSelected = batchGroupIds.every(id => selectedGroupIds.has(id));
                 const someInBatchSelected = batchGroupIds.some(id => selectedGroupIds.has(id));
@@ -93,11 +113,41 @@ export default function Review({
         });
     }, [selectedGroupIds]);
 
+    // Custom LLM query handler
+    const handleCustomQuery = () => {
+        if (!customPrompt.trim() || !conversation.id) {
+return;
+}
+
+        setIsCustomQuerying(true);
+        router.post(
+            `/synthesis/custom-query/${conversation.id}`,
+            {
+                prompt: customPrompt,
+                selected_group_ids: Array.from(selectedGroupIds),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setCustomPrompt('');
+                    setIsCustomQuerying(false);
+                },
+                onError: () => setIsCustomQuerying(false),
+            }
+        );
+    };
+
+    // Delete custom query handler
+    const handleDeleteCustomQuery = (queryId: number) => {
+        router.delete(`/synthesis/custom-query/${queryId}`, {
+            preserveScroll: true,
+        });
+    };
+
     const handleTriggerLLM = () => {
         setIsAnalyzing(true);
         setAnalysisStatus('idle');
         setAnalysisMessage('');
-        console.log('[Review] Triggering LLM analysis for conversation:', conversation.id);
         router.post(
             `/synthesis/analyze/${conversation.id}`,
             {
@@ -107,19 +157,13 @@ export default function Review({
                 preserveScroll: true,
                 onSuccess: (page: any) => {
                     const newReport = page.props.report;
-                    console.log('[Review] POST onSuccess - newReport:', newReport);
+
                     if (newReport) {
-                        console.log('[Review] Setting textareas with new report data:', {
-                            convergence_text_length: newReport.convergence_text?.length ?? 0,
-                            consideration_text_length: newReport.consideration_text?.length ?? 0,
-                            proposals_text_length: newReport.proposals_text?.length ?? 0,
-                        });
                         setConvergenceText(newReport.convergence_text ?? '');
                         setConsiderationText(newReport.consideration_text ?? '');
                         setProposalsText(newReport.proposals_text ?? '');
-                    } else {
-                        console.warn('[Review] newReport is null or undefined');
                     }
+
                     setIsAnalyzing(false);
                     setAnalysisStatus('success');
                     setAnalysisMessage(
@@ -127,7 +171,6 @@ export default function Review({
                     );
                 },
                 onError: (errors) => {
-                    console.error('[Review] POST onError:', errors);
                     setIsAnalyzing(false);
                     setAnalysisStatus('error');
                     setAnalysisMessage(errors.analysis || 'Analysis failed. Please try again.');
@@ -137,7 +180,10 @@ export default function Review({
     };
 
     const handleSaveReport = () => {
-        if (!report?.id) return;
+        if (!report?.id) {
+return;
+}
+
         router.patch(
             `/synthesis/report/${report.id}`,
             {
@@ -164,7 +210,10 @@ export default function Review({
     };
 
     const handleStatusUpdate = (status: 'draft' | 'reviewed' | 'submitted') => {
-        if (!report?.id) return;
+        if (!report?.id) {
+return;
+}
+
         router.patch(
             `/synthesis/report/${report.id}`,
             { status },
@@ -190,11 +239,13 @@ export default function Review({
     const toggleGroup = (groupId: number) => {
         setSelectedGroupIds(prev => {
             const newSet = new Set(prev);
+
             if (newSet.has(groupId)) {
                 newSet.delete(groupId);
             } else {
                 newSet.add(groupId);
             }
+
             return newSet;
         });
     };
@@ -204,11 +255,13 @@ export default function Review({
         setSelectedGroupIds(prev => {
             const newSet = new Set(prev);
             const allSelected = batchGroupIds.every(id => newSet.has(id));
+
             if (allSelected) {
                 batchGroupIds.forEach(id => newSet.delete(id));
             } else {
                 batchGroupIds.forEach(id => newSet.add(id));
             }
+
             return newSet;
         });
     };
@@ -227,17 +280,24 @@ export default function Review({
     const getGroupBatches = () => {
         const groupIds = getUniqueGroupIds();
         const batches = [];
+
         for (let i = 0; i < groupIds.length; i += 5) {
             batches.push(groupIds.slice(i, i + 5));
         }
+
         return batches;
     };
 
     // Collect all consensus submissions from the groups (filtered by selectedGroupIds)
     const allConsensusSubmissions: any[] = [];
+
     for (const group of groups) {
-        if (!selectedGroupIds.has(group.id)) continue;
+        if (!selectedGroupIds.has(group.id)) {
+continue;
+}
+
         const submissions = consensusSubmissions[group.id] || [];
+
         for (const submission of submissions) {
             allConsensusSubmissions.push({
                 ...submission,
@@ -247,25 +307,54 @@ export default function Review({
         }
     }
 
+    // Render AI text as bullet points
+    const renderAiText = (text: string | null): React.ReactNode => {
+        if (!text || !text.trim()) {
+return null;
+}
+
+        const bullets = text.split('\n').filter(line => line.trim());
+
+        return (
+            <ul className="space-y-1">
+                {bullets.map((bullet, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                        <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                        <span className="text-sm">{bullet.replace(/^-+\s*/, '')}</span>
+                    </li>
+                ))}
+            </ul>
+        );
+    };
+
     return (
         <>
             <Head title={`Review - ${conversation?.title || 'Synthesis Review'}`} />
             <div className="p-8 max-w-[1920px] mx-auto">
                 {/* Header */}
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold">{conversation?.title}</h1>
-                    <p className="text-muted-foreground mt-1">Conversation ID: {conversation?.id}</p>
-                    {report && (
-                        <Badge
-                            variant={report.status === 'submitted' ? 'default' : 'secondary'}
-                            className="mt-2"
-                        >
-                            Status: {report.status}
-                            {report.llm_generated && (
-                                <span className="ml-1 text-xs">(LLM Generated)</span>
-                            )}
-                        </Badge>
-                    )}
+                <div className="mb-6 flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold">{conversation?.title}</h1>
+                        <p className="text-muted-foreground mt-1">Conversation ID: {conversation?.id}</p>
+                        {report && (
+                            <Badge
+                                variant={report.status === 'submitted' ? 'default' : 'secondary'}
+                                className="mt-2"
+                            >
+                                Status: {report.status}
+                                {report.llm_generated && (
+                                    <span className="ml-1 text-xs">(LLM Generated)</span>
+                                )}
+                            </Badge>
+                        )}
+                    </div>
+                    <div className="flex gap-2 pb-2">
+                        <Link href={`/synthesis/review-page/${conversation.id}`}>
+                            <Button variant="outline" className="flex items-center gap-2">
+                                <Users className="size-4" /> Collaborative Review
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
                 {/* Analysis Status Indicator */}
@@ -419,6 +508,7 @@ export default function Review({
                                             (s: any) => s.is_submitted
                                         );
                                         const isSelected = selectedGroupIds.has(group.id);
+
                                         return (
                                             <div key={group.id} className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
@@ -441,12 +531,12 @@ export default function Review({
                         </Card>
                     </div>
 
-                    {/* Right Column - Synthesis Editor */}
+                    {/* Right Column - Synthesis Panel */}
                     <div className="space-y-4">
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
-                                    <CardTitle>Synthesis Editor</CardTitle>
+                                    <CardTitle>Synthesis Panel</CardTitle>
                                     <Button
                                         onClick={handleTriggerLLM}
                                         disabled={isAnalyzing || selectedGroupIds.size === 0}
@@ -458,11 +548,29 @@ export default function Review({
                                     </Button>
                                 </div>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-4">
+                            <CardContent className="space-y-6">
+                                {/* Convergence Section */}
+                                <div className="space-y-2">
+                                    {/* AI-generated field (only visible when exists) */}
+                                    {report?.ai_convergence_text && report.ai_convergence_text.trim() && (
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <label className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                                    Convergence (AI)
+                                                </label>
+                                                <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                                                    <Bot className="h-3 w-3 mr-1" /> AI Generated
+                                                </Badge>
+                                            </div>
+                                            <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3 min-h-[60px]">
+                                                {renderAiText(report.ai_convergence_text)}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* User field (always visible) */}
                                     <div>
                                         <label className="text-sm font-medium mb-1 block">
-                                            Convergence (A)
+                                            Convergence (Your Input)
                                         </label>
                                         <Textarea
                                             value={convergenceText}
@@ -473,9 +581,30 @@ export default function Review({
                                             placeholder="Points of agreement..."
                                         />
                                     </div>
+                                </div>
+
+                                {/* Matters for Consideration Section */}
+                                <div className="space-y-2">
+                                    {/* AI-generated field (only visible when exists) */}
+                                    {report?.ai_consideration_text && report.ai_consideration_text.trim() && (
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <label className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                                                    Matters for Consideration (AI)
+                                                </label>
+                                                <Badge variant="secondary" className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                                                    <Bot className="h-3 w-3 mr-1" /> AI Generated
+                                                </Badge>
+                                            </div>
+                                            <div className="bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-md p-3 min-h-[60px]">
+                                                {renderAiText(report.ai_consideration_text)}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* User field (always visible) */}
                                     <div>
                                         <label className="text-sm font-medium mb-1 block">
-                                            Matters for Consideration (B)
+                                            Matters for Consideration (Your Input)
                                         </label>
                                         <Textarea
                                             value={considerationText}
@@ -486,9 +615,30 @@ export default function Review({
                                             placeholder="Areas of concern or unresolved questions..."
                                         />
                                     </div>
+                                </div>
+
+                                {/* Proposals Section */}
+                                <div className="space-y-2">
+                                    {/* AI-generated field (only visible when exists) */}
+                                    {report?.ai_proposals_text && report.ai_proposals_text.trim() && (
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <label className="text-sm font-medium text-green-700 dark:text-green-300">
+                                                    Proposals (AI)
+                                                </label>
+                                                <Badge variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                                                    <Bot className="h-3 w-3 mr-1" /> AI Generated
+                                                </Badge>
+                                            </div>
+                                            <div className="bg-green-50/50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md p-3 min-h-[60px]">
+                                                {renderAiText(report.ai_proposals_text)}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* User field (always visible) */}
                                     <div>
                                         <label className="text-sm font-medium mb-1 block">
-                                            Proposals (C)
+                                            Proposals (Your Input)
                                         </label>
                                         <Textarea
                                             value={proposalsText}
@@ -501,6 +651,7 @@ export default function Review({
                                     </div>
                                 </div>
 
+                                {/* Action Buttons */}
                                 <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
                                     <Button onClick={handleSaveReport} className="flex-1">
                                         Save Draft
@@ -522,8 +673,75 @@ export default function Review({
                                         Submit Synthesis
                                     </Button>
                                 </div>
+
+                                {/* Custom LLM Prompt Section */}
+                                <div className="pt-4 border-t">
+                                    <h3 className="text-sm font-medium mb-2">Custom LLM Prompt</h3>
+                                    <div className="flex gap-2">
+                                        <Textarea
+                                            value={customPrompt}
+                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                                                setCustomPrompt(e.target.value)
+                                            }
+                                            rows={2}
+                                            placeholder="Ask the LLM a specific question about the group responses..."
+                                            className="flex-1"
+                                        />
+                                        <Button
+                                            onClick={handleCustomQuery}
+                                            disabled={!customPrompt.trim() || isCustomQuerying}
+                                            variant="outline"
+                                            className="self-start flex-shrink-0"
+                                        >
+                                            {isCustomQuerying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                            Ask AI
+                                        </Button>
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
+
+                        {/* Others Section - Custom Query Results */}
+                        {report?.custom_queries && report.custom_queries.length > 0 && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Bot className="h-5 w-5" />
+                                        Others
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {report.custom_queries.map((query) => (
+                                        <div key={query.id} className="border rounded-lg p-4 bg-card">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-medium">{query.prompt}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {query.provider ? `via ${query.provider}` : 'Unknown provider'} · {new Date(query.created_at).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600 ml-2 flex-shrink-0"
+                                                    onClick={() => handleDeleteCustomQuery(query.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                            <ul className="space-y-1 mt-2">
+                                                {query.response.map((point: string, i: number) => (
+                                                    <li key={i} className="flex items-start gap-2 text-sm">
+                                                        <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+                                                        <span>{point}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        )}
                     </div>
                 </div>
             </div>

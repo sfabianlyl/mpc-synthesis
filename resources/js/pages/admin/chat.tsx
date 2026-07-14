@@ -1,10 +1,10 @@
 import { Head } from '@inertiajs/react';
-import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Send, Loader2, Users, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app/app-sidebar-layout';
 
 interface Conversation {
@@ -54,9 +54,12 @@ export default function Chat({ conversations, selectedConversationId }: PageProp
     }, [messages]);
 
     const loadStats = async () => {
-        if (!selectedConversation) return;
+        if (!selectedConversation) {
+return;
+}
         
         setStatsLoading(true);
+
         try {
             const response = await (window as any).axios.get('/admin/chat/details', {
                 params: { conversation_id: selectedConversation }
@@ -70,7 +73,9 @@ export default function Chat({ conversations, selectedConversationId }: PageProp
     };
 
     const sendMessage = async () => {
-        if (!input.trim() || !selectedConversation || loading) return;
+        if (!input.trim() || !selectedConversation || loading) {
+return;
+}
 
         const userMessage: ChatMessage = { role: 'user', content: input };
         setMessages(prev => [...prev, userMessage]);

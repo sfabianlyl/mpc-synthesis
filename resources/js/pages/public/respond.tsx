@@ -1,10 +1,10 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { useEffect } from 'react';
 import { AlertCircle, CheckCircle2, Send, Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 
 interface EventData {
     id: number;
@@ -60,7 +60,10 @@ export default function Respond({ event_id, group_id, event, group, conversation
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!data.conversation_id || !data.consensus_text.trim()) return;
+
+        if (!data.conversation_id || !data.consensus_text.trim()) {
+return;
+}
 
         post(`/respond/${event_id}/${group_id}`, {
             onSuccess: () => {

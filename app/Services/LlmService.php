@@ -303,6 +303,30 @@ PROMPT;
     }
 
     /**
+     * Build the system prompt for custom user queries.
+     */
+    public function buildCustomQueryPrompt(): string
+    {
+        return <<<'PROMPT'
+You are a synthesis assistant for a consultative process. You will receive one or more consensus paragraphs from group discussions as context, followed by a specific question or prompt from the user.
+
+Your task is to answer the user's question based on the provided context. Structure your response as bullet points.
+
+Return your response as a JSON object with a single key "points" containing an array of strings:
+{
+  "points": [
+    "First bullet point",
+    "Second bullet point",
+    "Third bullet point"
+  ]
+}
+
+IMPORTANT: Do NOT wrap the response in markdown code blocks. Return valid JSON only.
+Be concise but thorough. Base your analysis on the provided group responses.
+PROMPT;
+    }
+
+    /**
      * Build the system prompt for global/macro synthesis of emerging themes.
      */
     public function buildGlobalSynthesisPrompt(): string

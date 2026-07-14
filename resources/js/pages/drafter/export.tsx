@@ -1,12 +1,12 @@
 import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Download, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Download, Loader2 } from 'lucide-react';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useEffect, useState } from 'react';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface User {
     id: number;
@@ -78,6 +78,7 @@ export default function Export({ document: initialDocument, reports: initialRepo
     const handleGenerateDownload = () => {
         if (!initialDocument?.id) {
             alert('No document selected for export.');
+
             return;
         }
 
@@ -104,6 +105,7 @@ export default function Export({ document: initialDocument, reports: initialRepo
     const handleSubmitSynthesis = () => {
         if (selectedConversationIds.length === 0) {
             alert('Please select at least one conversation');
+
             return;
         }
 
@@ -133,6 +135,7 @@ export default function Export({ document: initialDocument, reports: initialRepo
             if (!conversationsByEvent[conv.event_id]) {
                 conversationsByEvent[conv.event_id] = [];
             }
+
             conversationsByEvent[conv.event_id].push(conv);
         }
     });

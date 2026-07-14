@@ -1,13 +1,13 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { AlertCircle, CheckCircle, Send, Users, Calendar } from 'lucide-react';
-import AppLayout from '@/layouts/app-layout';
-import { Conversation, Group } from '@/types/models';
 import { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import type { Conversation, Group } from '@/types/models';
 
 interface PageProps {
     groups: Group[];
@@ -32,7 +32,10 @@ export default function Submit({ groups, currentGroup, conversations }: PageProp
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!data.conversation_id || !data.group_id || !data.consensus_text.trim()) return;
+
+        if (!data.conversation_id || !data.group_id || !data.consensus_text.trim()) {
+return;
+}
 
         post('/respond', {
             onSuccess: () => {
