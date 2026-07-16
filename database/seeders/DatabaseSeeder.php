@@ -55,13 +55,54 @@ class DatabaseSeeder extends Seeder
 
         // ─── 4. Create 18 Synthesis Team Members (Users with role 'synthesis') ──
         $synthesisMembers = [];
-        for ($i = 1; $i <= 18; $i++) {
+        $synthesisMembers[] = User::factory()->create([
+                'name' => "Gregory Pravin Rajah",
+                'email' => "greg@mpc.demo",
+                'role' => 'synthesis',
+            ]);
+        $synthesisMembers[] = User::factory()->create([
+                'name' => "Salomi, Rgs",
+                'email' => "salomi@mpc.demo",
+                'role' => 'synthesis',
+            ]);
+        $synthesisMembers[] = User::factory()->create([
+                'name' => "Thomas Paul",
+                'email' => "thomas@mpc.demo",
+                'role' => 'synthesis',
+            ]);
+        $synthesisMembers[] = User::factory()->create([
+                'name' => "Anna Teresa",
+                'email' => "anna@mpc.demo",
+                'role' => 'synthesis',
+            ]);
+        $synthesisMembers[] = User::factory()->create([
+                'name' => "Bernadine",
+                'email' => "bernadine@mpc.demo",
+                'role' => 'synthesis',
+            ]);
+        $synthesisMembers[] = User::factory()->create([
+                'name' => "Gerald",
+                'email' => "gerald@mpc.demo",
+                'role' => 'synthesis',
+            ]);
+        $synthesisMembers[] = User::factory()->create([
+                'name' => "Francisco",
+                'email' => "francisco@mpc.demo",
+                'role' => 'synthesis',
+            ]);
+        $synthesisMembers[] = User::factory()->create([
+                'name' => "Sr Retta",
+                'email' => "retta@mpc.demo",
+                'role' => 'synthesis',
+            ]);
+        for ($i = 9; $i <= 18; $i++) {
             $synthesisMembers[] = User::factory()->create([
                 'name' => "Synthesis Member {$i}",
                 'email' => "synthesis{$i}@mpc.demo",
                 'role' => 'synthesis',
             ]);
         }
+        
 
         // ─── 4b. Create 10 Admin Users ──
         for ($i = 1; $i <= 10; $i++) {
@@ -88,13 +129,13 @@ class DatabaseSeeder extends Seeder
 
         // ─── 5b. Assign conversations to synthesis members via pivot table ──
         // Each conversation gets 6 synthesis members assigned
-        // CIS 1: Synthesis Members 1-6
-        $cis1Members = array_slice($synthesisMembers, 0, 6);
+        // CIS 1: Synthesis Members 1-8
+        $cis1Members = array_slice($synthesisMembers, 0, 8);
         $cis1MemberIds = array_column($cis1Members, 'id');
         $conversations[0]->synthesisMembers()->attach($cis1MemberIds);
 
-        // CIS 2: Synthesis Members 7-12
-        $cis2Members = array_slice($synthesisMembers, 6, 6);
+        // CIS 2: Synthesis Members 9-12
+        $cis2Members = array_slice($synthesisMembers, 8, 4);
         $cis2MemberIds = array_column($cis2Members, 'id');
         $conversations[1]->synthesisMembers()->attach($cis2MemberIds);
 
@@ -129,13 +170,11 @@ class DatabaseSeeder extends Seeder
             'As a group we have discerned that the job description of the parish priest must be listed out in detail and made available to the public. The role of the parish priest can not and should be vague nor up to each parish priest to decide for himself. In order to uphold the integrity of the priesthood and the transparency and accountability of the priest, priests too must be reviewed formally, of their work by the bishop and the parish community. Methods and processes driven by each parish priest must also be evaluated to identify if synodality is resisted or incorporated in their ministry. Our group does present this consensus as an attack on the clergy but as a safeguarding measure against some bad apples in the bunch.',
         ];
 
-        foreach ($groups as $index => $group) {
-            // Cycle through available consensus texts for groups beyond 7
-            $textIndex = $index % count($consensusTexts);
+        foreach ($consensusTexts as $index=>$consensus){
             Response::create([
                 'conversation_id' => $conversations[0]->id,
-                'group_id' => $group->id,
-                'consensus_text' => $consensusTexts[$textIndex],
+                'group_id' => $groups[$index]->id,
+                'consensus_text' => $consensus,
                 'submitted_at' => now()->subDays(5),
             ]);
         }
@@ -146,7 +185,7 @@ class DatabaseSeeder extends Seeder
             'conversation_id' => $cis2->id,
             'synthesis_id' => $synthesisMembers[0]->id,
             // AI-generated content
-            'ai_convergence_text' => "- Strong concern about lack of pastoral accompaniment for families and irregular situations.\n- Recognition that Catholic families are losing their identity in a secular media landscape.\n- Call for more leadership training and cultural understanding across Sabah, Sarawak, and Semenanjung.\n- Urgent need for young people (ages 25-45) to take up leadership roles alongside the older generation.",
+            'ai_convergence_text' => "- Strong concern about lack of pastoral accompaniment for families.\n- Recognition that Catholic families are losing their identity in a secular media landscape.\n- Call for more leadership training and cultural understanding across Sabah, Sarawak, and Semenanjung.\n- Urgent need for young people (ages 25-45) to take up leadership roles alongside the older generation.",
             'ai_consideration_text' => "- Need for trained, qualified, and certified personnel for pastoral work to prevent burnout.\n- Funding challenges for employing more lay workers and redefining monetary priorities.\n- Tension between addressing taboo topics and protecting victims from further harm.",
             'ai_proposals_text' => "- Establish parish hubs for family support (counselling, after-school programmes, grief groups).\n- Deploy full-time dedicated persons to accompany families in irregular circumstances.\n- Redefine roles to enable young and older generations to work together in tandem.\n- Train, qualify, and certify clergy and laity for specialised pastoral missions.",
             'ai_source_group_ids' => [1, 2, 3, 4],
@@ -212,25 +251,8 @@ class DatabaseSeeder extends Seeder
             'provider' => 'mock',
         ]);
 
-        // ─── 8. Seed minimal data for CIS 1 and CIS 3 (placeholder) ─
-        $cis1 = $conversations[0];
-        $cis3 = $conversations[2];
-
-        // CIS 1: one sample response from Group 2 (Group 1 already has a response from the loop above)
-        Response::create([
-            'conversation_id' => $cis1->id,
-            'group_id' => $groups[1]->id,
-            'consensus_text' => 'Our group discerned the importance of building communion through digital outreach and welcoming environments for all parishioners.',
-            'submitted_at' => now()->subDays(25),
-        ]);
-
-        // CIS 3: one sample response from Group 2 (Group 1 already has a response from the loop above)
-        Response::create([
-            'conversation_id' => $cis3->id,
-            'group_id' => $groups[1]->id,
-            'consensus_text' => '[Placeholder] Our group reflected on the future governance of the church and the need for inclusive discernment processes.',
-            'submitted_at' => now()->subDays(20),
-        ]);
+        // ─── 8. Seed Sample Document Sources (PDF Knowledge Base) ───
+        $this->call(UploadedDocumentSourceSeeder::class);
 
         $this->command->info('Demo data seeded successfully!');
         $this->command->info('Event: Malaysian Pastoral Convention (MPC)');

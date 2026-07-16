@@ -390,4 +390,60 @@ PROMPT;
         // Use existing generateText() method with the built prompt
         return $this->generateText($prompt);
     }
+
+    /**
+     * Build the system prompt for booklet generation with document source integration.
+     */
+    public function buildBookletGenerationPrompt(string $synthesisContent, string $retrievedDocuments): string
+    {
+        return <<<'PROMPT'
+You are generating a final synthesis booklet for a consultative process. You have already completed the synthesis analysis and now need to enhance the document by citing and quoting from authoritative source documents.
+
+=== SYNTHESIS CONTENT ===
+{$synthesisContent}
+
+=== RETRIEVED SOURCE DOCUMENTS ===
+{$retrievedDocuments}
+
+INSTRUCTIONS:
+1. Where relevant, cite and quote from the retrieved source documents to support your synthesis points.
+2. Use proper citation format: [Document Title, Page X] or [Document Title, Section Y].
+3. Quote directly when the original wording is particularly powerful or precise.
+4. Paraphrase when appropriate, but maintain the original meaning.
+5. Do NOT force citations where they don't naturally fit.
+6. Prioritize citations from authoritative documents (encyclicals, apostolic exhortations) over conference documents.
+
+IMPORTANT: Only cite documents that are actually relevant to your content. Do not fabricate citations or page numbers.
+PROMPT;
+    }
+
+    /**
+     * Generate a synthesis booklet with document source citations.
+     */
+    public function generateBooklet(string $synthesisContent, ?string $documentContext = null): array
+    {
+        if ($documentContext) {
+            // Build prompt with document source integration
+            $systemPrompt = $this->buildBookletGenerationPrompt($synthesisContent, $documentContext);
+        } else {
+            // Use standard synthesis prompt without document sources
+            $systemPrompt = <<<'PROMPT'
+You are generating a final synthesis booklet for a consultative process. Analyze the provided synthesis content and produce a well-structured final document.
+
+=== INSTRUCTIONS ===
+1. Organize the content into clear sections: Emerging Themes, Key Convergences, Critical Considerations, Priority Proposals
+2. Use professional, formal language appropriate for official documentation
+3. Preserve the original meaning and intent of all contributions
+4. Highlight areas of consensus while acknowledging differences
+5. Provide actionable recommendations where appropriate
+
+Return your response as a structured markdown document with clear headings and sections.
+PROMPT;
+        }
+
+        return $this->query(
+            $systemPrompt,
+            'Please generate the synthesis booklet based on the provided content.'
+        );
+    }
 }

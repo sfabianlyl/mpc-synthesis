@@ -1,5 +1,5 @@
 import { Head, usePage } from '@inertiajs/react';
-import { BarChart3, ClipboardList, FileText, Send, Shield } from 'lucide-react';
+import { BarChart3, ClipboardList, FileText, Shield } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 
 export default function Dashboard() {
@@ -8,13 +8,6 @@ export default function Dashboard() {
 
     const roleCards: Record<string, { title: string; description: string; icon: React.ReactNode; href: string; gradient: string }[]> = {
         synthesis: [
-            {
-                title: 'Submit Response',
-                description: 'Submit a consensus paragraph on behalf of a group.',
-                icon: <Send className="size-6" />,
-                href: '/respond',
-                gradient: 'from-emerald-500/20 to-teal-500/20',
-            },
             {
                 title: 'Synthesis Dashboard',
                 description: 'Review assigned groups, trigger AI analysis, and edit synthesis reports.',
@@ -25,13 +18,6 @@ export default function Dashboard() {
         ],
         drafter: [
             {
-                title: 'Submit Response',
-                description: 'Submit a consensus paragraph on behalf of a group.',
-                icon: <Send className="size-6" />,
-                href: '/respond',
-                gradient: 'from-emerald-500/20 to-teal-500/20',
-            },
-            {
                 title: 'Drafter Dashboard',
                 description: 'View aggregated reports, generate global synthesis, and export documents.',
                 icon: <FileText className="size-6" />,
@@ -40,13 +26,6 @@ export default function Dashboard() {
             },
         ],
         admin: [
-            {
-                title: 'Submit Response',
-                description: 'Submit a consensus paragraph on behalf of a group.',
-                icon: <Send className="size-6" />,
-                href: '/respond',
-                gradient: 'from-emerald-500/20 to-teal-500/20',
-            },
             {
                 title: 'Synthesis Dashboard',
                 description: 'Review assigned groups, trigger AI analysis, and edit synthesis reports.',

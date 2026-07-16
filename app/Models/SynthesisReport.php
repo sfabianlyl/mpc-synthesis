@@ -5,12 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property int $conversation_id
+ * @property bool $is_master_synthesis
+ * @property int|null $conversation_id
  * @property int $synthesis_id
  * @property int|null $submission_number
  * @property string|null $convergence_text
@@ -22,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $ai_proposals_text
  * @property string|null $ai_other_text
  * @property array|null $ai_source_group_ids
+ * @property array|null $group_ids
  * @property Carbon|null $ai_generated_at
  * @property bool $llm_generated
  * @property bool $is_llm_assisted
@@ -38,6 +41,7 @@ class SynthesisReport extends Model
     use HasFactory;
 
     protected $fillable = [
+        'is_master_synthesis',
         'conversation_id',
         'synthesis_id',
         'submission_number',
@@ -50,6 +54,7 @@ class SynthesisReport extends Model
         'ai_proposals_text',
         'ai_other_text',
         'ai_source_group_ids',
+        'group_ids',
         'ai_generated_at',
         'llm_generated',
         'is_llm_assisted',
@@ -60,9 +65,11 @@ class SynthesisReport extends Model
     protected function casts(): array
     {
         return [
+            'is_master_synthesis' => 'boolean',
             'llm_generated' => 'boolean',
             'is_llm_assisted' => 'boolean',
             'ai_source_group_ids' => 'array',
+            'group_ids' => 'array',
             'ai_generated_at' => 'datetime',
             'submitted_at' => 'datetime',
         ];
@@ -77,12 +84,12 @@ class SynthesisReport extends Model
     }
 
     /**
-     * Get the next submission number for this conversation/synthesis pair.
+     * Get the next submission number for this conversation/user pair.
      */
-    public static function getNextSubmissionNumber(int $conversationId, int $synthesisId): int
+    public static function getNextSubmissionNumber(int $conversationId, int $userId): int
     {
         return static::where('conversation_id', $conversationId)
-            ->where('synthesis_id', $synthesisId)
+            ->where('synthesis_id', $userId)
             ->max('submission_number') + 1;
     }
 
@@ -97,9 +104,25 @@ class SynthesisReport extends Model
     /**
      * Get the synthesis team member who created this report.
      */
-    public function synthesis(): BelongsTo
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'synthesis_id');
+    }
+
+    /**
+     * Alias for user() - returns the synthesis team member who created this report.
+     */
+    public function synthesis(): BelongsTo
+    {
+        return $this->user();
+    }
+
+    /**
+     * Get the groups whose consensuses were synthesized.
+     */
+    public function groups(): BelongsToMany
+    {
+        return $this->belongsToMany(Group::class, 'synthesis_group_pivot', 'synthesis_report_id', 'group_id');
     }
 
     /**
@@ -108,5 +131,51 @@ class SynthesisReport extends Model
     public function customQueries(): HasMany
     {
         return $this->hasMany(SynthesisCustomQuery::class);
+    }
+
+    /**
+     * Scope: Only master syntheses.
+     */
+    public function scopeMasterSyntheses($query)
+    {
+        return $query->where('is_master_synthesis', true);
+    }
+
+    /**
+     * Scope: Only individual syntheses.
+     */
+    public function scopeIndividualSyntheses($query)
+    {
+        return $query->where('is_master_synthesis', false);
+    }
+
+    /**
+     * Get the 4 category names for this synthesis report.
+     */
+    public function categories(): array
+    {
+        return ['convergence', 'matters_for_consideration', 'proposals', 'others'];
+    }
+
+    /**
+     * Check if any AI-generated content field is populated.
+     */
+    public function hasAiContent(): bool
+    {
+        return !is_null($this->ai_convergence_text)
+            || !is_null($this->ai_consideration_text)
+            || !is_null($this->ai_proposals_text)
+            || !is_null($this->ai_other_text);
+    }
+
+    /**
+     * Check if any manual content field is populated.
+     */
+    public function hasManualContent(): bool
+    {
+        return !is_null($this->convergence_text)
+            || !is_null($this->consideration_text)
+            || !is_null($this->proposals_text)
+            || !is_null($this->other_text);
     }
 }

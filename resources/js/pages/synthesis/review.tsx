@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle2, XCircle, Loader2, FileText, Users, Bot, Trash2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, FileText, Users, Bot, Trash2, FileDown } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,7 @@ interface PageProps {
     success?: string;
     errors?: Record<string, string>;
     consensusSubmissions: Record<number, any[]>;
+    provider?: string;
 }
 
 export default function Review({
@@ -60,6 +61,7 @@ export default function Review({
     // New state for custom prompt
     const [customPrompt, setCustomPrompt] = useState('');
     const [isCustomQuerying, setIsCustomQuerying] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Refs for batch checkbox indeterminate state
     const batchCheckboxRefs = useRef<Map<number, HTMLInputElement>>(new Map());
@@ -113,11 +115,19 @@ export default function Review({
         });
     }, [selectedGroupIds]);
 
+    // Reset all inputs to clear them after submission
+    const resetInputs = () => {
+        setConvergenceText('');
+        setConsiderationText('');
+        setProposalsText('');
+        setCustomPrompt('');
+    };
+
     // Custom LLM query handler
     const handleCustomQuery = () => {
         if (!customPrompt.trim() || !conversation.id) {
-return;
-}
+            return;
+        }
 
         setIsCustomQuerying(true);
         router.post(
@@ -144,6 +154,58 @@ return;
         });
     };
 
+    // Submit synthesis handler - packages all data and clears inputs after submission
+    const handleSubmitSynthesis = () => {
+        if (!conversation.id || !report?.id) {
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        // Gather custom queries from the report (these are already linked to the report)
+        const customQueries = report.custom_queries ?? [];
+
+        router.post(
+            `/synthesis/submit-synthesis/${conversation.id}`,
+            {
+                // Manual inputs by category
+                convergence_text: convergenceText,
+                consideration_text: considerationText,
+                proposals_text: proposalsText,
+                // Others category: compile all custom query prompts and their responses
+                other_text: customQueries.length > 0
+                    ? customQueries.map(q => `Prompt: ${q.prompt}\nResponse: ${q.response.join('\n')}`).join('\n\n---\n\n')
+                    : null,
+                // Include AI data that will be part of the final submission
+                ai_convergence_text: report.ai_convergence_text ?? '',
+                ai_consideration_text: report.ai_consideration_text ?? '',
+                ai_proposals_text: report.ai_proposals_text ?? '',
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setAnalysisStatus('success');
+                    setAnalysisMessage('Synthesis submitted successfully.');
+
+                    // Clear all inputs after successful submission
+                    resetInputs();
+
+                    setIsSubmitting(false);
+
+                    setTimeout(() => {
+                        setAnalysisStatus('idle');
+                        setAnalysisMessage('');
+                    }, 5000);
+                },
+                onError: () => {
+                    setAnalysisStatus('error');
+                    setAnalysisMessage('Failed to submit synthesis. Please try again.');
+                    setIsSubmitting(false);
+                },
+            }
+        );
+    };
+
     const handleTriggerLLM = () => {
         setIsAnalyzing(true);
         setAnalysisStatus('idle');
@@ -152,10 +214,17 @@ return;
             `/synthesis/analyze/${conversation.id}`,
             {
                 selected_group_ids: Array.from(selectedGroupIds),
+                // Send current manual text values so they get saved alongside AI output
+                convergence_text: convergenceText,
+                consideration_text: considerationText,
+                proposals_text: proposalsText,
             },
             {
                 preserveScroll: true,
+                preserveState: true,
                 onSuccess: (page: any) => {
+                    // Read success message and report from page props (passed via session flash from back()->with())
+                    const successMessage = page.props.success;
                     const newReport = page.props.report;
 
                     if (newReport) {
@@ -167,6 +236,7 @@ return;
                     setIsAnalyzing(false);
                     setAnalysisStatus('success');
                     setAnalysisMessage(
+                        successMessage ||
                         'LLM analysis completed successfully using ' + (page.props?.provider || 'unknown') + ' provider.'
                     );
                 },
@@ -181,8 +251,8 @@ return;
 
     const handleSaveReport = () => {
         if (!report?.id) {
-return;
-}
+            return;
+        }
 
         router.patch(
             `/synthesis/report/${report.id}`,
@@ -211,8 +281,8 @@ return;
 
     const handleStatusUpdate = (status: 'draft' | 'reviewed' | 'submitted') => {
         if (!report?.id) {
-return;
-}
+            return;
+        }
 
         router.patch(
             `/synthesis/report/${report.id}`,
@@ -293,8 +363,8 @@ return;
 
     for (const group of groups) {
         if (!selectedGroupIds.has(group.id)) {
-continue;
-}
+            continue;
+        }
 
         const submissions = consensusSubmissions[group.id] || [];
 
@@ -310,8 +380,8 @@ continue;
     // Render AI text as bullet points
     const renderAiText = (text: string | null): React.ReactNode => {
         if (!text || !text.trim()) {
-return null;
-}
+            return null;
+        }
 
         const bullets = text.split('\n').filter(line => line.trim());
 
@@ -354,6 +424,13 @@ return null;
                                 <Users className="size-4" /> Collaborative Review
                             </Button>
                         </Link>
+                        {report && (
+                            <Link href={`/synthesis/export-booklet/${conversation.id}`}>
+                                <Button variant="outline" className="flex items-center gap-2">
+                                    <FileDown className="size-4" /> Export Booklet
+                                </Button>
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -501,32 +578,22 @@ return null;
                                 <CardTitle className="text-lg">Submission Status</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-3">
-                                    {groups.map((group: any) => {
+                                {(() => {
+                                    const totalGroups = groups.length;
+                                    const submittedGroups = groups.filter((group: any) => {
                                         const submissions = consensusSubmissions[group.id] || [];
-                                        const hasSubmitted = submissions.some(
-                                            (s: any) => s.is_submitted
-                                        );
-                                        const isSelected = selectedGroupIds.has(group.id);
+                                        return submissions.some((s: any) => s.is_submitted);
+                                    }).length;
 
-                                        return (
-                                            <div key={group.id} className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onChange={() => toggleGroup(group.id)}
-                                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                                    />
-                                                    <span className="text-sm">{group.name}</span>
-                                                </div>
-                                                <Badge variant={hasSubmitted ? 'default' : 'secondary'} className="text-xs">
-                                                    {hasSubmitted ? 'Submitted' : 'Pending'}
-                                                </Badge>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                    return (
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-muted-foreground">Consensus Submissions</span>
+                                            <Badge variant="outline" className="text-base font-semibold">
+                                                {submittedGroups} / {totalGroups} Submitted
+                                            </Badge>
+                                        </div>
+                                    );
+                                })()}
                             </CardContent>
                         </Card>
                     </div>
@@ -551,7 +618,7 @@ return null;
                             <CardContent className="space-y-6">
                                 {/* Convergence Section */}
                                 <div className="space-y-2">
-                                    {/* AI-generated field (only visible when exists) */}
+                                    {/* AI-generated field (read-only, cannot be edited) */}
                                     {report?.ai_convergence_text && report.ai_convergence_text.trim() && (
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
@@ -567,7 +634,7 @@ return null;
                                             </div>
                                         </div>
                                     )}
-                                    {/* User field (always visible) */}
+                                    {/* User field (editable input) */}
                                     <div>
                                         <label className="text-sm font-medium mb-1 block">
                                             Convergence (Your Input)
@@ -585,7 +652,7 @@ return null;
 
                                 {/* Matters for Consideration Section */}
                                 <div className="space-y-2">
-                                    {/* AI-generated field (only visible when exists) */}
+                                    {/* AI-generated field (read-only, cannot be edited) */}
                                     {report?.ai_consideration_text && report.ai_consideration_text.trim() && (
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
@@ -601,7 +668,7 @@ return null;
                                             </div>
                                         </div>
                                     )}
-                                    {/* User field (always visible) */}
+                                    {/* User field (editable input) */}
                                     <div>
                                         <label className="text-sm font-medium mb-1 block">
                                             Matters for Consideration (Your Input)
@@ -619,7 +686,7 @@ return null;
 
                                 {/* Proposals Section */}
                                 <div className="space-y-2">
-                                    {/* AI-generated field (only visible when exists) */}
+                                    {/* AI-generated field (read-only, cannot be edited) */}
                                     {report?.ai_proposals_text && report.ai_proposals_text.trim() && (
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
@@ -635,7 +702,7 @@ return null;
                                             </div>
                                         </div>
                                     )}
-                                    {/* User field (always visible) */}
+                                    {/* User field (editable input) */}
                                     <div>
                                         <label className="text-sm font-medium mb-1 block">
                                             Proposals (Your Input)
@@ -649,29 +716,6 @@ return null;
                                             placeholder="Concrete suggestions or recommendations..."
                                         />
                                     </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
-                                    <Button onClick={handleSaveReport} className="flex-1">
-                                        Save Draft
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => handleStatusUpdate('reviewed')}
-                                        disabled={!report?.id}
-                                        className="flex-1"
-                                    >
-                                        Mark Reviewed
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => handleStatusUpdate('submitted')}
-                                        disabled={!report?.id}
-                                        className="flex-1"
-                                    >
-                                        Submit Synthesis
-                                    </Button>
                                 </div>
 
                                 {/* Custom LLM Prompt Section */}
@@ -698,6 +742,7 @@ return null;
                                         </Button>
                                     </div>
                                 </div>
+
                             </CardContent>
                         </Card>
 
@@ -742,6 +787,32 @@ return null;
                                 </CardContent>
                             </Card>
                         )}
+
+                        {/* Action Buttons */}
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <Button onClick={handleSaveReport} className="flex-1">
+                                        Save Draft
+                                    </Button>
+
+                                    <Button
+                                        onClick={handleSubmitSynthesis}
+                                        disabled={isSubmitting || !report?.id}
+                                        className="flex-1"
+                                    >
+                                        {isSubmitting ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Submitting...
+                                            </>
+                                        ) : (
+                                            'Submit Synthesis'
+                                        )}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
             </div>

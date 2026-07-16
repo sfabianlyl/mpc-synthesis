@@ -60,4 +60,56 @@ return [
         'gemini_model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | PDF Document Source Processing
+    |--------------------------------------------------------------------------
+    */
+
+    'pdf' => [
+        'max_file_size' => (int) env('PDF_PARSER_MAX_FILE_SIZE', 52428800),
+        'clean_level' => env('PDF_PARSER_CLEAN_LEVEL', 'standard'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Embedding Service (for vector search)
+    |--------------------------------------------------------------------------
+    */
+
+    'embedding' => [
+        'provider' => env('EMBEDDING_PROVIDER', 'mock'),
+        'model' => env('EMBEDDING_MODEL', 'text-embedding-3-small'),
+        'dimension' => (int) env('EMBEDDING_DIMENSION', 1536),
+        'api_key' => env('EMBEDDING_API_KEY', ''),
+        'local_url' => env('EMBEDDING_LOCAL_URL', 'http://localhost:8080/v1/embeddings'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Qdrant (optional, for future vector search enhancement)
+    |--------------------------------------------------------------------------
+    */
+
+    'qdrant' => [
+        'host' => env('QDRANT_HOST', 'localhost'),
+        'port' => (int) env('QDRANT_PORT', 6333),
+        'api_key' => env('QDRANT_API_KEY', ''),
+        'collection_name' => env('QDRANT_COLLECTION_NAME', 'document-chunks'),
+        'distance' => env('QDRANT_DISTANCE', 'Cosine'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Neo4j (optional, for future graph-based document relationships)
+    |--------------------------------------------------------------------------
+    */
+
+    'neo4j' => [
+        'uri' => env('NEO4J_URI', 'bolt://localhost:7687'),
+        'username' => env('NEO4J_USERNAME', 'neo4j'),
+        'password' => env('NEO4J_PASSWORD', ''),
+        'database' => env('NEO4J_DATABASE', 'neo4j'),
+    ],
+
 ];

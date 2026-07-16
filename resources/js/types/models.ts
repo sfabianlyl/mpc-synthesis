@@ -35,29 +35,46 @@ export interface Response {
     group?: Group;
 }
 
+/**
+ * SynthesisReport represents an individual synthesis submission from a synthesis member.
+ * Each category can have both AI-generated content (ai_* fields) and manual content (regular fields).
+ */
 export interface SynthesisReport {
     id: number;
     conversation_id: number;
+    user_id: number;
     synthesis_id: number;
     submission_number?: number;
+    
+    // Manual content fields (can be edited by synthesis member)
     convergence_text?: string;
     consideration_text?: string;
     proposals_text?: string;
     other_text?: string;
+    
+    // AI-generated content fields (read-only, populated by LLM)
     ai_convergence_text?: string | null;
     ai_consideration_text?: string | null;
     ai_proposals_text?: string | null;
     ai_other_text?: string | null;
+    
+    // Flags and metadata
     is_llm_assisted?: boolean;
+    is_master_synthesis?: boolean;
     llm_generated: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
     submitted_at?: string | null;
     created_at: string;
     updated_at: string;
+    
+    // Relationships
     synthesis?: User;
     conversation?: Conversation;
 }
 
+/**
+ * SynthesisSubmission represents a submitted synthesis for the collaborative review page.
+ */
 export interface SynthesisSubmission {
     id: number;
     submission_number: number;
@@ -82,17 +99,47 @@ export interface SynthesisSubmission {
     }>;
 }
 
+/**
+ * MasterSynthesisReport represents the "synthesis of synthesis" crafted during
+ * the Collaborative Review session. It aggregates content from all individual syntheses.
+ */
 export interface MasterSynthesisReport {
     id: number | null;
     conversation_id: number;
-    convergence_text: string | null;
-    consideration_text: string | null;
-    proposals_text: string | null;
-    other_text: string | null;
+    user_id: number | null;
+    submission_number?: number;
+    is_master_synthesis: boolean;
+    is_llm_assisted: boolean;
+    group_ids: number[];
+    
+    // Categories with both AI and manual content
+    convergence_text?: string | null;
+    consideration_text?: string | null;
+    proposals_text?: string | null;
+    other_text?: string | null;
+    ai_convergence_text?: string | null;
+    ai_consideration_text?: string | null;
+    ai_proposals_text?: string | null;
+    ai_other_text?: string | null;
+    
     llm_generated: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
+    submitted_at: string | null;
     created_at: string;
     updated_at: string;
+}
+
+/**
+ * Payload for creating/updating a master synthesis via the API.
+ */
+export interface MasterSynthesisPayload {
+    conversation_id: number;
+    categories: {
+        convergence: { ai_content: string; manual_content: string };
+        matters_for_consideration: { ai_content: string; manual_content: string };
+        proposals: { ai_content: string; manual_content: string };
+        others: { ai_content: string; manual_content: string };
+    };
 }
 
 export interface SynthesisCustomQuery {
@@ -104,22 +151,43 @@ export interface SynthesisCustomQuery {
     created_at: string;
 }
 
+/**
+ * FinalDocument represents a booklet or final document generated from syntheses.
+ * Can be AI-generated (is_ai_generated = true) or manually drafted.
+ */
 export interface FinalDocument {
     id: number;
+    event_id: number | null;
     title: string;
-    content_json: {
+    content: string;
+    content_json?: {
         emerging_themes?: string;
         key_convergences?: string;
         critical_considerations?: string;
         priority_proposals?: string;
     };
     emerging_themes?: string;
+    
+    // AI generation flags
+    is_ai_generated: boolean;
+    drafted_by: number | null;
+    drafted_at: string | null;
+    
+    // Source tracking for AI-generated documents
+    source_report_ids: number[];
+    retrieved_chunk_references: number[];
+    
+    // Export tracking
     exported_file_path?: string;
     created_by?: number;
     created_at: string;
     updated_at: string;
+    
+    // Relationships
     conversations?: Conversation[];
+    event?: Event;
     creator?: User;
+    draftedBy?: User;
 }
 
 export interface ConsensusSubmission {
@@ -129,6 +197,81 @@ export interface ConsensusSubmission {
     submitted_at: string | null;
     consensus_text: string;
     is_submitted: boolean;
+}
+
+export interface UploadedDocumentSource {
+    id: number;
+    conversation_id: number | null;
+    user_id: number | null;
+    original_name: string;
+    document_name: string;
+    file_path: string;
+    file_size: number | null;
+    mime_type: string | null;
+    chunk_count: number;
+    embedding_status: 'pending' | 'completed' | 'failed';
+    processing_status: 'pending' | 'processing' | 'completed' | 'failed';
+    processing_error: string | null;
+    uploaded_by: number | null;
+    created_at: string;
+    updated_at: string;
+    uploader?: { id: number; name: string; email: string };
+}
+
+export interface DocumentSourceChunk {
+    id: number;
+    source_id: number;
+    chunk_index: number;
+    chunk_content: string;
+    embedding: number[] | null;
+    title: string | null;
+    section_heading: string | null;
+    page_start: number | null;
+    page_end: number | null;
+    word_count: number;
+    created_at: string;
+    updated_at: string;
+    source?: UploadedDocumentSource;
+}
+
+/**
+ * Enriched chunk response from searchChunks endpoint with citation metadata.
+ */
+export interface EnrichedDocumentChunk {
+    chunk_id: number | null;
+    content: string;
+    similarity_score: number | null;
+    document_name: string | null;
+    document_type: string | null;
+    page_number: number | null;
+    source_id: number | null;
+    citation: string;
+}
+
+export interface DocumentRetrievalResponse {
+    chunks: Array<{
+        id: number;
+        chunk_content: string;
+        title: string | null;
+        section_heading: string | null;
+        page_start: number | null;
+        page_end: number | null;
+        similarity_score: number;
+        word_count: number;
+    }>;
+    total_results: number;
+    query_time_ms?: number;
+}
+
+export interface Event {
+    id: number;
+    title: string;
+    start_date: string;
+    end_date: string | null;
+    location?: string;
+    description?: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export type Stats = {

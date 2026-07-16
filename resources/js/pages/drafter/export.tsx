@@ -1,12 +1,15 @@
 import { Head, Link, useForm, router } from '@inertiajs/react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, FileText, BookOpen, Search, ExternalLink } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { EnrichedDocumentChunk } from '@/types/models';
 
 interface User {
     id: number;
@@ -17,32 +20,58 @@ interface Event {
     id: number;
     title: string;
     start_date: string;
+    end_date: string | null;
+    location?: string;
 }
 
 interface Conversation {
     id: number;
     title: string;
-    status: string;
+    status: 'active' | 'completed';
     event_id: number | null;
     created_at: string;
     event?: Event;
+}
+
+interface MasterSynthesis {
+    id: number;
+    conversation_id: number;
+    convergence_text?: string | null;
+    consideration_text?: string | null;
+    proposals_text?: string | null;
+    other_text?: string | null;
+    ai_convergence_text?: string | null;
+    ai_consideration_text?: string | null;
+    ai_proposals_text?: string | null;
+    ai_other_text?: string | null;
+    is_llm_assisted: boolean;
+    status: 'draft' | 'reviewed' | 'submitted';
+    booklet_file_path?: string | null;
+    created_at: string;
+    updated_at: string;
 }
 
 interface Document {
     id: number;
     title: string;
     content_json: Record<string, unknown>;
-    emerging_themes: string;
+    emerging_themes?: string;
     exported_file_path: string | null;
     created_by: number | null;
+    is_ai_generated: boolean;
+    source_report_ids: number[];
+    retrieved_chunk_references: number[];
     created_at: string;
     creator?: User;
 }
 
 interface SynthesisReport {
     id: number;
-    group_id: number;
+    conversation_id: number;
+    user_id: number;
     synthesis_id: number;
+    submission_number?: number;
+    is_master_synthesis?: boolean;
     status: string;
     created_at: string;
     group?: { id: number; name: string };
@@ -52,11 +81,18 @@ interface SynthesisReport {
 interface PageProps {
     document?: Document | null;
     reports?: SynthesisReport[];
+    masterSyntheses?: MasterSynthesis[];
     conversations?: Conversation[];
     events?: Event[];
 }
 
-export default function Export({ document: initialDocument, reports: initialReports = [], conversations: availableConversations = [], events: availableEvents = [] }: PageProps) {
+export default function Export({ 
+    document: initialDocument, 
+    reports: initialReports = [], 
+    masterSyntheses = [],
+    conversations: availableConversations = [], 
+    events: availableEvents = [] 
+}: PageProps) {
     const { data, setData, post, processing } = useForm({
         format: 'pdf',
         documentId: initialDocument?.id ?? null,
@@ -67,6 +103,13 @@ export default function Export({ document: initialDocument, reports: initialRepo
     const [selectedConversationIds, setSelectedConversationIds] = useState<number[]>([]);
     const [synthesisTitle, setSynthesisTitle] = useState('');
     const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+    
+    // State for booklet generation with sources
+    const [showBookletDialog, setShowBookletDialog] = useState(false);
+    const [selectedMasterSynthesisIds, setSelectedMasterSynthesisIds] = useState<number[]>([]);
+    const [selectedSourceChunks, setSelectedSourceChunks] = useState<Set<number>>(new Set());
+    const [retrievedChunks, setRetrievedChunks] = useState<EnrichedDocumentChunk[]>([]);
+    const [isRetrievingSources, setIsRetrievingSources] = useState(false);
 
     // Auto-select all conversations when dialog opens
     useEffect(() => {
@@ -75,10 +118,16 @@ export default function Export({ document: initialDocument, reports: initialRepo
         }
     }, [showSynthesisDialog]);
 
+    // Auto-select all master syntheses when booklet dialog opens
+    useEffect(() => {
+        if (showBookletDialog && masterSyntheses.length > 0 && selectedMasterSynthesisIds.length === 0) {
+            setSelectedMasterSynthesisIds(masterSyntheses.map(ms => ms.id));
+        }
+    }, [showBookletDialog]);
+
     const handleGenerateDownload = () => {
         if (!initialDocument?.id) {
             alert('No document selected for export.');
-
             return;
         }
 
@@ -94,6 +143,43 @@ export default function Export({ document: initialDocument, reports: initialRepo
         setSelectedEventId(availableEvents.length > 0 ? availableEvents[0].id : null);
     };
 
+    // Generate booklet with sources for selected master syntheses
+    const handleGenerateBookletWithSources = () => {
+        if (selectedMasterSynthesisIds.length === 0) {
+            alert('Please select at least one master synthesis.');
+            return;
+        }
+
+        // Retrieve document sources first
+        setIsRetrievingSources(true);
+        
+        router.post('/drafter/retrieve-booklet-sources', {
+            master_synthesis_ids: selectedMasterSynthesisIds,
+            selected_chunk_ids: Array.from(selectedSourceChunks),
+        }, {
+            onSuccess: (page: any) => {
+                setRetrievedChunks(page.props.chunks || []);
+                setIsRetrievingSources(false);
+            },
+            onError: () => {
+                setIsRetrievingSources(false);
+            },
+        });
+    };
+
+    // Toggle chunk selection for citation sources
+    const toggleChunkSelection = (chunkId: number) => {
+        setSelectedSourceChunks(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(chunkId)) {
+                newSet.delete(chunkId);
+            } else {
+                newSet.add(chunkId);
+            }
+            return newSet;
+        });
+    };
+
     const handleSelectAllConversations = () => {
         if (selectedConversationIds.length === availableConversations.length) {
             setSelectedConversationIds([]);
@@ -105,7 +191,6 @@ export default function Export({ document: initialDocument, reports: initialRepo
     const handleSubmitSynthesis = () => {
         if (selectedConversationIds.length === 0) {
             alert('Please select at least one conversation');
-
             return;
         }
 
@@ -114,12 +199,11 @@ export default function Export({ document: initialDocument, reports: initialRepo
             title: synthesisTitle || `Global Synthesis - ${new Date().toLocaleDateString()}`,
             event_id: selectedEventId,
         }, {
+            preserveScroll: true,
             onSuccess: () => {
-                alert('Global synthesis completed! Refreshing dashboard...');
                 window.location.href = '/drafter';
             },
             onError: (errors) => {
-                // Show actual validation errors for debugging
                 const errorMessages = Object.entries(errors)
                     .map(([key, value]) => `${key}: ${value}`)
                     .join('\n');
@@ -135,23 +219,31 @@ export default function Export({ document: initialDocument, reports: initialRepo
             if (!conversationsByEvent[conv.event_id]) {
                 conversationsByEvent[conv.event_id] = [];
             }
-
             conversationsByEvent[conv.event_id].push(conv);
         }
+    });
+
+    // Group master syntheses by conversation for the booklet dialog
+    const masterSynthesisByConversation: Record<number, MasterSynthesis[]> = {};
+    masterSyntheses.forEach(ms => {
+        if (!masterSynthesisByConversation[ms.conversation_id]) {
+            masterSynthesisByConversation[ms.conversation_id] = [];
+        }
+        masterSynthesisByConversation[ms.conversation_id].push(ms);
     });
 
     return (
         <>
             <Head title="Export Final Document" />
-            <div className="p-8 max-w-3xl mx-auto space-y-8">
+            <div className="p-8 max-w-4xl mx-auto space-y-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Export Final Document</h1>
                     <p className="text-muted-foreground mt-1">
-                        Generate and export the final synthesized document.
+                        Generate and export the final synthesized document or booklet.
                     </p>
                 </div>
 
-                {/* Global Synthesis Section */}
+                {/* ─── Global Synthesis Section ───────────────────── */}
                 {!initialDocument && (
                     <Card>
                         <CardHeader>
@@ -169,7 +261,38 @@ export default function Export({ document: initialDocument, reports: initialRepo
                     </Card>
                 )}
 
-                {/* Export Options */}
+                {/* ─── Generate Booklet with Sources Section ──────── */}
+                {masterSyntheses.length > 0 && !initialDocument && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <BookOpen className="h-5 w-5 text-purple-600" />
+                                Generate Synthesis Booklet
+                            </CardTitle>
+                            <CardDescription>
+                                Generate a booklet containing master syntheses organized by conversation and category,
+                                with citation sources from retrieved document chunks.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button 
+                                onClick={() => {
+                                    setShowBookletDialog(true);
+                                    setSelectedMasterSynthesisIds([]);
+                                    setSelectedSourceChunks(new Set());
+                                }} 
+                                disabled={processing} 
+                                className="w-full" 
+                                size="lg"
+                            >
+                                <BookOpen className="mr-2 h-4 w-4" />
+                                Generate Booklet with Sources
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* ─── Export Options (existing document) ─────────── */}
                 {initialDocument && (
                     <>
                         <Card>
@@ -178,14 +301,29 @@ export default function Export({ document: initialDocument, reports: initialRepo
                                 <CardDescription>{initialDocument.title}</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="text-sm text-muted-foreground space-y-2">
                                     <p>Created: {new Date(initialDocument.created_at).toLocaleDateString()}</p>
                                     {initialDocument.creator && <p>By: {initialDocument.creator.name}</p>}
+                                    {initialDocument.is_ai_generated && (
+                                        <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950/20 text-purple-600">
+                                            AI-Generated
+                                        </Badge>
+                                    )}
                                     {initialDocument.emerging_themes && (
                                         <div className="mt-2 p-3 bg-muted rounded-md">
                                             <p className="font-medium">Emerging Themes:</p>
                                             <p className="whitespace-pre-wrap">{initialDocument.emerging_themes}</p>
                                         </div>
+                                    )}
+                                    {initialDocument.source_report_ids?.length > 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Source reports: {initialDocument.source_report_ids.length}
+                                        </p>
+                                    )}
+                                    {initialDocument.retrieved_chunk_references?.length > 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Document chunks referenced: {initialDocument.retrieved_chunk_references.length}
+                                        </p>
                                     )}
                                 </div>
                             </CardContent>
@@ -242,7 +380,16 @@ export default function Export({ document: initialDocument, reports: initialRepo
                                     <div className="space-y-2">
                                         {initialReports.slice(0, 5).map((report) => (
                                             <div key={report.id} className="flex items-center justify-between p-2 rounded bg-muted/50">
-                                                <span className="text-sm">{report.group?.name || `Group #${report.group_id}`}</span>
+                                                <span className="text-sm">
+                                                    {report.is_master_synthesis ? (
+                                                        <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 mr-2">
+                                                            Master
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="secondary" className="mr-2">Individual</Badge>
+                                                    )}
+                                                    {report.group?.name || `Conversation #${report.conversation_id}`}
+                                                </span>
                                                 <span className={`px-2 py-0.5 rounded text-xs ${
                                                     report.status === 'submitted' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                                                 }`}>
@@ -262,7 +409,7 @@ export default function Export({ document: initialDocument, reports: initialRepo
                     </>
                 )}
 
-                {/* Global Synthesis Dialog */}
+                {/* ─── Global Synthesis Dialog ────────────────────── */}
                 <Dialog open={showSynthesisDialog} onOpenChange={setShowSynthesisDialog}>
                     <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
@@ -341,7 +488,7 @@ export default function Export({ document: initialDocument, reports: initialRepo
                                                 )}
                                             </div>
                                             <span className={`px-2 py-0.5 rounded text-xs ${
-                                                conv.status === 'submitted' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                                conv.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                             }`}>
                                                 {conv.status}
                                             </span>
@@ -376,6 +523,137 @@ export default function Export({ document: initialDocument, reports: initialRepo
                             <Button onClick={handleSubmitSynthesis} disabled={processing || selectedConversationIds.length === 0}>
                                 {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Generate Synthesis
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* ─── Booklet Generation Dialog ──────────────────── */}
+                <Dialog open={showBookletDialog} onOpenChange={setShowBookletDialog}>
+                    <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Generate Synthesis Booklet</DialogTitle>
+                            <DialogDescription>
+                                Select master syntheses to include in the booklet. The booklet will organize content by conversation and category.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-4">
+                            {/* Master Synthesis Selection */}
+                            <div className="space-y-2">
+                                <Label>Master Syntheses</Label>
+                                <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-1">
+                                    {masterSyntheses.map((ms) => (
+                                        <div
+                                            key={ms.id}
+                                            className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                                            onClick={() => toggleChunkSelection(ms.id)}
+                                        >
+                                            <Checkbox
+                                                checked={selectedMasterSynthesisIds.includes(ms.id)}
+                                                onCheckedChange={() => {
+                                                    setSelectedMasterSynthesisIds(prev =>
+                                                        prev.includes(ms.id)
+                                                            ? prev.filter(id => id !== ms.id)
+                                                            : [...prev, ms.id]
+                                                    );
+                                                }}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium">Conversation #{ms.conversation_id}</p>
+                                                <div className="flex gap-2 mt-1">
+                                                    {ms.is_llm_assisted && (
+                                                        <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/20 text-purple-600">
+                                                            AI-Assisted
+                                                        </Badge>
+                                                    )}
+                                                    <Badge variant={ms.status === 'submitted' ? 'default' : 'secondary'} className="text-xs">
+                                                        {ms.status}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Citation Sources Section */}
+                            <Tabs defaultValue="preview" className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="preview">Citation Sources</TabsTrigger>
+                                    <TabsTrigger value="instructions">Instructions</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="preview" className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <Label>Document Source Chunks (will be included as citations)</Label>
+                                        <Button 
+                                            size="sm" 
+                                            variant="outline" 
+                                            onClick={() => {
+                                                setIsRetrievingSources(true);
+                                                setTimeout(() => setIsRetrievingSources(false), 1000);
+                                            }}
+                                            disabled={isRetrievingSources}
+                                        >
+                                            {isRetrievingSources ? (
+                                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                            ) : (
+                                                <Search className="mr-2 h-3 w-3" />
+                                            )}
+                                            Retrieve Sources
+                                        </Button>
+                                    </div>
+                                    
+                                    {retrievedChunks.length > 0 ? (
+                                        <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-2">
+                                            {retrievedChunks.map((chunk) => (
+                                                <div key={chunk.chunk_id} className="p-2 rounded bg-muted/50 text-xs">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="font-medium">{chunk.document_name || 'Unknown Document'}</span>
+                                                        {chunk.page_number && (
+                                                            <span className="text-muted-foreground">Page {chunk.page_number}</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-muted-foreground truncate">{chunk.content}</p>
+                                                    <p className="text-muted-foreground mt-1">{chunk.citation}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-4 text-muted-foreground text-sm">
+                                            <Search className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
+                                            <p>Click "Retrieve Sources" to fetch document chunks for citations.</p>
+                                        </div>
+                                    )}
+                                </TabsContent>
+                                <TabsContent value="instructions">
+                                    <div className="space-y-2 text-sm">
+                                        <p><strong>Booklet Structure:</strong></p>
+                                        <ol className="list-decimal list-inside space-y-1 ml-2">
+                                            <li>Event information at the top</li>
+                                            <li>Conversations as sections</li>
+                                            <li>Master syntheses organized by category (Convergence, Matters for Consideration, Proposals, Others)</li>
+                                            <li>Citation references from document chunks</li>
+                                            <li>Both AI-generated and manually crafted content clearly distinguished</li>
+                                        </ol>
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
+
+                            {/* Selection Summary */}
+                            <div className="text-sm text-muted-foreground p-3 rounded-md bg-muted/50">
+                                {selectedMasterSynthesisIds.length} master synthesis{selectedMasterSynthesisIds.length !== 1 ? 'es' : ''} selected
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button variant="outline">Cancel</Button>
+                            </DialogClose>
+                            <Button onClick={handleGenerateBookletWithSources} disabled={processing || selectedMasterSynthesisIds.length === 0 || isRetrievingSources}>
+                                {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                <BookOpen className="mr-2 h-4 w-4" />
+                                Generate Booklet
                             </Button>
                         </DialogFooter>
                     </DialogContent>

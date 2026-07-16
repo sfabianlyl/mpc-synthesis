@@ -156,7 +156,7 @@ return;
                                 <rect width="18" height="18" x="3" y="4" rx="2" />
                                 <path d="M3 10h18" />
                             </svg>
-                            <span>{formatDate(event.start_date)}</span>
+                            {/* <span>{formatDate(event.start_date)}</span> */}
                         </div>
                         
                     </div>

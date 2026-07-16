@@ -2,6 +2,8 @@ import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { FileText, Bot, Pencil, Users, ArrowLeft, BookOpen } from 'lucide-react';
 
 interface User {
     id: number;
@@ -10,8 +12,10 @@ interface User {
 
 interface Response {
     id: number;
+    conversation_id: number;
+    group_id: number;
     consensus_text: string;
-    submitted_at: string;
+    submitted_at: string | null;
     submitter?: User;
 }
 
@@ -20,54 +24,197 @@ interface Group {
     name: string;
 }
 
-interface Report {
+/**
+ * Individual Synthesis Report (individual submission from a synthesis member).
+ */
+interface SynthesisReport {
     id: number;
-    group_id: number;
+    conversation_id: number;
+    user_id: number;
     synthesis_id: number;
-    convergence_text: string;
-    consideration_text: string;
-    proposals_text: string;
+    submission_number?: number;
+    
+    // Manual content fields
+    convergence_text?: string | null;
+    consideration_text?: string | null;
+    proposals_text?: string | null;
+    other_text?: string | null;
+    
+    // AI-generated content fields (read-only reference)
+    ai_convergence_text?: string | null;
+    ai_consideration_text?: string | null;
+    ai_proposals_text?: string | null;
+    ai_other_text?: string | null;
+    
+    is_llm_assisted?: boolean;
+    is_master_synthesis?: boolean;
     llm_generated: boolean;
     status: string;
+    submitted_at?: string | null;
     created_at: string;
     updated_at: string;
     group?: Group;
     synthesis?: User;
+    conversation?: { id: number; title: string };
     responses?: Response[];
 }
 
-interface PageProps {
-    report: Report;
+/**
+ * Master Synthesis (aggregated "synthesis of syntheses" for a conversation).
+ */
+interface MasterSynthesis {
+    id: number;
+    conversation_id: number;
+    convergence_text?: string | null;
+    consideration_text?: string | null;
+    proposals_text?: string | null;
+    other_text?: string | null;
+    ai_convergence_text?: string | null;
+    ai_consideration_text?: string | null;
+    ai_proposals_text?: string | null;
+    ai_other_text?: string | null;
+    is_llm_assisted: boolean;
+    status: 'draft' | 'reviewed' | 'submitted';
+    created_at: string;
+    updated_at: string;
 }
 
-export default function ReportDetail({ report }: PageProps) {
+interface PageProps {
+    report: SynthesisReport;
+    masterSynthesis?: MasterSynthesis | null;
+    relatedReports?: SynthesisReport[];
+}
+
+// Category configuration for display
+const CATEGORIES = [
+    { 
+        key: 'convergence', 
+        label: 'Convergence', 
+        description: 'Points of agreement across all groups',
+        color: 'text-emerald-600 dark:text-emerald-400',
+        bgColor: 'bg-emerald-50 dark:bg-emerald-950/20',
+        borderColor: 'border-emerald-200 dark:border-emerald-800',
+    },
+    { 
+        key: 'consideration', 
+        label: 'Matters for Consideration', 
+        description: 'Critical issues requiring attention',
+        color: 'text-amber-600 dark:text-amber-400',
+        bgColor: 'bg-amber-50 dark:bg-amber-950/20',
+        borderColor: 'border-amber-200 dark:border-amber-800',
+    },
+    { 
+        key: 'proposals', 
+        label: 'Proposals', 
+        description: 'Actionable recommendations and suggestions',
+        color: 'text-blue-600 dark:text-blue-400',
+        bgColor: 'bg-blue-50 dark:bg-blue-950/20',
+        borderColor: 'border-blue-200 dark:border-blue-800',
+    },
+    { 
+        key: 'others', 
+        label: 'Others', 
+        description: 'Additional insights and observations',
+        color: 'text-violet-600 dark:text-violet-400',
+        bgColor: 'bg-violet-50 dark:bg-violet-950/20',
+        borderColor: 'border-violet-200 dark:border-violet-800',
+    },
+] as const;
+
+const renderContent = (text: string | null, isAiGenerated: boolean = false): React.ReactNode => {
+    if (!text || !text.trim()) {
+        return <p className="text-sm text-muted-foreground italic">No content available</p>;
+    }
+
+    const lines = text.split('\n').filter((line) => line.trim());
+
+    if (lines.length > 1) {
+        return (
+            <ul className="space-y-1">
+                {lines.map((line, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                        <span className={`${isAiGenerated ? 'text-blue-500' : 'text-primary'} mt-0.5 flex-shrink-0`}>•</span>
+                        <span className="text-sm">{line.replace(/^-+\s*/, '')}</span>
+                    </li>
+                ))}
+            </ul>
+        );
+    }
+
+    return <p className="text-sm whitespace-pre-wrap">{text}</p>;
+};
+
+export default function ReportDetail({ report, masterSynthesis, relatedReports = [] }: PageProps) {
+    const isMaster = report.is_master_synthesis || masterSynthesis?.id;
+    const currentMaster = masterSynthesis || (isMaster ? report as any : null);
+
+    // Get categories with content from master synthesis or individual report
+    const getCategories = () => {
+        if (currentMaster) {
+            return CATEGORIES.map(cat => ({
+                ...cat,
+                ai_content: (currentMaster as any)[`ai_${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
+                manual_content: (currentMaster as any)[`${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
+            }));
+        }
+        
+        return CATEGORIES.map(cat => ({
+            ...cat,
+            ai_content: (report as any)[`ai_${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
+            manual_content: (report as any)[`${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
+        }));
+    };
+
+    const categories = getCategories();
+
     return (
         <>
-            <Head title={`Report Detail - ${report.group?.name || `Group #${report.group_id}`}`} />
+            <Head title={`Report Detail - ${report.group?.name || `Conversation #${report.conversation_id}`}`} />
             <div className="p-8 space-y-8">
+                {/* ─── Header ─────────────────────────────────────── */}
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Report Detail</h1>
+                        <h1 className="text-3xl font-bold tracking-tight">
+                            {isMaster ? 'Master Synthesis' : 'Synthesis Report'} Detail
+                        </h1>
                         <p className="text-muted-foreground mt-1">
-                            {report.group?.name || `Group #${report.group_id}`} — Synthesis Report #{report.id}
+                            {report.conversation?.title || `Conversation #${report.conversation_id}`}
+                            {report.group && (
+                                <span className="ml-2 text-sm">— {report.group.name}</span>
+                            )}
                         </p>
                     </div>
-                    <Link href="/drafter">
-                        <Button variant="outline">Back to Dashboard</Button>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/drafter">
+                            <Button variant="outline" className="flex items-center gap-2">
+                                <ArrowLeft className="size-4" /> Back to Dashboard
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
-                {/* Report Info */}
+                {/* ─── Report Info ────────────────────────────────── */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Report Information</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                             <div>
-                                <span className="text-muted-foreground">Status:</span>
+                                <span className="text-muted-foreground block">Type:</span>
+                                {isMaster ? (
+                                    <Badge variant="secondary" className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 mt-1">
+                                        Master Synthesis
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="secondary" className="mt-1">Individual</Badge>
+                                )}
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block">Status:</span>
                                 <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
                                     report.status === 'submitted' ? 'bg-green-100 text-green-800' : 
+                                    report.status === 'reviewed' ? 'bg-blue-100 text-blue-800' :
                                     report.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : 
                                     'bg-gray-100 text-gray-800'
                                 }`}>
@@ -75,74 +222,220 @@ export default function ReportDetail({ report }: PageProps) {
                                 </span>
                             </div>
                             <div>
-                                <span className="text-muted-foreground">LLM Generated:</span>
-                                <span className="ml-2">{report.llm_generated ? 'Yes' : 'No'}</span>
+                                <span className="text-muted-foreground block">AI-Assisted:</span>
+                                <span className="ml-2">
+                                    {report.is_llm_assisted || report.llm_generated ? (
+                                        <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950/20 text-purple-600 text-xs">
+                                            <Bot className="h-3 w-3 mr-1" /> Yes
+                                        </Badge>
+                                    ) : (
+                                        <span className="text-muted-foreground">No</span>
+                                    )}
+                                </span>
                             </div>
                             <div>
-                                <span className="text-muted-foreground">Synthesis Member:</span>
+                                <span className="text-muted-foreground block">Synthesis Member:</span>
                                 <span className="ml-2">{report.synthesis?.name || 'Unknown'}</span>
                             </div>
+                            {report.submission_number && (
+                                <div>
+                                    <span className="text-muted-foreground block">Submission #:</span>
+                                    <Badge variant="outline" className="mt-1 text-xs">#{report.submission_number}</Badge>
+                                </div>
+                            )}
                             <div>
-                                <span className="text-muted-foreground">Created:</span>
-                                <span className="ml-2">{new Date(report.created_at).toLocaleDateString()}</span>
+                                <span className="text-muted-foreground block">Last Updated:</span>
+                                <span className="ml-2">{new Date(report.updated_at).toLocaleString()}</span>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Synthesis Content */}
-                <div className="grid gap-6 md:grid-cols-3">
+                {/* ─── Master Synthesis Overview (if available) ───── */}
+                {masterSynthesis && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-lg">Convergence</CardTitle>
-                            <CardDescription>Areas of agreement</CardDescription>
+                            <CardTitle className="flex items-center gap-2">
+                                <BookOpen className="h-5 w-5 text-purple-600" />
+                                Master Synthesis Overview
+                            </CardTitle>
+                            <CardDescription>
+                                Aggregated synthesis for this conversation, organized by category.
+                            </CardDescription>
                         </CardHeader>
-                        <CardContent className="text-sm whitespace-pre-wrap">
-                            {report.convergence_text || <span className="text-muted-foreground">No convergence text available.</span>}
+                        <CardContent className="space-y-4">
+                            {categories.map((cat) => (
+                                <div key={cat.key} className={`p-4 rounded-lg border ${cat.bgColor} ${cat.borderColor}`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className={`text-sm font-medium ${cat.color}`}>
+                                            {cat.label}
+                                        </h4>
+                                        <div className="flex gap-1">
+                                            {(cat as any).ai_content && (cat as any).ai_content.trim() && (
+                                                <Badge variant="outline" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                                                    <Bot className="h-3 w-3 mr-1" /> AI Reference
+                                                </Badge>
+                                            )}
+                                            {(cat as any).manual_content && (cat as any).manual_content.trim() && (
+                                                <Badge variant="outline" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                                                    <Pencil className="h-3 w-3 mr-1" /> Manual Content
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mb-2">{cat.description}</p>
+                                    
+                                    {/* AI Reference Content */}
+                                    {(cat as any).ai_content && (cat as any).ai_content.trim() && (
+                                        <div className="mb-2">
+                                            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">AI-Generated Reference:</p>
+                                            <div className="bg-white/50 dark:bg-black/10 rounded-md p-2 max-h-32 overflow-y-auto">
+                                                {renderContent((cat as any).ai_content, true)}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Manual Content */}
+                                    {(cat as any).manual_content && (cat as any).manual_content.trim() && (
+                                        <div>
+                                            <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Master Content:</p>
+                                            <div className="bg-white/50 dark:bg-black/10 rounded-md p-2 max-h-32 overflow-y-auto">
+                                                {renderContent((cat as any).manual_content, false)}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </CardContent>
                     </Card>
+                )}
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-lg">Matters for Consideration</CardTitle>
-                            <CardDescription>Items needing attention</CardDescription>
-                        </CardHeader>
-                        <CardContent className="text-sm whitespace-pre-wrap">
-                            {report.consideration_text || <span className="text-muted-foreground">No considerations available.</span>}
-                        </CardContent>
-                    </Card>
+                {/* ─── Synthesis Content ──────────────────────────── */}
+                <div className="grid gap-6 md:grid-cols-2">
+                    {categories.map((cat) => (
+                        <Card key={cat.key}>
+                            <CardHeader className={`${cat.bgColor} border-b ${cat.borderColor}`}>
+                                <CardTitle className={`text-lg ${cat.color} flex items-center gap-2`}>
+                                    {cat.label}
+                                </CardTitle>
+                                <CardDescription>{cat.description}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-4">
+                                {/* AI Content (if available) */}
+                                {(cat as any).ai_content && (cat as any).ai_content.trim() && (
+                                    <div className="mb-4">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Bot className="h-4 w-4 text-blue-600" />
+                                            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">AI-Generated Reference:</span>
+                                        </div>
+                                        <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3 min-h-[60px]">
+                                            {renderContent((cat as any).ai_content, true)}
+                                        </div>
+                                    </div>
+                                )}
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-lg">Proposals</CardTitle>
-                            <CardDescription>Suggested actions</CardDescription>
-                        </CardHeader>
-                        <CardContent className="text-sm whitespace-pre-wrap">
-                            {report.proposals_text || <span className="text-muted-foreground">No proposals available.</span>}
-                        </CardContent>
-                    </Card>
+                                <Separator className="my-4" />
+
+                                {/* Manual Content */}
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Pencil className="h-4 w-4 text-green-600" />
+                                        <span className="text-sm font-medium text-green-700 dark:text-green-300">Manual Content:</span>
+                                    </div>
+                                    <div className="min-h-[60px]">
+                                        {renderContent((cat as any).manual_content, false)}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
                 </div>
 
-                {/* Original Responses (Drill-down) */}
+                {/* ─── Source Group Consensuses (Traceability) ────── */}
                 {report.responses && report.responses.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Original Responses (Drill-down)</CardTitle>
-                            <CardDescription>Source responses from group members</CardDescription>
+                            <CardTitle className="flex items-center gap-2">
+                                <Users className="h-5 w-5" />
+                                Source Group Consensuses (Traceability)
+                            </CardTitle>
+                            <CardDescription>
+                                Original consensus responses from group members that contributed to this synthesis.
+                            </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {report.responses.map((response) => (
                                 <div key={response.id} className="p-4 rounded-lg border bg-muted/30">
                                     <div className="flex justify-between items-start mb-2">
-                                        <span className="font-medium text-sm">{response.submitter?.name || 'Anonymous'}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                            {new Date(response.submitted_at).toLocaleDateString()}
-                                        </span>
+                                        <div>
+                                            <span className="font-medium text-sm">{response.submitter?.name || 'Anonymous'}</span>
+                                            <p className="text-xs text-muted-foreground">Group #{response.group_id}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {response.submitted_at && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {new Date(response.submitted_at).toLocaleDateString()}
+                                                </span>
+                                            )}
+                                            <Badge variant="outline" className="text-xs">
+                                                Source
+                                            </Badge>
+                                        </div>
                                     </div>
                                     <Separator className="my-2" />
                                     <p className="text-sm whitespace-pre-wrap">{response.consensus_text}</p>
                                 </div>
                             ))}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* ─── Related Reports (Other Individual Syntheses) ─ */}
+                {relatedReports.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Related Individual Syntheses</CardTitle>
+                            <CardDescription>
+                                Other individual synthesis submissions for this conversation.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-3">
+                                {relatedReports.map((relatedReport) => (
+                                    <Link 
+                                        key={relatedReport.id} 
+                                        href={`/drafter/report/${relatedReport.id}`}
+                                        className="block p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                                                    {relatedReport.synthesis?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium">{relatedReport.synthesis?.name || 'Unknown'}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Submission #{relatedReport.submission_number || 1} · {new Date(relatedReport.updated_at).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {relatedReport.is_llm_assisted && (
+                                                    <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/20 text-purple-600">
+                                                        AI-Assisted
+                                                    </Badge>
+                                                )}
+                                                <Badge 
+                                                    variant={relatedReport.status === 'submitted' ? 'default' : 'secondary'}
+                                                    className="text-xs"
+                                                >
+                                                    {relatedReport.status}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
                         </CardContent>
                     </Card>
                 )}
