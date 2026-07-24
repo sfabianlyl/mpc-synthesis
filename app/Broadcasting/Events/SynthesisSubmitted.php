@@ -2,48 +2,37 @@
 
 namespace App\Broadcasting\Events;
 
-use App\Models\SynthesisReport;
+use App\Models\MasterSynthesis;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
 
 class SynthesisSubmitted implements ShouldBroadcastNow
 {
-    use InteractsWithSockets;
+    use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
         public int $conversationId,
-        public SynthesisReport $report
+        public MasterSynthesis $report
     ) {}
 
-    /**
-     * Get the channels the event should broadcast on.
-     */
     public function broadcastOn(): array
     {
         return [
-            new PresenceChannel("conversation.{$this->conversationId}"),
+            new Channel("conversation.{$this->conversationId}"),
         ];
     }
 
-    /**
-     * The event's broadcast payload.
-     */
     public function broadcastWith(): array
     {
         return [
-            'submission' => [
-                'id' => $this->report->id,
-                'submission_number' => $this->report->submission_number,
-                'user' => [
-                    'id' => $this->report->synthesis->id,
-                    'name' => $this->report->synthesis->name,
-                    'email' => $this->report->synthesis->email,
-                ],
-                'status' => 'submitted',
-                'submitted_at' => $this->report->submitted_at?->toIso8601String(),
-            ],
+            'id' => $this->report->id,
+            'conversation_id' => $this->report->conversation_id,
+            'synthesis_id' => $this->report->synthesis_id,
+            'status' => $this->report->status,
+            'created_at' => $this->report->created_at?->toISOString(),
         ];
     }
 }

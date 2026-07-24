@@ -510,7 +510,7 @@
                 </div>
             </div>
 
-            @if($report->other_text || ($report instanceof \App\Models\SynthesisReport && property_exists($report, 'ai_other_text') && $report->ai_other_text))
+            @if($report->other_text || ($report instanceof \App\Models\MasterSynthesis && property_exists($report, 'ai_other_text') && $report->ai_other_text))
             <div class="section">
                 <span class="category-label others">Others</span>
                 <div class="{{ $report->ai_other_text ? 'content-block ai-content' : 'content-block mixed-content' }}">

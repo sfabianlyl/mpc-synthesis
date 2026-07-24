@@ -7,7 +7,7 @@ use App\Models\DocumentSourceChunk;
 use App\Models\Event;
 use App\Models\FinalDocument;
 use App\Models\Response;
-use App\Models\SynthesisReport;
+use App\Models\MasterSynthesis;
 use App\Services\DocumentRetrievalService;
 use App\Services\LlmService;
 use Illuminate\Http\Request;
@@ -54,7 +54,7 @@ class DrafterController extends Controller
         $selectedConversationId = (int) $selectedConversationId;
 
         // Fetch reports for the selected conversation
-        $reports = SynthesisReport::where('conversation_id', $selectedConversationId)
+        $reports = MasterSynthesis::where('conversation_id', $selectedConversationId)
             ->where('status', 'submitted')
             ->with(['synthesis'])
             ->get();
@@ -64,9 +64,9 @@ class DrafterController extends Controller
 
         // Stats
         $stats = [
-            'total_reports' => SynthesisReport::where('conversation_id', $selectedConversationId)->count(),
-            'submitted_reports' => SynthesisReport::where('conversation_id', $selectedConversationId)->where('status', 'submitted')->count(),
-            'draft_reports' => SynthesisReport::where('conversation_id', $selectedConversationId)->where('status', 'draft')->count(),
+            'total_reports' => MasterSynthesis::where('conversation_id', $selectedConversationId)->count(),
+            'submitted_reports' => MasterSynthesis::where('conversation_id', $selectedConversationId)->where('status', 'submitted')->count(),
+            'draft_reports' => MasterSynthesis::where('conversation_id', $selectedConversationId)->where('status', 'draft')->count(),
             'documents_created' => FinalDocument::count(),
         ];
 
@@ -83,7 +83,7 @@ class DrafterController extends Controller
     /**
      * Show a detailed view of a specific report with drill-down to original responses.
      */
-    public function show(Request $request, SynthesisReport $report)
+    public function show(Request $request, MasterSynthesis $report)
     {
         $report->load(['synthesis', 'conversation']);
 
@@ -113,7 +113,7 @@ class DrafterController extends Controller
         $conversationIds = $validated['conversation_ids'];
 
         // Get all submitted synthesis reports for these conversations
-        $reports = SynthesisReport::where('status', 'submitted')
+        $reports = MasterSynthesis::where('status', 'submitted')
             ->whereIn('conversation_id', $conversationIds)
             ->with(['conversation', 'synthesis'])
             ->get();
@@ -198,7 +198,7 @@ class DrafterController extends Controller
         }
 
         // Fetch all master syntheses for these conversations
-        $masterSyntheses = SynthesisReport::whereIn('conversation_id', $conversationIds)
+        $masterSyntheses = MasterSynthesis::whereIn('conversation_id', $conversationIds)
             ->where('is_master_synthesis', true)
             ->with(['synthesis', 'conversation'])
             ->orderBy('submitted_at', 'desc')
@@ -365,7 +365,7 @@ class DrafterController extends Controller
     {
         $conversations = $event->conversations()->pluck('conversations.id')->toArray();
 
-        $reports = SynthesisReport::whereIn('conversation_id', $conversations)
+        $reports = MasterSynthesis::whereIn('conversation_id', $conversations)
             ->with(['synthesis', 'conversation'])
             ->orderBy('submitted_at', 'desc')
             ->get()
@@ -411,7 +411,7 @@ class DrafterController extends Controller
         if ($document) {
             $document->load(['conversations', 'event']);
 
-            $reports = SynthesisReport::where('status', 'submitted')
+            $reports = MasterSynthesis::where('status', 'submitted')
                 ->whereIn('conversation_id', $document->conversations->pluck('id'))
                 ->with(['synthesis', 'conversation'])
                 ->get();
@@ -444,7 +444,7 @@ class DrafterController extends Controller
     {
         $document->load(['conversations', 'event']);
 
-        $reports = SynthesisReport::where('status', 'submitted')
+        $reports = MasterSynthesis::where('status', 'submitted')
             ->whereIn('conversation_id', $document->conversations->pluck('id'))
             ->with(['synthesis', 'conversation'])
             ->get();

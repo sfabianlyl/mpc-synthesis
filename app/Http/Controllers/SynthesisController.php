@@ -4,11 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Broadcasting\Events\MasterSynthesisUpdated;
 use App\Broadcasting\Events\SynthesisSubmitted;
+use App\Jobs\LlmExtractionJob;
+use App\Models\ConsensusNote;
 use App\Models\Conversation;
+use App\Models\Extraction;
 use App\Models\Group;
+use App\Models\MasterSynthesis;
 use App\Models\Response;
 use App\Models\SynthesisCustomQuery;
-use App\Models\SynthesisReport;
+use App\Models\SynthesisDraft;
+use App\Models\SynthesisGroupAssignment;
 use App\Services\LlmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -74,7 +79,7 @@ class SynthesisController extends Controller
         });
 
         // Fetch the synthesis report for this session and synthesis member
-        $report = SynthesisReport::where('conversation_id', $selectedConversationId)
+        $report = MasterSynthesis::where('conversation_id', $selectedConversationId)
             ->where('synthesis_id', $user->id)
             ->first();
 
@@ -124,49 +129,55 @@ class SynthesisController extends Controller
             abort(403, 'You are not assigned to this conversation.');
         }
 
-        // Fetch ALL groups for this conversation (not just assigned groups)
-        $allGroupsForConversation = Group::whereHas('responses', function ($query) use ($conversation) {
-            $query->where('conversation_id', $conversation->id);
-        })->with(['responses' => function ($query) use ($conversation) {
-            $query->where('conversation_id', $conversation->id);
-        }])->get();
+        // Get groups assigned to THIS user for this conversation
+        $assignedGroupIds = SynthesisGroupAssignment::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->pluck('group_id');
 
-        // Build groups structure with responses from ALL synthesis members assigned to this conversation
-        $groups = $allGroupsForConversation->map(function ($group) {
-            return (object)[
-                'id' => $group->id,
-                'name' => $group->name,
-                'responses' => $group->responses,
-            ];
-        });
+        // Get the assigned groups with their consensuses
+        $assignedGroups = Group::whereIn('id', $assignedGroupIds)
+            ->with(['responses' => function ($query) use ($conversation) {
+                $query->where('conversation_id', $conversation->id);
+            }])
+            ->get();
 
-        // Fetch or create a draft report so user inputs can be saved
-        $report = SynthesisReport::where('conversation_id', $conversation->id)
-            ->where('synthesis_id', $user->id)
-            ->with('customQueries')
+        // Get user's notes for these groups
+        $notes = ConsensusNote::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->get()
+            ->keyBy('group_id');
+
+        // Get user's existing draft
+        $draft = SynthesisDraft::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
             ->first();
 
-        // Auto-create draft report if none exists, so manual inputs have a record to update
-        if (!$report) {
-            $report = SynthesisReport::create([
+        // Auto-create draft if none exists
+        if (!$draft) {
+            $draft = SynthesisDraft::create([
                 'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
-                'submission_number' => SynthesisReport::getNextSubmissionNumber($conversation->id, $user->id),
+                'user_id' => $user->id,
                 'status' => 'draft',
-                'is_llm_assisted' => false,
             ]);
         }
 
-        // Fetch consensus submission status from all groups for this conversation
+        // Get user's extraction (if any)
+        $extraction = Extraction::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        // Check if all assigned groups have submitted their consensus
+        $allSubmitted = $this->checkAllGroupsSubmitted($conversation->id, $user->id);
+
+        // Fetch consensus submission status for assigned groups
         $consensusSubmissions = [];
-        if ($allGroupsForConversation->isNotEmpty()) {
-            $groupIds = $allGroupsForConversation->pluck('id');
+        if ($assignedGroups->isNotEmpty()) {
+            $groupIds = $assignedGroups->pluck('id');
             $responses = Response::whereIn('group_id', $groupIds)
                 ->where('conversation_id', $conversation->id)
                 ->with('group')
                 ->get();
 
-            // Group submissions by group_id
             $consensusSubmissions = $responses->groupBy('group_id')->map(function ($groupResponses) {
                 return $groupResponses->map(function ($response) {
                     return [
@@ -183,13 +194,41 @@ class SynthesisController extends Controller
 
         return Inertia::render('synthesis/review', [
             'conversation' => $conversation,
-            'group' => (object)[
-                'id' => $conversation->id,
-                'name' => $conversation->title,
-            ],
-            'groups' => $groups,
-            'responses' => $groups->flatMap->responses,
-            'report' => $report,
+            'assignedGroups' => $assignedGroups->map(function ($group) use ($consensusSubmissions, $notes) {
+                return (object)[
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'responses' => $group->responses,
+                    'consensusSubmission' => $consensusSubmissions[$group->id][0] ?? null,
+                    'note' => $notes[$group->id] ? (object)[
+                        'id' => $notes[$group->id]->id,
+                        'text' => $notes[$group->id]->text,
+                    ] : null,
+                ];
+            })->values()->toArray(),
+            'notes' => $notes->map(fn($n) => (object)[
+                'id' => $n->id,
+                'group_id' => $n->group_id,
+                'text' => $n->text,
+            ])->toArray(),
+            'draft' => $draft ? [
+                'id' => $draft->id,
+                'convergence_text' => $draft->convergence_text,
+                'consideration_text' => $draft->consideration_text,
+                'proposals_text' => $draft->proposals_text,
+                'is_submitted' => $draft->is_submitted,
+                'submitted_at' => $draft->submitted_at?->toIso8601String(),
+            ] : null,
+            'extraction' => $extraction ? [
+                'id' => $extraction->id,
+                'convergence_text' => $extraction->convergence_text,
+                'consideration_text' => $extraction->consideration_text,
+                'proposals_text' => $extraction->proposals_text,
+                'provider' => $extraction->provider,
+                'is_successful' => $extraction->is_successful,
+                'extracted_at' => $extraction->extracted_at?->toIso8601String(),
+            ] : null,
+            'allConsensusSubmitted' => $allSubmitted,
             'consensusSubmissions' => $consensusSubmissions,
         ]);
     }
@@ -316,7 +355,7 @@ class SynthesisController extends Controller
             $updateData['proposals_text'] = $manualProposals;
         }
 
-        $report = SynthesisReport::updateOrCreate(
+        $report = MasterSynthesis::updateOrCreate(
             [
                 'conversation_id' => $conversation->id,
                 'synthesis_id' => $user->id,
@@ -428,7 +467,7 @@ class SynthesisController extends Controller
         ]);
 
         // Ensure report exists
-        $report = SynthesisReport::firstOrCreate(
+        $report = MasterSynthesis::firstOrCreate(
             ['conversation_id' => $conversation->id, 'synthesis_id' => $user->id],
             ['status' => 'draft']
         );
@@ -500,7 +539,7 @@ class SynthesisController extends Controller
     /**
      * Update a synthesis report (manual edits).
      */
-    public function update(Request $request, SynthesisReport $report)
+    public function update(Request $request, MasterSynthesis $report)
     {
         $user = $request->user();
 
@@ -525,7 +564,7 @@ class SynthesisController extends Controller
     /**
      * Submit the synthesis report for compilation.
      */
-    public function submit(Request $request, SynthesisReport $report)
+    public function submit(Request $request, MasterSynthesis $report)
     {
         $user = $request->user();
 
@@ -570,7 +609,7 @@ class SynthesisController extends Controller
         });
 
         // Fetch all submissions for this conversation
-        $submissions = SynthesisReport::where('conversation_id', $conversation->id)
+        $submissions = MasterSynthesis::where('conversation_id', $conversation->id)
             ->with(['synthesis', 'customQueries'])
             ->orderBy('submission_number')
             ->get();
@@ -606,7 +645,7 @@ class SynthesisController extends Controller
         });
 
         // Fetch master synthesis (latest submitted report for this conversation)
-        $masterSynthesis = SynthesisReport::where('conversation_id', $conversation->id)
+        $masterSynthesis = MasterSynthesis::where('conversation_id', $conversation->id)
             ->whereIn('status', ['submitted', 'reviewed'])
             ->orderBy('submission_number', 'desc')
             ->first();
@@ -644,7 +683,7 @@ class SynthesisController extends Controller
             })->toArray();
         }
 
-        return Inertia::render('synthesis/review-page', [
+        return Inertia::render('synthesis/collaborate', [
             'conversation' => $conversation,
             'submissions' => $submissions,
             'masterSynthesis' => $masterSynthesisData,
@@ -691,7 +730,7 @@ class SynthesisController extends Controller
         ]);
 
         // Check if user already has a submitted submission for this conversation
-        $existingSubmitted = SynthesisReport::where('conversation_id', $conversation->id)
+        $existingSubmitted = MasterSynthesis::where('conversation_id', $conversation->id)
             ->where('synthesis_id', $user->id)
             ->where('status', 'submitted')
             ->first();
@@ -703,7 +742,7 @@ class SynthesisController extends Controller
         }
 
         // Find the existing draft to get its ID for custom query cleanup
-        $existingDraft = SynthesisReport::where('conversation_id', $conversation->id)
+        $existingDraft = MasterSynthesis::where('conversation_id', $conversation->id)
             ->where('synthesis_id', $user->id)
             ->where('status', 'draft')
             ->first();
@@ -719,7 +758,7 @@ class SynthesisController extends Controller
             $report = $existingDraft->fresh();
         } else {
             // Create new submission with next submission_number
-            $nextNumber = SynthesisReport::getNextSubmissionNumber($conversation->id, $user->id);
+            $nextNumber = MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id);
             $createData = array_merge($validated, [
                 'conversation_id' => $conversation->id,
                 'synthesis_id' => $user->id,
@@ -728,7 +767,7 @@ class SynthesisController extends Controller
                 'submitted_at' => now(),
                 'is_llm_assisted' => false,
             ]);
-            $report = SynthesisReport::create($createData);
+            $report = MasterSynthesis::create($createData);
         }
 
         // Broadcast the submission event for real-time updates
@@ -818,14 +857,14 @@ class SynthesisController extends Controller
         }
 
         // Find or create a draft submission for the current user
-        $report = SynthesisReport::firstOrCreate(
+        $report = MasterSynthesis::firstOrCreate(
             [
                 'conversation_id' => $conversation->id,
                 'synthesis_id' => $user->id,
                 'status' => 'draft',
             ],
             [
-                'submission_number' => SynthesisReport::getNextSubmissionNumber($conversation->id, $user->id),
+                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
             ]
         );
 
@@ -890,15 +929,15 @@ class SynthesisController extends Controller
         }
 
         // Find or create the master synthesis report for this conversation
-        $report = SynthesisReport::where('conversation_id', $conversation->id)
+        $report = MasterSynthesis::where('conversation_id', $conversation->id)
             ->where('is_master_synthesis', true)
             ->first();
 
         if (!$report) {
-            $report = SynthesisReport::create([
+            $report = MasterSynthesis::create([
                 'conversation_id' => $conversation->id,
                 'synthesis_id' => $user->id,
-                'submission_number' => SynthesisReport::getNextSubmissionNumber($conversation->id, $user->id),
+                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
                 'is_master_synthesis' => true,
                 'status' => 'submitted',
                 'submitted_at' => now(),
@@ -971,7 +1010,7 @@ class SynthesisController extends Controller
      */
     public function getMasterSynthesis(Conversation $conversation)
     {
-        $masterSynthesis = SynthesisReport::where('conversation_id', $conversation->id)
+        $masterSynthesis = MasterSynthesis::where('conversation_id', $conversation->id)
             ->where('is_master_synthesis', true)
             ->first();
 
@@ -1008,14 +1047,14 @@ class SynthesisController extends Controller
     public function getSynthesesByCategory(Conversation $conversation)
     {
         // Fetch individual syntheses (non-master)
-        $individualSyntheses = SynthesisReport::where('conversation_id', $conversation->id)
+        $individualSyntheses = MasterSynthesis::where('conversation_id', $conversation->id)
             ->where('is_master_synthesis', false)
             ->with('synthesis')
             ->orderBy('submission_number')
             ->get();
 
         // Fetch master synthesis (if exists)
-        $masterSynthesis = SynthesisReport::where('conversation_id', $conversation->id)
+        $masterSynthesis = MasterSynthesis::where('conversation_id', $conversation->id)
             ->where('is_master_synthesis', true)
             ->first();
 
@@ -1081,16 +1120,16 @@ class SynthesisController extends Controller
         // Find or create the master synthesis report for this conversation.
         // Only match records that are master synthesis (is_llm_assisted = false) to avoid
         // accidentally updating a regular user's submitted report.
-        $report = SynthesisReport::where('conversation_id', $conversation->id)
+        $report = MasterSynthesis::where('conversation_id', $conversation->id)
             ->where('is_llm_assisted', false)
             ->whereIn('status', ['submitted', 'reviewed'])
             ->first();
 
         if (!$report) {
-            $report = SynthesisReport::create([
+            $report = MasterSynthesis::create([
                 'conversation_id' => $conversation->id,
                 'synthesis_id' => $user->id,
-                'submission_number' => SynthesisReport::getNextSubmissionNumber($conversation->id, $user->id),
+                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
                 'is_llm_assisted' => false,
                 'status' => 'submitted',
             ]);
@@ -1163,7 +1202,7 @@ class SynthesisController extends Controller
         }
 
         // Get the user's submitted synthesis report for this conversation
-        $report = SynthesisReport::where('conversation_id', $conversation->id)
+        $report = MasterSynthesis::where('conversation_id', $conversation->id)
             ->where('synthesis_id', $user->id)
             ->where('status', 'submitted')
             ->first();
@@ -1190,5 +1229,220 @@ class SynthesisController extends Controller
         return response($html)
             ->header('Content-Type', 'text/html')
             ->header('Content-Disposition', 'inline; filename="' . $filename . '.html"');
+    }
+
+    // ─── New Methods for Synthesis Review Refactoring ─────────────────
+
+    /**
+     * Get groups assigned to current user for a conversation.
+     */
+    public function getGroupAssignments(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $assignments = SynthesisGroupAssignment::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->with('group')
+            ->get();
+
+        return response()->json([
+            'assignments' => $assignments->map(fn($a) => [
+                'id' => $a->id,
+                'group_id' => $a->group_id,
+                'group_name' => $a->group?->name,
+            ]),
+        ]);
+    }
+
+    /**
+     * Save/update notes for a group consensus.
+     */
+    public function saveConsensusNote(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $validated = $request->validate([
+            'group_id' => 'required|exists:groups,id',
+            'notes' => 'nullable|string',
+        ]);
+
+        ConsensusNote::updateOrCreate(
+            [
+                'conversation_id' => $conversation->id,
+                'user_id' => $user->id,
+                'group_id' => $validated['group_id'],
+            ],
+            ['text' => $validated['notes'] ?? null]
+        );
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Get all notes for current user's assigned groups.
+     */
+    public function getConsensusNotes(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $notes = ConsensusNote::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->get();
+
+        return response()->json([
+            'notes' => $notes->map(fn($n) => [
+                'id' => $n->id,
+                'group_id' => $n->group_id,
+                'text' => $n->text,
+            ]),
+        ]);
+    }
+
+    /**
+     * Manually trigger LLM extraction (queued job).
+     */
+    public function triggerExtraction(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        LlmExtractionJob::dispatch($conversation->id, $user->id);
+
+        return response()->json(['success' => true, 'message' => 'Extraction job dispatched.']);
+    }
+
+    /**
+     * Get extraction for current user.
+     */
+    public function getExtractions(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $extraction = Extraction::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        return response()->json([
+            'extraction' => $extraction ? [
+                'id' => $extraction->id,
+                'convergence_text' => $extraction->convergence_text,
+                'consideration_text' => $extraction->consideration_text,
+                'proposals_text' => $extraction->proposals_text,
+                'provider' => $extraction->provider,
+                'is_successful' => $extraction->is_successful,
+                'extracted_at' => $extraction->extracted_at?->toIso8601String(),
+            ] : null,
+        ]);
+    }
+
+    /**
+     * Autosave draft content.
+     */
+    public function saveDraft(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $validated = $request->validate([
+            'convergence_text' => 'nullable|string',
+            'consideration_text' => 'nullable|string',
+            'proposals_text' => 'nullable|string',
+        ]);
+
+        $draft = SynthesisDraft::updateOrCreate(
+            [
+                'conversation_id' => $conversation->id,
+                'user_id' => $user->id,
+            ],
+            $validated
+        );
+
+        return response()->json(['success' => true, 'draft_id' => $draft->id]);
+    }
+
+    /**
+     * Submit synthesis draft and redirect to collaborate page.
+     */
+    public function submitDraft(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $draft = SynthesisDraft::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$draft || $draft->is_submitted) {
+            return back()->withErrors(['submission' => 'No draft to submit or already submitted.']);
+        }
+
+        // Mark as submitted
+        $draft->update([
+            'is_submitted' => true,
+            'submitted_at' => now(),
+        ]);
+
+        // Redirect to collaborative review page
+        return redirect()->route('synthesis.collaborate', ['conversation' => $conversation])->with('success', 'Synthesis submitted successfully.');
+    }
+
+    /**
+     * Check if all assigned groups have submitted their consensus.
+     */
+    private function checkAllGroupsSubmitted(int $conversationId, int $userId): bool
+    {
+        $assignedGroupIds = SynthesisGroupAssignment::where('conversation_id', $conversationId)
+            ->where('user_id', $userId)
+            ->pluck('group_id');
+
+        if ($assignedGroupIds->isEmpty()) {
+            return false;
+        }
+
+        $submittedCount = Response::where('conversation_id', $conversationId)
+            ->whereIn('group_id', $assignedGroupIds)
+            ->whereNotNull('submitted_at')
+            ->count();
+
+        return $submittedCount >= $assignedGroupIds->count();
     }
 }

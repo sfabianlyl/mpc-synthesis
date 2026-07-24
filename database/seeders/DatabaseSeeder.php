@@ -7,7 +7,7 @@ use App\Models\Conversation;
 use App\Models\User;
 use App\Models\Group;
 use App\Models\Response;
-use App\Models\SynthesisReport;
+use App\Models\MasterSynthesis;
 use App\Models\SynthesisCustomQuery;
 use Illuminate\Database\Seeder;
 
@@ -181,7 +181,7 @@ class DatabaseSeeder extends Seeder
 
         // ─── 7. Create Synthesis Reports for CIS 2 ──────────────────
         // Synthesis Member A: reports for Groups 1-4 (4 responses)
-        $report1 = SynthesisReport::create([
+        $report1 = MasterSynthesis::create([
             'conversation_id' => $cis2->id,
             'synthesis_id' => $synthesisMembers[0]->id,
             // AI-generated content
@@ -199,7 +199,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Synthesis Member B: reports for Groups 5-7 (3 responses)
-        $report2 = SynthesisReport::create([
+        $report2 = MasterSynthesis::create([
             'conversation_id' => $cis2->id,
             'synthesis_id' => $synthesisMembers[1]->id,
             // AI-generated content

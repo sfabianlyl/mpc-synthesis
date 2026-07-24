@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\SynthesisReports\Tables;
+namespace App\Filament\Resources\MasterSyntheses\Tables;
 
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -9,7 +9,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
-class SynthesisReportsTable
+class MasterSynthesesTable
 {
     public static function configure(Table $table): Table
     {

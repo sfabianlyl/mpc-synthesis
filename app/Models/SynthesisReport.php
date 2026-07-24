@@ -40,6 +40,13 @@ class SynthesisReport extends Model
 {
     use HasFactory;
 
+    /**
+     * The table associated with the model.
+     *
+     * @var string
+     */
+    protected $table = 'master_syntheses';
+
     protected $fillable = [
         'is_master_synthesis',
         'conversation_id',

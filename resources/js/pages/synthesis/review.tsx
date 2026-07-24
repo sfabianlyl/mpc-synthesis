@@ -1,70 +1,83 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle2, XCircle, Loader2, FileText, Users, Bot, Trash2, FileDown } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { CheckCircle2, XCircle, Loader2, FileText, Users, Bot, FileDown } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { debounce } from '@/lib/debounce';
 
-interface SynthesisCustomQuery {
+interface GroupAssignment {
     id: number;
-    prompt: string;
-    response: string[];
-    provider: string | null;
-    created_at: string;
+    name: string;
+    responses: any[];
+    consensusSubmission?: {
+        is_submitted: boolean;
+        consensus_text: string;
+        submitted_at: string | null;
+    } | null;
+    note?: { id: number; text: string | null } | null;
 }
 
-interface SynthesisReport {
+interface Extraction {
     id: number;
     convergence_text: string | null;
     consideration_text: string | null;
     proposals_text: string | null;
-    ai_convergence_text: string | null;
-    ai_consideration_text: string | null;
-    ai_proposals_text: string | null;
-    ai_source_group_ids: number[] | null;
-    ai_generated_at: string | null;
-    llm_generated: boolean;
-    status: string;
-    custom_queries: SynthesisCustomQuery[];
+    provider: string | null;
+    is_successful: boolean;
+    extracted_at: string | null;
+}
+
+interface SynthesisDraft {
+    id: number;
+    convergence_text: string | null;
+    consideration_text: string | null;
+    proposals_text: string | null;
+    is_submitted: boolean;
+    submitted_at: string | null;
 }
 
 interface PageProps {
     conversation: any;
-    groups: any[];
-    responses: any[];
-    report: SynthesisReport | null;
-    success?: string;
-    errors?: Record<string, string>;
+    assignedGroups: GroupAssignment[];
+    notes: Record<number, { id: number; text: string | null }>;
+    draft: SynthesisDraft | null;
+    extraction: Extraction | null;
+    allConsensusSubmitted: boolean;
     consensusSubmissions: Record<number, any[]>;
-    provider?: string;
+    success?: string;
 }
 
 export default function Review({
     conversation,
-    groups,
-    responses,
-    report,
+    assignedGroups,
+    notes,
+    draft,
+    extraction,
+    allConsensusSubmitted,
+    consensusSubmissions,
     success: initialSuccess,
-    errors: initialErrors,
-    consensusSubmissions = {},
 }: PageProps) {
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [isSynthesizing, setIsSynthesizing] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [analysisMessage, setAnalysisMessage] = useState('');
-    const [convergenceText, setConvergenceText] = useState(report?.convergence_text ?? '');
-    const [considerationText, setConsiderationText] = useState(report?.consideration_text ?? '');
-    const [proposalsText, setProposalsText] = useState(report?.proposals_text ?? '');
-    const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(
-        new Set(groups.map(g => g.id))
-    );
-    // New state for custom prompt
-    const [customPrompt, setCustomPrompt] = useState('');
-    const [isCustomQuerying, setIsCustomQuerying] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Refs for batch checkbox indeterminate state
-    const batchCheckboxRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+    // Local state for draft fields
+    const [convergenceText, setConvergenceText] = useState(draft?.convergence_text ?? '');
+    const [considerationText, setConsiderationText] = useState(draft?.consideration_text ?? '');
+    const [proposalsText, setProposalsText] = useState(draft?.proposals_text ?? '');
+
+    // Local state for notes per group
+    const [groupNotes, setGroupNotes] = useState<Record<number, string>>(() => {
+        const initial: Record<number, string> = {};
+        assignedGroups.forEach((group) => {
+            initial[group.id] = group.note?.text ?? '';
+        });
+        return initial;
+    });
 
     useEffect(() => {
         if (initialSuccess) {
@@ -75,316 +88,121 @@ export default function Review({
                 setAnalysisMessage('');
             }, 5000);
         }
+    }, [initialSuccess]);
 
-        if (initialErrors?.analysis) {
-            setAnalysisStatus('error');
-            setAnalysisMessage(initialErrors.analysis);
-            setTimeout(() => {
-                setAnalysisStatus('idle');
-                setAnalysisMessage('');
-            }, 5000);
-        }
-    }, [initialSuccess, initialErrors]);
-
-    // Sync local state when report prop changes (e.g., after Inertia re-render)
+    // Sync local state when draft prop changes
     useEffect(() => {
-        if (report) {
-            setConvergenceText(report.convergence_text ?? '');
-            setConsiderationText(report.consideration_text ?? '');
-            setProposalsText(report.proposals_text ?? '');
+        if (draft) {
+            setConvergenceText(draft.convergence_text ?? '');
+            setConsiderationText(draft.consideration_text ?? '');
+            setProposalsText(draft.proposals_text ?? '');
         }
-    }, [report]);
+    }, [draft]);
 
-    // Update indeterminate state for batch checkboxes when selectedGroupIds changes
-    useEffect(() => {
-        const groupIds = getUniqueGroupIds();
-        const batches = [];
-
-        for (let i = 0; i < groupIds.length; i += 5) {
-            batches.push(groupIds.slice(i, i + 5));
-        }
-
-        batches.forEach((batchGroupIds, batchIndex) => {
-            const ref = batchCheckboxRefs.current.get(batchIndex);
-
-            if (ref) {
-                const allInBatchSelected = batchGroupIds.every(id => selectedGroupIds.has(id));
-                const someInBatchSelected = batchGroupIds.some(id => selectedGroupIds.has(id));
-                ref.indeterminate = someInBatchSelected && !allInBatchSelected;
-            }
-        });
-    }, [selectedGroupIds]);
-
-    // Reset all inputs to clear them after submission
-    const resetInputs = () => {
-        setConvergenceText('');
-        setConsiderationText('');
-        setProposalsText('');
-        setCustomPrompt('');
-    };
-
-    // Custom LLM query handler
-    const handleCustomQuery = () => {
-        if (!customPrompt.trim() || !conversation.id) {
-            return;
-        }
-
-        setIsCustomQuerying(true);
-        router.post(
-            `/synthesis/custom-query/${conversation.id}`,
-            {
-                prompt: customPrompt,
-                selected_group_ids: Array.from(selectedGroupIds),
-            },
-            {
+    // Debounced save handlers with 2s delay
+    const debouncedSaveDraft = useMemo(
+        () => debounce((field: string, value: string) => {
+            if (!conversation?.id) return;
+            router.patch(`/synthesis/draft/${conversation.id}`, { [field]: value }, {
                 preserveScroll: true,
-                onSuccess: () => {
-                    setCustomPrompt('');
-                    setIsCustomQuerying(false);
-                },
-                onError: () => setIsCustomQuerying(false),
-            }
-        );
-    };
-
-    // Delete custom query handler
-    const handleDeleteCustomQuery = (queryId: number) => {
-        router.delete(`/synthesis/custom-query/${queryId}`, {
-            preserveScroll: true,
-        });
-    };
-
-    // Submit synthesis handler - packages all data and clears inputs after submission
-    const handleSubmitSynthesis = () => {
-        if (!conversation.id || !report?.id) {
-            return;
-        }
-
-        setIsSubmitting(true);
-
-        // Gather custom queries from the report (these are already linked to the report)
-        const customQueries = report.custom_queries ?? [];
-
-        router.post(
-            `/synthesis/submit-synthesis/${conversation.id}`,
-            {
-                // Manual inputs by category
-                convergence_text: convergenceText,
-                consideration_text: considerationText,
-                proposals_text: proposalsText,
-                // Others category: compile all custom query prompts and their responses
-                other_text: customQueries.length > 0
-                    ? customQueries.map(q => `Prompt: ${q.prompt}\nResponse: ${q.response.join('\n')}`).join('\n\n---\n\n')
-                    : null,
-                // Include AI data that will be part of the final submission
-                ai_convergence_text: report.ai_convergence_text ?? '',
-                ai_consideration_text: report.ai_consideration_text ?? '',
-                ai_proposals_text: report.ai_proposals_text ?? '',
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setAnalysisStatus('success');
-                    setAnalysisMessage('Synthesis submitted successfully.');
-
-                    // Clear all inputs after successful submission
-                    resetInputs();
-
-                    setIsSubmitting(false);
-
-                    setTimeout(() => {
-                        setAnalysisStatus('idle');
-                        setAnalysisMessage('');
-                    }, 5000);
-                },
-                onError: () => {
-                    setAnalysisStatus('error');
-                    setAnalysisMessage('Failed to submit synthesis. Please try again.');
-                    setIsSubmitting(false);
-                },
-            }
-        );
-    };
-
-    const handleTriggerLLM = () => {
-        setIsAnalyzing(true);
-        setAnalysisStatus('idle');
-        setAnalysisMessage('');
-        router.post(
-            `/synthesis/analyze/${conversation.id}`,
-            {
-                selected_group_ids: Array.from(selectedGroupIds),
-                // Send current manual text values so they get saved alongside AI output
-                convergence_text: convergenceText,
-                consideration_text: considerationText,
-                proposals_text: proposalsText,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: (page: any) => {
-                    // Read success message and report from page props (passed via session flash from back()->with())
-                    const successMessage = page.props.success;
-                    const newReport = page.props.report;
-
-                    if (newReport) {
-                        setConvergenceText(newReport.convergence_text ?? '');
-                        setConsiderationText(newReport.consideration_text ?? '');
-                        setProposalsText(newReport.proposals_text ?? '');
-                    }
-
-                    setIsAnalyzing(false);
-                    setAnalysisStatus('success');
-                    setAnalysisMessage(
-                        successMessage ||
-                        'LLM analysis completed successfully using ' + (page.props?.provider || 'unknown') + ' provider.'
-                    );
-                },
-                onError: (errors) => {
-                    setIsAnalyzing(false);
-                    setAnalysisStatus('error');
-                    setAnalysisMessage(errors.analysis || 'Analysis failed. Please try again.');
-                },
-            }
-        );
-    };
-
-    const handleSaveReport = () => {
-        if (!report?.id) {
-            return;
-        }
-
-        router.patch(
-            `/synthesis/report/${report.id}`,
-            {
-                convergence_text: convergenceText,
-                consideration_text: considerationText,
-                proposals_text: proposalsText,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setAnalysisStatus('success');
-                    setAnalysisMessage('Report saved successfully.');
-                    setTimeout(() => {
-                        setAnalysisStatus('idle');
-                        setAnalysisMessage('');
-                    }, 3000);
-                },
-                onError: () => {
-                    setAnalysisStatus('error');
-                    setAnalysisMessage('Failed to save report. Please try again.');
-                },
-            }
-        );
-    };
-
-    const handleStatusUpdate = (status: 'draft' | 'reviewed' | 'submitted') => {
-        if (!report?.id) {
-            return;
-        }
-
-        router.patch(
-            `/synthesis/report/${report.id}`,
-            { status },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setAnalysisStatus('success');
-                    setAnalysisMessage(`Report marked as ${status}.`);
-                    setTimeout(() => {
-                        setAnalysisStatus('idle');
-                        setAnalysisMessage('');
-                    }, 3000);
-                },
-                onError: () => {
-                    setAnalysisStatus('error');
-                    setAnalysisMessage('Failed to update status.');
-                },
-            }
-        );
-    };
-
-    // Toggle a single group selection
-    const toggleGroup = (groupId: number) => {
-        setSelectedGroupIds(prev => {
-            const newSet = new Set(prev);
-
-            if (newSet.has(groupId)) {
-                newSet.delete(groupId);
-            } else {
-                newSet.add(groupId);
-            }
-
-            return newSet;
-        });
-    };
-
-    // Toggle all groups in a batch
-    const toggleBatch = (batchGroupIds: number[]) => {
-        setSelectedGroupIds(prev => {
-            const newSet = new Set(prev);
-            const allSelected = batchGroupIds.every(id => newSet.has(id));
-
-            if (allSelected) {
-                batchGroupIds.forEach(id => newSet.delete(id));
-            } else {
-                batchGroupIds.forEach(id => newSet.add(id));
-            }
-
-            return newSet;
-        });
-    };
-
-    // Check if all groups are selected
-    const isAllSelected = () => {
-        return groups.every(g => selectedGroupIds.has(g.id));
-    };
-
-    // Get unique group IDs sorted
-    const getUniqueGroupIds = () => {
-        return [...new Set(groups.map(g => g.id))].sort((a, b) => a - b);
-    };
-
-    // Group batches of 5
-    const getGroupBatches = () => {
-        const groupIds = getUniqueGroupIds();
-        const batches = [];
-
-        for (let i = 0; i < groupIds.length; i += 5) {
-            batches.push(groupIds.slice(i, i + 5));
-        }
-
-        return batches;
-    };
-
-    // Collect all consensus submissions from the groups (filtered by selectedGroupIds)
-    const allConsensusSubmissions: any[] = [];
-
-    for (const group of groups) {
-        if (!selectedGroupIds.has(group.id)) {
-            continue;
-        }
-
-        const submissions = consensusSubmissions[group.id] || [];
-
-        for (const submission of submissions) {
-            allConsensusSubmissions.push({
-                ...submission,
-                groupName: group.name,
-                groupId: group.id,
             });
-        }
-    }
+        }, 2000),
+        [conversation?.id]
+    );
 
-    // Render AI text as bullet points
-    const renderAiText = (text: string | null): React.ReactNode => {
-        if (!text || !text.trim()) {
-            return null;
-        }
+    const debouncedSaveNote = useMemo(
+        () => debounce((groupId: number, text: string) => {
+            if (!conversation?.id) return;
+            router.post(`/synthesis/consensus-note/${conversation.id}`, {
+                group_id: groupId,
+                notes: text,
+            }, {
+                preserveScroll: true,
+            });
+        }, 2000),
+        [conversation?.id]
+    );
 
+    // Handle draft field changes with autosave
+    const handleDraftChange = (field: 'convergence_text' | 'consideration_text' | 'proposals_text', value: string) => {
+        if (field === 'convergence_text') setConvergenceText(value);
+        if (field === 'consideration_text') setConsiderationText(value);
+        if (field === 'proposals_text') setProposalsText(value);
+        debouncedSaveDraft(field, value);
+    };
+
+    // Handle note changes with autosave
+    const handleNoteChange = (groupId: number, text: string) => {
+        setGroupNotes((prev) => ({ ...prev, [groupId]: text }));
+        debouncedSaveNote(groupId, text);
+    };
+
+    // Trigger LLM extraction
+    const handleTriggerExtraction = () => {
+        if (!conversation?.id) return;
+        setIsExtracting(true);
+        router.post(`/synthesis/extract/${conversation.id}`, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setAnalysisStatus('success');
+                setAnalysisMessage('Extraction job dispatched. Results will appear shortly.');
+                setTimeout(() => setAnalysisStatus('idle'), 3000);
+            },
+            onError: () => {
+                setAnalysisStatus('error');
+                setAnalysisMessage('Failed to trigger extraction.');
+            },
+        });
+    };
+
+    // Trigger LLM synthesis (from notes)
+    const handleTriggerSynthesis = () => {
+        if (!conversation?.id || !draft?.id) return;
+        setIsSynthesizing(true);
+        // Use the existing ai-synthesis endpoint with draft data
+        router.post(`/synthesis/ai-synthesis/${conversation.id}`, {
+            selected_group_ids: [],
+            convergence_text: convergenceText,
+            consideration_text: considerationText,
+            proposals_text: proposalsText,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setAnalysisStatus('success');
+                setAnalysisMessage('Synthesis generated successfully.');
+                setTimeout(() => setAnalysisStatus('idle'), 3000);
+            },
+            onError: () => {
+                setAnalysisStatus('error');
+                setAnalysisMessage('Failed to generate synthesis.');
+            },
+        });
+    };
+
+    // Submit draft
+    const handleSubmitDraft = () => {
+        if (!conversation?.id) return;
+        setIsSubmitting(true);
+        router.post(`/synthesis/submit-draft/${conversation.id}`, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setAnalysisStatus('success');
+                setAnalysisMessage('Synthesis submitted successfully.');
+            },
+            onError: () => {
+                setAnalysisStatus('error');
+                setAnalysisMessage('Failed to submit synthesis.');
+            },
+        });
+    };
+
+    // Render extraction text as bullet points
+    const renderExtractionText = (text: string | null): React.ReactNode => {
+        if (!text || !text.trim()) return <p className="text-muted-foreground text-sm italic">No content</p>;
         const bullets = text.split('\n').filter(line => line.trim());
-
+        if (bullets.length <= 1) {
+            return <p className="text-sm whitespace-pre-wrap">{text}</p>;
+        }
         return (
             <ul className="space-y-1">
                 {bullets.map((bullet, i) => (
@@ -397,6 +215,8 @@ export default function Review({
         );
     };
 
+    const isDraftSubmitted = draft?.is_submitted ?? false;
+
     return (
         <>
             <Head title={`Review - ${conversation?.title || 'Synthesis Review'}`} />
@@ -406,30 +226,27 @@ export default function Review({
                     <div>
                         <h1 className="text-3xl font-bold">{conversation?.title}</h1>
                         <p className="text-muted-foreground mt-1">Conversation ID: {conversation?.id}</p>
-                        {report && (
+                        {draft && (
                             <Badge
-                                variant={report.status === 'submitted' ? 'default' : 'secondary'}
+                                variant={isDraftSubmitted ? 'default' : 'secondary'}
                                 className="mt-2"
                             >
-                                Status: {report.status}
-                                {report.llm_generated && (
-                                    <span className="ml-1 text-xs">(LLM Generated)</span>
-                                )}
+                                {isDraftSubmitted ? 'Submitted' : 'Draft'}
                             </Badge>
                         )}
                     </div>
                     <div className="flex gap-2 pb-2">
-                        <Link href={`/synthesis/review-page/${conversation.id}`}>
+                        <a href={`/synthesis/collaborate/${conversation.id}`}>
                             <Button variant="outline" className="flex items-center gap-2">
                                 <Users className="size-4" /> Collaborative Review
                             </Button>
-                        </Link>
-                        {report && (
-                            <Link href={`/synthesis/export-booklet/${conversation.id}`}>
+                        </a>
+                        {draft && (
+                            <a href={`/synthesis/export-booklet/${conversation.id}`}>
                                 <Button variant="outline" className="flex items-center gap-2">
                                     <FileDown className="size-4" /> Export Booklet
                                 </Button>
-                            </Link>
+                            </a>
                         )}
                     </div>
                 </div>
@@ -452,369 +269,230 @@ export default function Review({
                     </div>
                 )}
 
-                {/* 2-Column Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Left Column - Submitted Consensus */}
-                    <div className="space-y-4">
+                {/* ─── Left Column: Submitted Consensus + Notes ─────────────── */}
+                <section className="space-y-4">
+                    <h2 className="text-xl font-semibold">Submitted Consensus</h2>
+                    <div className="grid grid-cols-2 gap-4">
+                        {assignedGroups.map((group) => (
+                            <div key={group.id} className="border rounded-lg p-4 bg-card">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p className="font-medium text-sm">Group {group.name}</p>
+                                    </div>
+                                    <Badge
+                                        variant={group.consensusSubmission?.is_submitted ? 'default' : 'secondary'}
+                                        className="text-xs"
+                                    >
+                                        {group.consensusSubmission?.is_submitted ? (
+                                            <span className="flex items-center gap-1">
+                                                <CheckCircle2 className="h-3 w-3" /> Submitted
+                                            </span>
+                                        ) : (
+                                            <span className="flex items-center gap-1">
+                                                <XCircle className="h-3 w-3" /> Pending
+                                            </span>
+                                        )}
+                                    </Badge>
+                                </div>
+
+                                {/* Left half: Consensus text */}
+                                <div className="pr-2 border-r mb-2">
+                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Consensus</label>
+                                    {group.consensusSubmission?.is_submitted ? (
+                                        <p className="text-sm whitespace-pre-wrap bg-muted/50 p-3 rounded-md max-h-[200px] overflow-y-auto">
+                                            {group.consensusSubmission.consensus_text}
+                                        </p>
+                                    ) : (
+                                        <p className="text-muted-foreground text-sm italic p-3">Pending submission...</p>
+                                    )}
+                                </div>
+
+                                {/* Right half: Notes */}
+                                <div>
+                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Your Notes</label>
+                                    <Textarea
+                                        value={groupNotes[group.id] ?? ''}
+                                        onChange={(e) => handleNoteChange(group.id, e.target.value)}
+                                        disabled={isDraftSubmitted}
+                                        rows={6}
+                                        placeholder="Write your notes here..."
+                                        className="text-sm"
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Submission Status Summary */}
+                    <Card>
+                        <CardContent className="pt-6">
+                            {(() => {
+                                const totalGroups = assignedGroups.length;
+                                const submittedGroups = assignedGroups.filter(
+                                    (g) => g.consensusSubmission?.is_submitted
+                                ).length;
+
+                                return (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Consensus Submissions</span>
+                                        <Badge variant="outline" className="text-base font-semibold">
+                                            {submittedGroups} / {totalGroups} Submitted
+                                        </Badge>
+                                    </div>
+                                );
+                            })()}
+                        </CardContent>
+                    </Card>
+                </section>
+
+                {/* ─── Right Column: Synthesis Panel ──────────────────────── */}
+                <section className="space-y-4 pt-6 border-t">
+                    <h2 className="text-xl font-semibold">Synthesis Panel</h2>
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Left Section: LLM Extractions (Read-Only) */}
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <FileText className="h-5 w-5" />
-                                    Submitted Consensus
+                                    <Bot className="h-5 w-5" />
+                                    LLM Extraction
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {/* Group Selection Checkboxes */}
-                                <div className="border-b pb-4">
-                                    <label className="text-sm font-medium mb-3 block flex items-center gap-2">
-                                        <Users className="h-4 w-4 text-muted-foreground" />
-                                        Filter by Groups
-                                    </label>
-                                    <div className="space-y-2">
-                                        {/* Select All checkbox */}
-                                        <div className="flex items-center gap-2 pb-2 border-b">
-                                            <input
-                                                type="checkbox"
-                                                checked={isAllSelected()}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setSelectedGroupIds(new Set(getUniqueGroupIds()));
-                                                    } else {
-                                                        setSelectedGroupIds(new Set());
-                                                    }
-                                                }}
-                                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                            />
-                                            <span className="text-sm font-medium">Select All Groups</span>
-                                            <Badge variant="secondary" className="text-xs ml-auto">
-                                                {selectedGroupIds.size} / {groups.length}
-                                            </Badge>
-                                        </div>
-                                        {/* Batch checkboxes */}
-                                        {getGroupBatches().map((batchGroupIds, batchIndex) => {
-                                            const allInBatchSelected = batchGroupIds.every(id => selectedGroupIds.has(id));
-                                            const firstGroupId = batchGroupIds[0];
-                                            const lastGroupId = batchGroupIds[batchGroupIds.length - 1];
-                                            const count = batchGroupIds.length;
+                                {/* Trigger button (hidden if successful extraction exists) */}
+                                {!extraction?.is_successful && (
+                                    <Button
+                                        onClick={handleTriggerExtraction}
+                                        disabled={isExtracting}
+                                        variant="outline"
+                                        className="w-full"
+                                    >
+                                        {isExtracting ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Extracting...
+                                            </>
+                                        ) : 'Trigger LLM Extraction'}
+                                    </Button>
+                                )}
 
-                                            return (
-                                                <div key={`batch-${batchIndex}`} className="flex items-center gap-2 py-1">
-                                                    <input
-                                                        ref={(el) => {
-                                                            if (el) {
-                                                                batchCheckboxRefs.current.set(batchIndex, el);
-                                                            } else {
-                                                                batchCheckboxRefs.current.delete(batchIndex);
-                                                            }
-                                                        }}
-                                                        type="checkbox"
-                                                        checked={allInBatchSelected}
-                                                        onChange={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleBatch(batchGroupIds);
-                                                        }}
-                                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                                    />
-                                                    <span className="text-sm">
-                                                        Group {firstGroupId}-{lastGroupId} ({count})
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {allConsensusSubmissions.length > 0 ? (
-                                    allConsensusSubmissions.map((submission: any, index: number) => (
-                                        <div
-                                            key={`${submission.group_id || submission.id}-${index}`}
-                                            className="border rounded-lg p-4 bg-card"
-                                        >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div>
-                                                    <p className="font-medium text-sm">
-                                                        {submission.group_name || submission.facilitator_name || 'Anonymous'}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Group: {submission.groupName}
-                                                    </p>
-                                                </div>
-                                                <Badge
-                                                    variant={submission.is_submitted ? 'default' : 'secondary'}
-                                                    className="text-xs"
-                                                >
-                                                    {submission.is_submitted ? (
-                                                        <span className="flex items-center gap-1">
-                                                            <CheckCircle2 className="h-3 w-3" /> Submitted
-                                                        </span>
-                                                    ) : (
-                                                        <span className="flex items-center gap-1">
-                                                            <XCircle className="h-3 w-3" /> Pending
-                                                        </span>
-                                                    )}
-                                                </Badge>
-                                            </div>
-                                            {submission.submitted_at && (
-                                                <p className="text-xs text-muted-foreground mb-2">
-                                                    Submitted: {new Date(submission.submitted_at).toLocaleString()}
-                                                </p>
-                                            )}
-                                            <p className="text-sm whitespace-pre-wrap bg-muted/50 p-3 rounded-md">
-                                                {submission.consensus_text}
-                                            </p>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-muted-foreground text-center py-8">
-                                        No consensus submissions from selected groups.
+                                {/* Auto-trigger indicator */}
+                                {allConsensusSubmitted && !extraction?.is_successful && (
+                                    <p className="text-xs text-muted-foreground">
+                                        All consensuses submitted. Extraction will run automatically.
                                     </p>
+                                )}
+
+                                {/* Display extraction results (read-only) */}
+                                {extraction?.is_successful && (
+                                    <>
+                                        <div>
+                                            <label className="text-sm font-medium text-blue-700">Convergence</label>
+                                            <div className="bg-blue-50/50 border rounded-md p-3 min-h-[60px] mt-1">
+                                                {renderExtractionText(extraction.convergence_text)}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium text-purple-700">Matters for Consideration</label>
+                                            <div className="bg-purple-50/50 border rounded-md p-3 min-h-[60px] mt-1">
+                                                {renderExtractionText(extraction.consideration_text)}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium text-green-700">Proposals</label>
+                                            <div className="bg-green-50/50 border rounded-md p-3 min-h-[60px] mt-1">
+                                                {renderExtractionText(extraction.proposals_text)}
+                                            </div>
+                                        </div>
+                                    </>
                                 )}
                             </CardContent>
                         </Card>
 
-                        {/* Submission Status Summary */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">Submission Status</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {(() => {
-                                    const totalGroups = groups.length;
-                                    const submittedGroups = groups.filter((group: any) => {
-                                        const submissions = consensusSubmissions[group.id] || [];
-                                        return submissions.some((s: any) => s.is_submitted);
-                                    }).length;
-
-                                    return (
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-muted-foreground">Consensus Submissions</span>
-                                            <Badge variant="outline" className="text-base font-semibold">
-                                                {submittedGroups} / {totalGroups} Submitted
-                                            </Badge>
-                                        </div>
-                                    );
-                                })()}
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Right Column - Synthesis Panel */}
-                    <div className="space-y-4">
+                        {/* Right Section: Synthesis Draft Editor (Editable) */}
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
-                                    <CardTitle>Synthesis Panel</CardTitle>
+                                    <CardTitle>Synthesis Editor</CardTitle>
                                     <Button
-                                        onClick={handleTriggerLLM}
-                                        disabled={isAnalyzing || selectedGroupIds.size === 0}
+                                        onClick={handleTriggerSynthesis}
+                                        disabled={isSynthesizing || isDraftSubmitted}
                                         variant="outline"
                                         size="sm"
                                     >
-                                        {isAnalyzing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {isAnalyzing ? 'Processing...' : 'Trigger LLM Synthesis'}
+                                        {isSynthesizing ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Synthesizing...
+                                            </>
+                                        ) : 'Trigger LLM Synthesis'}
                                     </Button>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
-                                {/* Convergence Section */}
+                                {/* Convergence */}
                                 <div className="space-y-2">
-                                    {/* AI-generated field (read-only, cannot be edited) */}
-                                    {report?.ai_convergence_text && report.ai_convergence_text.trim() && (
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <label className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                                                    Convergence (AI)
-                                                </label>
-                                                <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                                                    <Bot className="h-3 w-3 mr-1" /> AI Generated
-                                                </Badge>
-                                            </div>
-                                            <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3 min-h-[60px]">
-                                                {renderAiText(report.ai_convergence_text)}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {/* User field (editable input) */}
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">
-                                            Convergence (Your Input)
-                                        </label>
-                                        <Textarea
-                                            value={convergenceText}
-                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                                                setConvergenceText(e.target.value)
-                                            }
-                                            rows={6}
-                                            placeholder="Points of agreement..."
-                                        />
-                                    </div>
+                                    <label className="text-sm font-medium">Convergence</label>
+                                    <Textarea
+                                        value={convergenceText}
+                                        onChange={(e) => handleDraftChange('convergence_text', e.target.value)}
+                                        disabled={isDraftSubmitted}
+                                        rows={6}
+                                        placeholder="Points of agreement..."
+                                    />
                                 </div>
 
-                                {/* Matters for Consideration Section */}
+                                {/* Matters for Consideration */}
                                 <div className="space-y-2">
-                                    {/* AI-generated field (read-only, cannot be edited) */}
-                                    {report?.ai_consideration_text && report.ai_consideration_text.trim() && (
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <label className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                                                    Matters for Consideration (AI)
-                                                </label>
-                                                <Badge variant="secondary" className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                                                    <Bot className="h-3 w-3 mr-1" /> AI Generated
-                                                </Badge>
-                                            </div>
-                                            <div className="bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-md p-3 min-h-[60px]">
-                                                {renderAiText(report.ai_consideration_text)}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {/* User field (editable input) */}
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">
-                                            Matters for Consideration (Your Input)
-                                        </label>
-                                        <Textarea
-                                            value={considerationText}
-                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                                                setConsiderationText(e.target.value)
-                                            }
-                                            rows={6}
-                                            placeholder="Areas of concern or unresolved questions..."
-                                        />
-                                    </div>
+                                    <label className="text-sm font-medium">Matters for Consideration</label>
+                                    <Textarea
+                                        value={considerationText}
+                                        onChange={(e) => handleDraftChange('consideration_text', e.target.value)}
+                                        disabled={isDraftSubmitted}
+                                        rows={6}
+                                        placeholder="Areas of concern or unresolved questions..."
+                                    />
                                 </div>
 
-                                {/* Proposals Section */}
+                                {/* Proposals */}
                                 <div className="space-y-2">
-                                    {/* AI-generated field (read-only, cannot be edited) */}
-                                    {report?.ai_proposals_text && report.ai_proposals_text.trim() && (
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <label className="text-sm font-medium text-green-700 dark:text-green-300">
-                                                    Proposals (AI)
-                                                </label>
-                                                <Badge variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                                                    <Bot className="h-3 w-3 mr-1" /> AI Generated
-                                                </Badge>
-                                            </div>
-                                            <div className="bg-green-50/50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md p-3 min-h-[60px]">
-                                                {renderAiText(report.ai_proposals_text)}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {/* User field (editable input) */}
-                                    <div>
-                                        <label className="text-sm font-medium mb-1 block">
-                                            Proposals (Your Input)
-                                        </label>
-                                        <Textarea
-                                            value={proposalsText}
-                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                                                setProposalsText(e.target.value)
-                                            }
-                                            rows={6}
-                                            placeholder="Concrete suggestions or recommendations..."
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Custom LLM Prompt Section */}
-                                <div className="pt-4 border-t">
-                                    <h3 className="text-sm font-medium mb-2">Custom LLM Prompt</h3>
-                                    <div className="flex gap-2">
-                                        <Textarea
-                                            value={customPrompt}
-                                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                                                setCustomPrompt(e.target.value)
-                                            }
-                                            rows={2}
-                                            placeholder="Ask the LLM a specific question about the group responses..."
-                                            className="flex-1"
-                                        />
-                                        <Button
-                                            onClick={handleCustomQuery}
-                                            disabled={!customPrompt.trim() || isCustomQuerying}
-                                            variant="outline"
-                                            className="self-start flex-shrink-0"
-                                        >
-                                            {isCustomQuerying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            Ask AI
-                                        </Button>
-                                    </div>
-                                </div>
-
-                            </CardContent>
-                        </Card>
-
-                        {/* Others Section - Custom Query Results */}
-                        {report?.custom_queries && report.custom_queries.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Bot className="h-5 w-5" />
-                                        Others
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {report.custom_queries.map((query) => (
-                                        <div key={query.id} className="border rounded-lg p-4 bg-card">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-medium">{query.prompt}</p>
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        {query.provider ? `via ${query.provider}` : 'Unknown provider'} · {new Date(query.created_at).toLocaleString()}
-                                                    </p>
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600 ml-2 flex-shrink-0"
-                                                    onClick={() => handleDeleteCustomQuery(query.id)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                            <ul className="space-y-1 mt-2">
-                                                {query.response.map((point: string, i: number) => (
-                                                    <li key={i} className="flex items-start gap-2 text-sm">
-                                                        <span className="text-primary mt-0.5 flex-shrink-0">•</span>
-                                                        <span>{point}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Action Buttons */}
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex flex-col sm:flex-row gap-2">
-                                    <Button onClick={handleSaveReport} className="flex-1">
-                                        Save Draft
-                                    </Button>
-
-                                    <Button
-                                        onClick={handleSubmitSynthesis}
-                                        disabled={isSubmitting || !report?.id}
-                                        className="flex-1"
-                                    >
-                                        {isSubmitting ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Submitting...
-                                            </>
-                                        ) : (
-                                            'Submit Synthesis'
-                                        )}
-                                    </Button>
+                                    <label className="text-sm font-medium">Proposals</label>
+                                    <Textarea
+                                        value={proposalsText}
+                                        onChange={(e) => handleDraftChange('proposals_text', e.target.value)}
+                                        disabled={isDraftSubmitted}
+                                        rows={6}
+                                        placeholder="Concrete suggestions or recommendations..."
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
                     </div>
-                </div>
+
+                    {/* Submit Button (Bottom) */}
+                    <Card>
+                        <CardContent className="pt-6">
+                            <Button
+                                onClick={handleSubmitDraft}
+                                disabled={isSubmitting || isDraftSubmitted}
+                                className="w-full"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Submitting...
+                                    </>
+                                ) : isDraftSubmitted ? (
+                                    <span className="flex items-center gap-2">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Submitted
+                                    </span>
+                                ) : (
+                                    'Submit Synthesis'
+                                )}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </section>
             </div>
         </>
     );

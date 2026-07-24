@@ -19,9 +19,14 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read Event|null $event
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Response> $responses
- * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisReport> $synthesisReports
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSynthesis
  * @property-read \Illuminate\Database\Eloquent\Collection<int, FinalDocument> $finalDocuments
  * @property-read \Illuminate\Database\Eloquent\Collection<int, User> $synthesisMembers
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisGroupAssignment> $synthesisGroupAssignments
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, ConsensusNote> $consensusNotes
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Extraction> $extractions
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisDraft> $synthesisDrafts
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSyntheses
  */
 class Conversation extends Model
 {
@@ -48,9 +53,9 @@ class Conversation extends Model
     /**
      * Get the synthesis reports for this conversation.
      */
-    public function synthesisReports(): HasMany
+    public function masterSynthesis(): HasMany
     {
-        return $this->hasMany(SynthesisReport::class);
+        return $this->hasMany(MasterSynthesis::class);
     }
 
     /**
@@ -68,5 +73,45 @@ class Conversation extends Model
     {
         return $this->belongsToMany(User::class, 'conversation_members', 'conversation_id', 'user_id')
             ->withTimestamps();
+    }
+
+    /**
+     * Get the synthesis group assignments for this conversation.
+     */
+    public function synthesisGroupAssignments(): HasMany
+    {
+        return $this->hasMany(SynthesisGroupAssignment::class, 'conversation_id');
+    }
+
+    /**
+     * Get the consensus notes for this conversation.
+     */
+    public function consensusNotes(): HasMany
+    {
+        return $this->hasMany(ConsensusNote::class, 'conversation_id');
+    }
+
+    /**
+     * Get the extractions for this conversation.
+     */
+    public function extractions(): HasMany
+    {
+        return $this->hasMany(Extraction::class, 'conversation_id');
+    }
+
+    /**
+     * Get the synthesis drafts for this conversation.
+     */
+    public function synthesisDrafts(): HasMany
+    {
+        return $this->hasMany(SynthesisDraft::class, 'conversation_id');
+    }
+
+    /**
+     * Get the master syntheses for this conversation.
+     */
+    public function masterSyntheses(): HasMany
+    {
+        return $this->hasMany(MasterSynthesis::class, 'conversation_id');
     }
 }

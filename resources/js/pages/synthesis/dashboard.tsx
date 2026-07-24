@@ -96,7 +96,7 @@ export default function Dashboard({
                                         <FileCheck className="size-4" /> View Synthesis
                                     </Button>
                                 </Link>
-                                <Link href={`/synthesis/review-page/${selectedConversationId}`} className="w-full">
+                                <Link href={`/synthesis/collaborate/${selectedConversationId}`} className="w-full">
                                     <Button variant="outline" className="w-full sm:w-auto flex items-center justify-center gap-2">
                                         <Users className="size-4" /> Collaborative Review
                                     </Button>
@@ -363,7 +363,7 @@ export default function Dashboard({
                             </div>
 
                             <div className="flex gap-2 pt-2">
-                                <Link href={`/synthesis/review-page/${selectedConversationId}`}>
+                                <Link href={`/synthesis/collaborate/${selectedConversationId}`}>
                                     <Button variant="outline" size="sm">
                                         Edit Master Synthesis
                                     </Button>

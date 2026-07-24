@@ -3,6 +3,10 @@
 namespace App\Models;
 
 // \Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\ConsensusNote;
+use App\Models\Extraction;
+use App\Models\SynthesisDraft;
+use App\Models\SynthesisGroupAssignment;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -29,9 +33,13 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Conversation> $assignedConversations
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Group> $assignedGroups
- * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisReport> $synthesisReports
- * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisReport> $masterSyntheses
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSynthesis
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSyntheses
  * @property-read \Illuminate\Database\Eloquent\Collection<int, FinalDocument> $draftedBooklets
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisGroupAssignment> $synthesisGroupAssignments
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, ConsensusNote> $consensusNotes
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Extraction> $extractions
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisDraft> $synthesisDrafts
  */
 #[Fillable(['name', 'email', 'password', 'role'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -99,9 +107,9 @@ class User extends Authenticatable
     /**
      * Get the synthesis reports created by this synthesis team member.
      */
-    public function synthesisReports(): HasMany
+    public function masterSynthesis(): HasMany
     {
-        return $this->hasMany(SynthesisReport::class, 'synthesis_id');
+        return $this->hasMany(MasterSynthesis::class, 'synthesis_id');
     }
     
     /**
@@ -109,7 +117,7 @@ class User extends Authenticatable
      */
     public function masterSyntheses(): HasMany
     {
-        return $this->hasMany(SynthesisReport::class, 'synthesis_id')
+        return $this->hasMany(MasterSynthesis::class, 'synthesis_id')
             ->where('is_master_synthesis', true);
     }
 
@@ -128,6 +136,38 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Conversation::class, 'conversation_members', 'user_id', 'conversation_id')
             ->withTimestamps();
+    }
+
+    /**
+     * Get the synthesis group assignments for this user.
+     */
+    public function synthesisGroupAssignments(): HasMany
+    {
+        return $this->hasMany(SynthesisGroupAssignment::class, 'user_id');
+    }
+
+    /**
+     * Get the consensus notes written by this user.
+     */
+    public function consensusNotes(): HasMany
+    {
+        return $this->hasMany(ConsensusNote::class, 'user_id');
+    }
+
+    /**
+     * Get the extractions performed by this user.
+     */
+    public function extractions(): HasMany
+    {
+        return $this->hasMany(Extraction::class, 'user_id');
+    }
+
+    /**
+     * Get the synthesis drafts created by this user.
+     */
+    public function synthesisDrafts(): HasMany
+    {
+        return $this->hasMany(SynthesisDraft::class, 'user_id');
     }
 
     /**

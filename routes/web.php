@@ -25,7 +25,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('review/{conversation}', [SynthesisController::class, 'review'])->name('review');
         
         // Collaborative Review Page (with real-time updates)
-        Route::get('review-page/{conversation}', [SynthesisController::class, 'reviewPage'])->name('review-page');
+        Route::get('collaborate/{conversation}', [SynthesisController::class, 'reviewPage'])->name('collaborate');
+        
+        // ─── Synthesis Review Refactoring Routes ─────────────────
+        
+        // Group assignments
+        Route::get('group-assignments/{conversation}', [SynthesisController::class, 'getGroupAssignments'])->name('group-assignments');
+        
+        // Consensus notes
+        Route::post('consensus-note/{conversation}', [SynthesisController::class, 'saveConsensusNote'])->name('consensus-note.save');
+        Route::get('consensus-notes/{conversation}', [SynthesisController::class, 'getConsensusNotes'])->name('consensus-notes');
+        
+        // Extraction
+        Route::post('extract/{conversation}', [SynthesisController::class, 'triggerExtraction'])->name('extract');
+        Route::get('extractions/{conversation}', [SynthesisController::class, 'getExtractions'])->name('extractions');
+        
+        // Draft management
+        Route::patch('draft/{conversation}', [SynthesisController::class, 'saveDraft'])->name('draft.save');
+        Route::post('submit-draft/{conversation}', [SynthesisController::class, 'submitDraft'])->name('draft.submit');
+        
+        // ─── Legacy Routes (kept for backward compatibility) ─────────
         
         // Submit Synthesis (new submission)
         Route::post('submit-synthesis/{conversation}', [SynthesisController::class, 'submitSynthesis'])->name('submit-synthesis');

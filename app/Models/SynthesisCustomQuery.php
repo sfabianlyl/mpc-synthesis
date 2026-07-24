@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $provider
  * @property \Carbon\Carbon|null $created_at
  * @property \Carbon\Carbon|null $updated_at
- * @property-read SynthesisReport $synthesisReport
+ * @property-read MasterSynthesis $synthesisReport
  */
 class SynthesisCustomQuery extends Model
 {
@@ -39,6 +39,6 @@ class SynthesisCustomQuery extends Model
      */
     public function synthesisReport(): BelongsTo
     {
-        return $this->belongsTo(SynthesisReport::class);
+        return $this->belongsTo(MasterSynthesis::class);
     }
 }

@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read User|null $synthesis
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Response> $responses
- * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisReport> $synthesisReports
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSynthesis
  */
 class Group extends Model
 {
@@ -46,8 +46,8 @@ class Group extends Model
     /**
      * Get the synthesis reports for this group.
      */
-    public function synthesisReports(): HasMany
+    public function masterSynthesis(): HasMany
     {
-        return $this->hasMany(SynthesisReport::class);
+        return $this->hasMany(MasterSynthesis::class);
     }
 }
