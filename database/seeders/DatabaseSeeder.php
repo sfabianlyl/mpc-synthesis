@@ -57,48 +57,48 @@ class DatabaseSeeder extends Seeder
         $synthesisMembers = [];
         $synthesisMembers[] = User::factory()->create([
                 'name' => "Gregory Pravin Rajah",
-                'email' => "greg@mpc.demo",
+                'email' => "greg@gerejakatolik.my",
                 'role' => 'synthesis',
             ]);
         $synthesisMembers[] = User::factory()->create([
                 'name' => "Salomi, Rgs",
-                'email' => "salomi@mpc.demo",
+                'email' => "salomi@gerejakatolik.my",
                 'role' => 'synthesis',
             ]);
         $synthesisMembers[] = User::factory()->create([
                 'name' => "Thomas Paul",
-                'email' => "thomas@mpc.demo",
+                'email' => "thomas@gerejakatolik.my",
                 'role' => 'synthesis',
             ]);
         $synthesisMembers[] = User::factory()->create([
                 'name' => "Anna Teresa",
-                'email' => "anna@mpc.demo",
+                'email' => "anna@gerejakatolik.my",
                 'role' => 'synthesis',
             ]);
         $synthesisMembers[] = User::factory()->create([
                 'name' => "Bernadine",
-                'email' => "bernadine@mpc.demo",
+                'email' => "bernadine@gerejakatolik.my",
                 'role' => 'synthesis',
             ]);
         $synthesisMembers[] = User::factory()->create([
                 'name' => "Gerald",
-                'email' => "gerald@mpc.demo",
+                'email' => "gerald@gerejakatolik.my",
                 'role' => 'synthesis',
             ]);
         $synthesisMembers[] = User::factory()->create([
                 'name' => "Francisco",
-                'email' => "francisco@mpc.demo",
+                'email' => "kiko@gerejakatolik.my",
                 'role' => 'synthesis',
             ]);
         $synthesisMembers[] = User::factory()->create([
                 'name' => "Sr Retta",
-                'email' => "retta@mpc.demo",
+                'email' => "retta@gerejakatolik.my",
                 'role' => 'synthesis',
             ]);
         for ($i = 9; $i <= 18; $i++) {
             $synthesisMembers[] = User::factory()->create([
                 'name' => "Synthesis Member {$i}",
-                'email' => "synthesis{$i}@mpc.demo",
+                'email' => "synthesis{$i}@gerejakatolik.my",
                 'role' => 'synthesis',
             ]);
         }
@@ -108,14 +108,14 @@ class DatabaseSeeder extends Seeder
         for ($i = 1; $i <= 10; $i++) {
             User::factory()->create([
                 'name' => "Admin {$i}",
-                'email' => "admin{$i}@mpc.demo",
+                'email' => "admin{$i}@gerejakatolik.my",
                 'role' => 'admin',
             ]);
         }
 
         User::factory()->create([
             'name' => 'Drafter 1',
-            'email' => 'drafter1@mpc.demo',
+            'email' => 'drafter1@gerejakatolik.my',
             'role' => 'drafter',
         ]);
 

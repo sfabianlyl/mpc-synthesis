@@ -151,18 +151,7 @@ export default function Dashboard({
 
                 {/* ─── Synthesis Submission Stats Cards ───────────── */}
                 {selectedConversationId && (
-                    <div className="grid gap-4 md:grid-cols-5">
-                        <Card>
-                            <CardContent className="pt-6 flex items-center gap-3">
-                                <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                                    <Layers className="h-5 w-5 text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">{submissions.length}</p>
-                                    <p className="text-xs text-muted-foreground">Total Submissions</p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                    <div className="grid gap-4 md:grid-cols-4">
                         <Card>
                             <CardContent className="pt-6 flex items-center gap-3">
                                 <div className="p-2 bg-green-50 dark:bg-green-950/20 rounded-lg">

@@ -606,18 +606,7 @@ export default function ReviewPage({
                 )}
 
                 {/* ─── Summary Cards ──────────────────────────────── */}
-                <div className="grid gap-4 md:grid-cols-5">
-                    <Card>
-                        <CardContent className="pt-6 flex items-center gap-3">
-                            <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                                <Users className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{submissionsLocal.length}</p>
-                                <p className="text-xs text-muted-foreground">Total Submissions</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                <div className="grid gap-4 md:grid-cols-4">
                     <Card>
                         <CardContent className="pt-6 flex items-center gap-3">
                             <div className="p-2 bg-green-50 dark:bg-green-950/20 rounded-lg">
@@ -1061,7 +1050,7 @@ export default function ReviewPage({
                                                 <textarea
                                                     value={masterEditors[category.key].ai_content}
                                                     rows={4}
-                                                    className="w-full min-h-[60px] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                                    className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                 />
                                             </div>
                                         )}
@@ -1070,7 +1059,7 @@ export default function ReviewPage({
                                             <textarea
                                                 value={masterEditors[category.key]?.manual_content ?? ''}
                                                 rows={6}
-                                                className="w-full min-h-[60px] rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                                className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                             />
                                         </div>
                                     </div>
