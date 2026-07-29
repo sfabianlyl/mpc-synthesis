@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DocumentRetrievalController;
 use App\Http\Controllers\DrafterController;
+use App\Http\Controllers\PastoralController;
 use App\Http\Controllers\ResponseController;
 use App\Http\Controllers\SynthesisController;
 use Illuminate\Support\Facades\Route;
@@ -19,8 +20,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('/', 'home')->name('home');
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 
-    // ─── Synthesis Dashboard ────────────────────────────────────────
-    Route::middleware('role:synthesis')->prefix('synthesis')->name('synthesis.')->group(function () {
+    // ─── Discernment Dashboard ────────────────────────────────────────
+    Route::middleware('role:discernment')->prefix('discernment')->name('discernment.')->group(function () {
+        Route::get('/', function () {
+            return inertia('/discernment/dashboard', [
+                'currentMode' => request()->query('mode') === 'synthesis' ? 'synthesis' : 'pastoral',
+            ]);
+        })->name('dashboard');
+    });
+
+    // ─── Synthesis Dashboard (read-only for discernment, full access for synthesis) ─────────────────
+    Route::middleware('role:synthesis,discernment')->prefix('synthesis')->name('synthesis.')->group(function () {
         Route::get('/', [SynthesisController::class, 'index'])->name('dashboard');
         Route::get('review/{conversation}', [SynthesisController::class, 'review'])->name('review');
         
@@ -43,6 +53,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Draft management
         Route::patch('draft/{conversation}', [SynthesisController::class, 'saveDraft'])->name('draft.save');
         Route::post('submit-draft/{conversation}', [SynthesisController::class, 'submitDraft'])->name('draft.submit');
+        
+        // ─── Phase 2: Synthesis Flow Adjustments ─────────────────
+        
+        // Extraction disable check
+        Route::get('can-trigger-extraction/{conversation}', [SynthesisController::class, 'canTriggerExtraction'])->name('can-trigger-extraction');
+        
+        // Summary jobs
+        Route::post('trigger-summary/{conversation}', [SynthesisController::class, 'triggerSummary'])->name('trigger-summary');
+        Route::post('check-auto-trigger-summary/{conversation}', [SynthesisController::class, 'checkAndAutoTriggerSummary'])->name('check-auto-trigger-summary');
+        
+        // Master Synthesis editing (all assigned members can edit)
+        Route::patch('master-synthesis-authorized/{conversation}', [SynthesisController::class, 'updateMasterSynthesisAuthorized'])->name('master-synthesis-authorized.update');
+        
+        // Submit Master Synthesis
+        Route::post('submit-master-synthesis/{conversation}', [SynthesisController::class, 'submitMasterSynthesis'])->name('submit-master-synthesis');
         
         // ─── Legacy Routes (kept for backward compatibility) ─────────
         
@@ -105,6 +130,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Get available sources and statistics
         Route::get('sources', [DocumentRetrievalController::class, 'getSources'])->name('sources');
         Route::get('statistics', [DocumentRetrievalController::class, 'getStatistics'])->name('statistics');
+    });
+
+    // ─── Pastoral Role Routes (accessible by pastoral and discernment) ─────────────────
+    Route::middleware(['auth', 'role:pastoral,discernment'])->prefix('pastoral')->name('pastoral.')->group(function () {
+        Route::get('/dashboard', [PastoralController::class, 'index'])->name('dashboard');
+        Route::get('/reports/{conversation}', [PastoralController::class, 'reports'])->name('reports');
+        Route::get('/decision-draft/{conversation}', [PastoralController::class, 'decisionDraft'])->name('decision-draft');
+        Route::post('/decision-draft/{conversation}', [PastoralController::class, 'storeDecisionDraft'])->name('decision-draft.store');
+        Route::get('/decisions/{conversation}', [PastoralController::class, 'decisions'])->name('decisions');
+        Route::post('/decision-summary/{conversation}/{level}', [PastoralController::class, 'decisionSummary'])->name('decision-summary');
+        Route::patch('/master-decision/{conversation}/{level}', [PastoralController::class, 'updateMasterDecision'])->name('master-decision.update');
     });
 
     // ─── Admin Chat Routes ────────────────────────────────────────────

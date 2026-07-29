@@ -2,8 +2,9 @@ export interface User {
     id: number;
     name: string;
     email: string;
-    role: 'synthesis' | 'drafter' | 'admin';
+    role: 'synthesis' | 'drafter' | 'admin' | 'pastoral' | 'discernment';
     created_at: string;
+    diocese_id?: number | null;
 }
 
 export interface Conversation {
@@ -270,6 +271,76 @@ export interface Event {
     end_date: string | null;
     location?: string;
     description?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * DecisionSummary represents a diocese-level decision summary.
+ */
+export interface DecisionSummary {
+    id: number;
+    diocese_id: number | null;
+    national_summary: string | null;
+    diocesan_summary: string | null;
+    provider: string | null;
+    is_finalized: boolean;
+    created_at: string;
+    updated_at: string;
+    diocese?: {
+        id: number;
+        name: string;
+        code: string;
+    };
+}
+
+/**
+ * DecisionDraft represents an individual's decision draft submission.
+ */
+export interface DecisionDraft {
+    id: number;
+    user_id: number;
+    diocese_id: number | null;
+    national_summary: string | null;
+    diocesan_summary: string | null;
+    is_finalized: boolean;
+    created_at: string;
+    updated_at: string;
+    user?: {
+        id: number;
+        name: string;
+        email: string;
+    };
+    diocese?: {
+        id: number;
+        name: string;
+        code: string;
+    };
+}
+
+/**
+ * MasterDecision represents the national-level master decision.
+ */
+export interface MasterDecision {
+    id: number;
+    national_decision: string;
+    diocesan_decisions: Array<{
+        diocese_id: number;
+        diocese_name: string;
+        decision: string;
+    }> | null;
+    is_finalized: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * Diocese represents a diocese entity.
+ */
+export interface Diocese {
+    id: number;
+    name: string;
+    code: string;
     created_at: string;
     updated_at: string;
 }

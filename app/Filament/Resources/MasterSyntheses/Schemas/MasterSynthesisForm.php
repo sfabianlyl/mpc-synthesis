@@ -5,7 +5,6 @@ namespace App\Filament\Resources\MasterSyntheses\Schemas;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
 class MasterSynthesisForm
@@ -26,8 +25,8 @@ class MasterSynthesisForm
                     ->columnSpanFull(),
                 Textarea::make('proposals_text')
                     ->columnSpanFull(),
-                Toggle::make('llm_generated')
-                    ->required(),
+                Textarea::make('other_text')
+                    ->columnSpanFull(),
                 TextInput::make('status')
                     ->required()
                     ->default('draft'),

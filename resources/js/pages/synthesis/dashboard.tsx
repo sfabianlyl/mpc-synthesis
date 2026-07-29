@@ -36,7 +36,6 @@ export default function Dashboard({
     // Count submission statuses
     const submittedCount = submissions.filter(s => s.status === 'submitted').length;
     const draftCount = submissions.filter(s => s.status === 'draft').length;
-    const aiAssistedCount = submissions.filter(s => s.is_llm_assisted).length;
 
     // Get highest submission number for this conversation
     const highestSubmissionNumber = submissions.reduce((max, s) => Math.max(max, s.submission_number || 0), 0);
@@ -151,7 +150,7 @@ export default function Dashboard({
 
                 {/* ─── Synthesis Submission Stats Cards ───────────── */}
                 {selectedConversationId && (
-                    <div className="grid gap-4 md:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-3">
                         <Card>
                             <CardContent className="pt-6 flex items-center gap-3">
                                 <div className="p-2 bg-green-50 dark:bg-green-950/20 rounded-lg">
@@ -171,17 +170,6 @@ export default function Dashboard({
                                 <div>
                                     <p className="text-2xl font-bold">{draftCount}</p>
                                     <p className="text-xs text-muted-foreground">Draft</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6 flex items-center gap-3">
-                                <div className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
-                                    <Users className="h-5 w-5 text-purple-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">{aiAssistedCount}</p>
-                                    <p className="text-xs text-muted-foreground">AI-Assisted</p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -223,9 +211,7 @@ export default function Dashboard({
                                     <TableRow>
                                         <TableHead>Submission #</TableHead>
                                         <TableHead>Synthesis Member</TableHead>
-                                        <TableHead>Type</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead>AI-Assisted</TableHead>
                                         <TableHead>Submitted At</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -250,15 +236,6 @@ export default function Dashboard({
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                {submission.is_master_synthesis ? (
-                                                    <Badge variant="secondary" className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
-                                                        Master Synthesis
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="secondary">Individual</Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
                                                 <Badge 
                                                     variant={submission.status === 'submitted' ? 'default' : submission.status === 'reviewed' ? 'outline' : 'secondary'} 
                                                     className={
@@ -271,15 +248,6 @@ export default function Dashboard({
                                                 >
                                                     {submission.status}
                                                 </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {submission.is_llm_assisted ? (
-                                                    <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/20 text-purple-600">
-                                                        Yes
-                                                    </Badge>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground">No</span>
-                                                )}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground text-sm">
                                                 {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : '—'}
@@ -349,13 +317,6 @@ export default function Dashboard({
                                     )}
                                 </div>
                             </div>
-                            
-                            {masterSynthesis.is_llm_assisted && (
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Users className="h-4 w-4" />
-                                    <span>AI-Assisted: Yes</span>
-                                </div>
-                            )}
 
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Clock className="h-4 w-4" />
@@ -476,12 +437,6 @@ export default function Dashboard({
                                                         <span className="text-sm text-muted-foreground">Report Status:</span>
                                                         <Badge variant={userSubmission.status === 'submitted' ? 'default' : 'secondary'}>
                                                             {userSubmission.status === 'submitted' ? 'Submitted' : 'Draft'}
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-sm text-muted-foreground">Generated via AI:</span>
-                                                        <Badge variant={userSubmission.is_llm_assisted ? 'outline' : 'secondary'}>
-                                                            {userSubmission.is_llm_assisted ? 'Yes' : 'Manual'}
                                                         </Badge>
                                                     </div>
                                                     <div className="flex items-center justify-between">

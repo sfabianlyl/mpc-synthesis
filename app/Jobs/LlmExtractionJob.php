@@ -37,9 +37,9 @@ class LlmExtractionJob implements ShouldQueue
     public function handle(LlmService $llm): void
     {
         // 1. Get all group consensuses for this user's assigned groups
-        $assignedGroupIds = SynthesisGroupAssignment::where('conversation_id', $this->conversationId)
-            ->where('user_id', $this->userId)
-            ->pluck('group_id');
+        $assignedGroupIds = \App\Models\Group::where('synthesis_id', $this->userId)
+            ->whereHas('conversations', fn($q) => $q->where('conversations.id', $this->conversationId))
+            ->pluck('id');
 
         // Fetch consensus texts from submitted responses and consensus notes
         $responseConsensusTexts = Response::whereIn('group_id', $assignedGroupIds)

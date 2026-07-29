@@ -47,6 +47,7 @@ interface PageProps {
     allConsensusSubmitted: boolean;
     consensusSubmissions: Record<number, any[]>;
     success?: string;
+    canTrigger?: boolean;
 }
 
 export default function Review({
@@ -58,12 +59,14 @@ export default function Review({
     allConsensusSubmitted,
     consensusSubmissions,
     success: initialSuccess,
+    canTrigger: initialCanTrigger,
 }: PageProps) {
     const [isExtracting, setIsExtracting] = useState(false);
     const [isSynthesizing, setIsSynthesizing] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [analysisMessage, setAnalysisMessage] = useState('');
+    const [extractionDisabled, setExtractionDisabled] = useState(false);
 
     // Local state for draft fields
     const [convergenceText, setConvergenceText] = useState(draft?.convergence_text ?? '');
@@ -89,6 +92,28 @@ export default function Review({
             }, 5000);
         }
     }, [initialSuccess]);
+
+    // Check if manual extraction trigger should be disabled (already has successful extraction)
+    useEffect(() => {
+        if (!conversation?.id || extraction?.is_successful) {
+            setExtractionDisabled(true);
+            return;
+        }
+
+        // Use initial prop value if available, otherwise fetch from API
+        if (initialCanTrigger !== undefined) {
+            setExtractionDisabled(!initialCanTrigger);
+            return;
+        }
+
+        router.get(`/synthesis/can-trigger-extraction/${conversation.id}`, {}, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const canTrigger = page.props.canTrigger;
+                setExtractionDisabled(canTrigger === false);
+            },
+        });
+    }, [conversation?.id, extraction?.is_successful, initialCanTrigger]);
 
     // Sync local state when draft prop changes
     useEffect(() => {
@@ -272,54 +297,59 @@ export default function Review({
                 {/* ─── Left Column: Submitted Consensus + Notes ─────────────── */}
                 <section className="space-y-4">
                     <h2 className="text-xl font-semibold">Submitted Consensus</h2>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-4">
                         {assignedGroups.map((group) => (
-                            <div key={group.id} className="border rounded-lg p-4 bg-card">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <p className="font-medium text-sm">Group {group.name}</p>
+                            <Card key={group.id}>
+                                <CardHeader className="pb-3 border-b">
+                                    <div className="flex justify-between items-center">
+                                        <CardTitle className="text-base font-semibold">Group {group.name}</CardTitle>
+                                        <Badge
+                                            variant={group.consensusSubmission?.is_submitted ? 'default' : 'secondary'}
+                                            className="text-xs"
+                                        >
+                                            {group.consensusSubmission?.is_submitted ? (
+                                                <span className="flex items-center gap-1">
+                                                    <CheckCircle2 className="h-3.5 w-3.5" /> Submitted
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center gap-1">
+                                                    <XCircle className="h-3.5 w-3.5" /> Pending
+                                                </span>
+                                            )}
+                                        </Badge>
                                     </div>
-                                    <Badge
-                                        variant={group.consensusSubmission?.is_submitted ? 'default' : 'secondary'}
-                                        className="text-xs"
-                                    >
-                                        {group.consensusSubmission?.is_submitted ? (
-                                            <span className="flex items-center gap-1">
-                                                <CheckCircle2 className="h-3 w-3" /> Submitted
-                                            </span>
-                                        ) : (
-                                            <span className="flex items-center gap-1">
-                                                <XCircle className="h-3 w-3" /> Pending
-                                            </span>
-                                        )}
-                                    </Badge>
-                                </div>
+                                </CardHeader>
+                                <CardContent className="pt-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Left Side: Consensus Text */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block">Group Consensus</label>
+                                            {group.consensusSubmission?.is_submitted ? (
+                                                <p className="text-sm whitespace-pre-wrap bg-muted/50 border rounded-md p-4 min-h-[140px] max-h-[300px] overflow-y-auto leading-relaxed">
+                                                    {group.consensusSubmission.consensus_text}
+                                                </p>
+                                            ) : (
+                                                <div className="bg-muted/30 border border-dashed rounded-md p-4 min-h-[140px] flex items-center justify-center">
+                                                    <p className="text-muted-foreground text-sm italic">Pending group submission...</p>
+                                                </div>
+                                            )}
+                                        </div>
 
-                                {/* Left half: Consensus text */}
-                                <div className="pr-2 border-r mb-2">
-                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Consensus</label>
-                                    {group.consensusSubmission?.is_submitted ? (
-                                        <p className="text-sm whitespace-pre-wrap bg-muted/50 p-3 rounded-md max-h-[200px] overflow-y-auto">
-                                            {group.consensusSubmission.consensus_text}
-                                        </p>
-                                    ) : (
-                                        <p className="text-muted-foreground text-sm italic p-3">Pending submission...</p>
-                                    )}
-                                </div>
-
-                                {/* Right half: Notes */}
-                                <div>
-                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Your Notes</label>
-                                    <Textarea
-                                        value={groupNotes[group.id] ?? ''}
-                                        onChange={(e) => handleNoteChange(group.id, e.target.value)}
-                                        disabled={isDraftSubmitted}
-                                        rows={6}
-                                        placeholder="Write your notes here..."
-                                        className="text-sm"
-                                    />
-                                </div>
-                            </div>
+                                        {/* Right Side: Notes */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block">Your Notes</label>
+                                            <Textarea
+                                                value={groupNotes[group.id] ?? ''}
+                                                onChange={(e) => handleNoteChange(group.id, e.target.value)}
+                                                disabled={isDraftSubmitted}
+                                                rows={6}
+                                                placeholder="Write your notes or observations here..."
+                                                className="text-sm min-h-[140px]"
+                                            />
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         ))}
                     </div>
 
@@ -358,11 +388,11 @@ export default function Review({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {/* Trigger button (hidden if successful extraction exists) */}
-                                {!extraction?.is_successful && (
+                                {/* Trigger button (disabled if successful extraction exists or API says disable) */}
+                                {!extraction?.is_successful && !extractionDisabled && (
                                     <Button
                                         onClick={handleTriggerExtraction}
-                                        disabled={isExtracting}
+                                        disabled={isExtracting || extractionDisabled}
                                         variant="outline"
                                         className="w-full"
                                     >

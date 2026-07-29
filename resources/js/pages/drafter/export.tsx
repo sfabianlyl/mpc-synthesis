@@ -40,11 +40,6 @@ interface MasterSynthesis {
     consideration_text?: string | null;
     proposals_text?: string | null;
     other_text?: string | null;
-    ai_convergence_text?: string | null;
-    ai_consideration_text?: string | null;
-    ai_proposals_text?: string | null;
-    ai_other_text?: string | null;
-    is_llm_assisted: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
     booklet_file_path?: string | null;
     created_at: string;
@@ -562,11 +557,6 @@ export default function Export({
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium">Conversation #{ms.conversation_id}</p>
                                                 <div className="flex gap-2 mt-1">
-                                                    {ms.is_llm_assisted && (
-                                                        <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/20 text-purple-600">
-                                                            AI-Assisted
-                                                        </Badge>
-                                                    )}
                                                     <Badge variant={ms.status === 'submitted' ? 'default' : 'secondary'} className="text-xs">
                                                         {ms.status}
                                                     </Badge>
@@ -634,7 +624,7 @@ export default function Export({
                                             <li>Conversations as sections</li>
                                             <li>Master syntheses organized by category (Convergence, Matters for Consideration, Proposals, Others)</li>
                                             <li>Citation references from document chunks</li>
-                                            <li>Both AI-generated and manually crafted content clearly distinguished</li>
+                                            <li>Manually crafted content clearly displayed</li>
                                         </ol>
                                     </div>
                                 </TabsContent>

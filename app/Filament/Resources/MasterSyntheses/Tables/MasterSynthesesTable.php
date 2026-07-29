@@ -5,7 +5,6 @@ namespace App\Filament\Resources\MasterSyntheses\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -19,8 +18,6 @@ class MasterSynthesesTable
                     ->searchable(),
                 TextColumn::make('synthesis.name')
                     ->searchable(),
-                IconColumn::make('llm_generated')
-                    ->boolean(),
                 TextColumn::make('status')
                     ->searchable(),
                 TextColumn::make('created_at')

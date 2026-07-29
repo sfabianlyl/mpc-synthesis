@@ -19,16 +19,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $consideration_text
  * @property string|null $proposals_text
  * @property string|null $other_text
- * @property string|null $ai_convergence_text
- * @property string|null $ai_consideration_text
- * @property string|null $ai_proposals_text
- * @property string|null $ai_other_text
- * @property array|null $ai_source_group_ids
  * @property array|null $group_ids
- * @property Carbon|null $ai_generated_at
- * @property bool $llm_generated
- * @property bool $is_llm_assisted
  * @property string $status
+ * @property bool $is_submitted
  * @property Carbon|null $submitted_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -56,16 +49,9 @@ class MasterSynthesis extends Model
         'consideration_text',
         'proposals_text',
         'other_text',
-        'ai_convergence_text',
-        'ai_consideration_text',
-        'ai_proposals_text',
-        'ai_other_text',
-        'ai_source_group_ids',
         'group_ids',
-        'ai_generated_at',
-        'llm_generated',
-        'is_llm_assisted',
         'status',
+        'is_submitted',
         'submitted_at',
     ];
 
@@ -73,11 +59,8 @@ class MasterSynthesis extends Model
     {
         return [
             'is_master_synthesis' => 'boolean',
-            'llm_generated' => 'boolean',
-            'is_llm_assisted' => 'boolean',
-            'ai_source_group_ids' => 'array',
             'group_ids' => 'array',
-            'ai_generated_at' => 'datetime',
+            'is_submitted' => 'boolean',
             'submitted_at' => 'datetime',
         ];
     }
@@ -162,27 +145,5 @@ class MasterSynthesis extends Model
     public function categories(): array
     {
         return ['convergence', 'matters_for_consideration', 'proposals', 'others'];
-    }
-
-    /**
-     * Check if any AI-generated content field is populated.
-     */
-    public function hasAiContent(): bool
-    {
-        return !is_null($this->ai_convergence_text)
-            || !is_null($this->ai_consideration_text)
-            || !is_null($this->ai_proposals_text)
-            || !is_null($this->ai_other_text);
-    }
-
-    /**
-     * Check if any manual content field is populated.
-     */
-    public function hasManualContent(): bool
-    {
-        return !is_null($this->convergence_text)
-            || !is_null($this->consideration_text)
-            || !is_null($this->proposals_text)
-            || !is_null($this->other_text);
     }
 }

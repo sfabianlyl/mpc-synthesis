@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $convergence_text
  * @property string|null $consideration_text
  * @property string|null $proposals_text
+ * @property string|null $other_text
  * @property bool $is_submitted
  * @property \Illuminate\Support\Carbon|null $submitted_at
  * @property \Illuminate\Support\Carbon|null $created_at
@@ -30,6 +31,7 @@ class SynthesisDraft extends Model
         'convergence_text',
         'consideration_text',
         'proposals_text',
+        'other_text',
         'is_submitted',
         'submitted_at',
     ];

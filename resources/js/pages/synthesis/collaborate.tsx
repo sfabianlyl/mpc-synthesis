@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { CheckCircle2, XCircle, Loader2, FileText, Users, Bot, Sparkles, ChevronDown, ChevronUp, Pencil, Eye, EyeOff, Clock, MessageSquare } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, FileText, Users, Sparkles, ChevronDown, ChevronUp, Pencil, Clock, MessageSquare } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,17 +21,13 @@ interface SynthesisMember {
 
 /**
  * Grouped synthesis contributions for a single category from all members.
- * Each member can have both AI-generated and manually input content.
  */
 interface CategoryContributions {
-    ai_content: string;        // LLM-generated content (read-only reference)
     manual_content: string;    // Manually crafted content (editable)
     submissions: Array<{
         id: number;
         user: { id: number; name: string };
-        ai_content: string | null;
         manual_content: string | null;
-        is_ai_generated: boolean;
         submission_number: number;
         created_at: string;
         updated_at: string;
@@ -100,9 +96,9 @@ const CATEGORIES = [
     },
 ] as const;
 
-// ─── Helper Functions ─────────────────────────────────────────────
+// ─── Helper Functions ───────────���─────────────────────────────────
 
-const renderContentText = (text: string | null, isAiGenerated: boolean = false): React.ReactNode => {
+const renderContentText = (text: string | null): React.ReactNode => {
     if (!text || !text.trim()) {
         return <p className="text-sm text-muted-foreground italic">No content</p>;
     }
@@ -114,7 +110,7 @@ const renderContentText = (text: string | null, isAiGenerated: boolean = false):
             <ul className="space-y-1">
                 {lines.map((line, i) => (
                     <li key={i} className="flex items-start gap-2">
-                        <span className={`${isAiGenerated ? 'text-blue-500' : 'text-primary'} mt-0.5 flex-shrink-0`}>•</span>
+                        <span className="text-primary mt-0.5 flex-shrink-0">•</span>
                         <span className="text-sm">{line.replace(/^-+\s*/, '')}</span>
                     </li>
                 ))}
@@ -151,8 +147,6 @@ export default function Collaborate({
     const { flash } = usePage().props as any;
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isAiGenerating, setIsAiGenerating] = useState(false);
-    const [isMasterAiGenerating, setIsMasterAiGenerating] = useState(false);
     const [masterSynthesisLocal, setMasterSynthesisLocal] = useState<MasterSynthesisReport | null>(masterSynthesis);
     const [submissionsLocal, setSubmissionsLocal] = useState<SynthesisSubmission[]>(submissions);
     
@@ -162,35 +156,19 @@ export default function Collaborate({
     const [proposalsInput, setProposalsInput] = useState('');
     const [othersInput, setOthersInput] = useState('');
     
-    // Per-category master synthesis editor state (both AI and manual content)
-    const [masterEditors, setMasterEditors] = useState<Record<string, { ai_content: string; manual_content: string }>>({
-        convergence: { ai_content: '', manual_content: '' },
-        matters_for_consideration: { ai_content: '', manual_content: '' },
-        proposals: { ai_content: '', manual_content: '' },
-        others: { ai_content: '', manual_content: '' },
+    // Per-category master synthesis editor state
+    const [masterEditors, setMasterEditors] = useState<Record<string, string>>({
+        convergence: '',
+        matters_for_consideration: '',
+        proposals: '',
+        others: '',
     });
     
     // Expand all master synthesis state
     const [showAllMasterSynthesis, setShowAllMasterSynthesis] = useState(false);
     
-    // Filter state for master synthesis content display
-    const [showAiContent, setShowAiContent] = useState<Record<string, boolean>>({
-        convergence: false,
-        matters_for_consideration: false,
-        proposals: false,
-        others: false,
-    });
-    
     // Active editing category indicator (for real-time collaboration)
     const [activeEditingCategory, setActiveEditingCategory] = useState<string | null>(null);
-
-    // Category field mapping for master synthesis
-    const MASTER_CATEGORY_FIELD_MAP: Record<string, string> = {
-        convergence: 'convergence',
-        matters_for_consideration: 'consideration',
-        proposals: 'proposals',
-        others: 'other',
-    };
 
     useEffect(() => {
         if (flash?.success) {
@@ -199,8 +177,8 @@ export default function Collaborate({
             return () => clearTimeout(timer);
         }
 
-        if (flash?.errors?.submission || flash?.errors?.ai_synthesis || flash?.errors?.master_synthesis) {
-            const key = flash.errors.submission ? 'submission' : flash.errors.ai_synthesis ? 'ai_synthesis' : 'master_synthesis';
+        if (flash?.errors?.submission || flash?.errors?.master_synthesis) {
+            const key = flash.errors.submission ? 'submission' : 'master_synthesis';
             setStatusMessage({ type: 'error', text: flash.errors[key] });
             const timer = setTimeout(() => setStatusMessage(null), 5000);
             return () => clearTimeout(timer);
@@ -224,68 +202,19 @@ export default function Collaborate({
     // Initialize master synthesis editors on mount or when masterSynthesis changes
     useEffect(() => {
         if (masterSynthesisLocal) {
-            const fieldMap: Record<string, string> = {
-                convergence: 'convergence_text',
-                matters_for_consideration: 'consideration_text',
-                proposals: 'proposals_text',
-                others: 'other_text',
-            };
-
-            // Check for AI-assisted fields
-            const hasAiFields = 
-                masterSynthesisLocal.ai_convergence_text ||
-                masterSynthesisLocal.ai_consideration_text ||
-                masterSynthesisLocal.ai_proposals_text ||
-                masterSynthesisLocal.ai_other_text;
-
-            if (hasAiFields) {
-                // If AI-assisted, pre-fill ai_content with AI data
-                setMasterEditors({
-                    convergence: { 
-                        ai_content: masterSynthesisLocal.ai_convergence_text ?? '', 
-                        manual_content: masterSynthesisLocal.convergence_text ?? '' 
-                    },
-                    matters_for_consideration: { 
-                        ai_content: masterSynthesisLocal.ai_consideration_text ?? '', 
-                        manual_content: masterSynthesisLocal.consideration_text ?? '' 
-                    },
-                    proposals: { 
-                        ai_content: masterSynthesisLocal.ai_proposals_text ?? '', 
-                        manual_content: masterSynthesisLocal.proposals_text ?? '' 
-                    },
-                    others: { 
-                        ai_content: masterSynthesisLocal.ai_other_text ?? '', 
-                        manual_content: masterSynthesisLocal.other_text ?? '' 
-                    },
-                });
-            } else {
-                // Otherwise, use regular fields as manual_content
-                setMasterEditors({
-                    convergence: { 
-                        ai_content: '', 
-                        manual_content: masterSynthesisLocal.convergence_text ?? '' 
-                    },
-                    matters_for_consideration: { 
-                        ai_content: '', 
-                        manual_content: masterSynthesisLocal.consideration_text ?? '' 
-                    },
-                    proposals: { 
-                        ai_content: '', 
-                        manual_content: masterSynthesisLocal.proposals_text ?? '' 
-                    },
-                    others: { 
-                        ai_content: '', 
-                        manual_content: masterSynthesisLocal.other_text ?? '' 
-                    },
-                });
-            }
+            setMasterEditors({
+                convergence: masterSynthesisLocal.convergence_text ?? '',
+                matters_for_consideration: masterSynthesisLocal.consideration_text ?? '',
+                proposals: masterSynthesisLocal.proposals_text ?? '',
+                others: masterSynthesisLocal.other_text ?? '',
+            });
         } else {
             // Reset to empty when no master synthesis exists
             setMasterEditors({
-                convergence: { ai_content: '', manual_content: '' },
-                matters_for_consideration: { ai_content: '', manual_content: '' },
-                proposals: { ai_content: '', manual_content: '' },
-                others: { ai_content: '', manual_content: '' },
+                convergence: '',
+                matters_for_consideration: '',
+                proposals: '',
+                others: '',
             });
         }
     }, [masterSynthesisLocal]);
@@ -293,11 +222,6 @@ export default function Collaborate({
     // Check if current user has a submitted submission
     const hasSubmitted = submissionsLocal.some(
         (s) => s.user.id === currentUser.id && s.status === 'submitted'
-    );
-
-    // Check if current user has a draft submission
-    const userDraft = submissionsLocal.find(
-        (s) => s.user.id === currentUser.id && s.status === 'draft'
     );
 
     // Get online synthesis members
@@ -317,34 +241,26 @@ export default function Collaborate({
         return submissionsLocal.map((s) => ({
             ...s,
             text: (s as unknown as Record<string, unknown>)[`${category}_text`] as string | null,
-            aiText: (s as unknown as Record<string, unknown>)[`ai_${category}_text`] as string | null,
         }));
     }, [submissionsLocal]);
 
     // Build category contributions from all submissions
     const buildCategoryContributions = useCallback((category: string): CategoryContributions => {
         const catSubmissions = getSubmissionsByCategory(category);
-        let aiContent = '';
         let manualContent = '';
 
         catSubmissions.forEach(s => {
-            if (s.aiText && s.aiText.trim()) {
-                aiContent += (aiContent ? '\n\n--- AI Source ---\n\n' : '') + s.aiText;
-            }
             if (s.text && s.text.trim()) {
                 manualContent += (manualContent ? '\n\n--- Manual Input ---\n\n' : '') + s.text;
             }
         });
 
         return {
-            ai_content: aiContent,
             manual_content: manualContent,
             submissions: catSubmissions.map(s => ({
                 id: s.id,
                 user: s.user,
-                ai_content: s.aiText,
                 manual_content: s.text,
-                is_ai_generated: !!s.aiText && !s.text?.trim(),
                 submission_number: s.submission_number || 1,
                 created_at: '',
                 updated_at: '',
@@ -375,49 +291,6 @@ export default function Collaborate({
         );
     };
 
-    // Generate AI-assisted synthesis handler for individual submission
-    const handleGenerateAiSynthesis = () => {
-        setIsAiGenerating(true);
-        router.post(
-            `/synthesis/ai-synthesis/${conversation.id}`,
-            {
-                selected_group_ids: groups.map((g) => g.id),
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setIsAiGenerating(false);
-                },
-                onError: () => {
-                    setIsAiGenerating(false);
-                },
-            }
-        );
-    };
-
-    // Generate AI summary for master synthesis category
-    const handleGenerateMasterAiSummary = (categoryKey: string) => {
-        setIsMasterAiGenerating(true);
-        router.post(
-            `/synthesis/generate-master-ai-summary/${conversation.id}`,
-            {
-                category: categoryKey,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: (page: any) => {
-                    if (page.props.masterSynthesis) {
-                        setMasterSynthesisLocal(page.props.masterSynthesis);
-                    }
-                    setIsMasterAiGenerating(false);
-                },
-                onError: () => {
-                    setIsMasterAiGenerating(false);
-                },
-            }
-        );
-    };
-
     // Save master synthesis for a specific category
     const handleSaveMasterCategory = (categoryKey: string) => {
         if (!masterSynthesisLocal?.id && currentUser.role !== 'admin' && currentUser.role !== 'drafter') {
@@ -428,24 +301,16 @@ export default function Collaborate({
         setActiveEditingCategory(categoryKey);
         setTimeout(() => setActiveEditingCategory(null), 3000);
 
-        const fieldMap: Record<string, string> = {
-            convergence: 'convergence_text',
-            matters_for_consideration: 'consideration_text',
-            proposals: 'proposals_text',
-            others: 'other_text',
-        };
-
-        const editor = masterEditors[categoryKey];
         const updateData: Record<string, string | null> = {
-            [fieldMap.convergence]: masterEditors.convergence.manual_content || null,
-            [fieldMap.matters_for_consideration]: masterEditors.matters_for_consideration.manual_content || null,
-            [fieldMap.proposals]: masterEditors.proposals.manual_content || null,
-            [fieldMap.others]: masterEditors.others.manual_content || null,
+            convergence_text: masterEditors.convergence || null,
+            consideration_text: masterEditors.matters_for_consideration || null,
+            proposals_text: masterEditors.proposals || null,
+            other_text: masterEditors.others || null,
         };
 
         router.patch(
             `/synthesis/master-synthesis/${conversation.id}`,
-            updateData,
+            { [categoryKey === 'convergence' ? 'convergence_text' : categoryKey === 'consideration' ? 'consideration_text' : categoryKey === 'proposals' ? 'proposals_text' : 'other_text']: masterEditors[categoryKey] || null },
             {
                 preserveScroll: true,
                 onSuccess: (page: any) => {
@@ -464,10 +329,10 @@ export default function Collaborate({
         }
 
         const updateData: Record<string, string | null> = {
-            convergence_text: masterEditors.convergence.manual_content || null,
-            consideration_text: masterEditors.matters_for_consideration.manual_content || null,
-            proposals_text: masterEditors.proposals.manual_content || null,
-            other_text: masterEditors.others.manual_content || null,
+            convergence_text: masterEditors.convergence || null,
+            consideration_text: masterEditors.matters_for_consideration || null,
+            proposals_text: masterEditors.proposals || null,
+            other_text: masterEditors.others || null,
         };
 
         router.post(
@@ -485,33 +350,11 @@ export default function Collaborate({
     };
 
     // Update master editor content for a category
-    const updateMasterEditor = (categoryKey: string, field: 'ai_content' | 'manual_content', value: string) => {
+    const updateMasterEditor = (categoryKey: string, value: string) => {
         setMasterEditors(prev => ({
             ...prev,
-            [categoryKey]: {
-                ...prev[categoryKey],
-                [field]: value,
-            },
+            [categoryKey]: value,
         }));
-    };
-
-    // Toggle AI content visibility for a category
-    const toggleAiContent = (categoryKey: string) => {
-        setShowAiContent(prev => ({
-            ...prev,
-            [categoryKey]: !prev[categoryKey],
-        }));
-    };
-
-    // Get master synthesis text for a category (from editable input state)
-    const getMasterText = (category: string): string => {
-        switch (category) {
-            case 'convergence': return masterEditors.convergence.manual_content;
-            case 'consideration': return masterEditors.matters_for_consideration.manual_content;
-            case 'proposals': return masterEditors.proposals.manual_content;
-            case 'others': return masterEditors.others.manual_content;
-            default: return '';
-        }
     };
 
     // Check if current user can edit (admin or drafter role)
@@ -606,7 +449,7 @@ export default function Collaborate({
                 )}
 
                 {/* ─── Summary Cards ──────────────────────────────── */}
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="pt-6 flex items-center gap-3">
                             <div className="p-2 bg-green-50 dark:bg-green-950/20 rounded-lg">
@@ -630,19 +473,6 @@ export default function Collaborate({
                                     {submissionsLocal.filter((s) => s.status === 'draft').length}
                                 </p>
                                 <p className="text-xs text-muted-foreground">In Progress</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6 flex items-center gap-3">
-                            <div className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
-                                <Bot className="h-5 w-5 text-purple-600" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">
-                                    {submissionsLocal.filter((s) => s.is_llm_assisted).length}
-                                </p>
-                                <p className="text-xs text-muted-foreground">AI-Assisted</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -678,7 +508,6 @@ export default function Collaborate({
                                 {CATEGORIES.map((category) => {
                                     const Icon = category.icon;
                                     const categorySubmissions = getSubmissionsByCategory(category.key);
-                                    const contributions = buildCategoryContributions(category.key);
 
                                     return (
                                         <TabsTrigger key={category.key} value={category.key} className="flex items-center gap-2">
@@ -697,15 +526,8 @@ export default function Collaborate({
                                 const categorySubmissions = getSubmissionsByCategory(category.key);
                                 const contributions = buildCategoryContributions(category.key);
                                 
-                                // Separate AI-only and manual submissions
-                                const aiOnlySubmissions = categorySubmissions.filter(
-                                    (s) => s.aiText && s.aiText.trim() && !s.text?.trim()
-                                );
                                 const manualSubmissions = categorySubmissions.filter(
                                     (s) => s.text && s.text.trim()
-                                );
-                                const mixedSubmissions = categorySubmissions.filter(
-                                    (s) => s.aiText && s.aiText.trim() && s.text && s.text.trim()
                                 );
 
                                 const isEditingThisCategory = activeEditingCategory === category.key;
@@ -719,122 +541,12 @@ export default function Collaborate({
                                             </p>
                                         </div>
 
-                                        {/* ─── AI-Generated Contributions Subsection ─ */}
-                                        {aiOnlySubmissions.length > 0 && (
-                                            <div>
-                                                <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-3 flex items-center gap-2">
-                                                    <Bot className="h-4 w-4" />
-                                                    AI-Assisted Contributions ({aiOnlySubmissions.length})
-                                                </h4>
-                                                <div className="space-y-3">
-                                                    {aiOnlySubmissions.map((submission) => (
-                                                        <div
-                                                            key={submission.id}
-                                                            className={`border ${category.borderColor} rounded-lg p-4 ${category.bgColor}`}
-                                                        >
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="size-6 rounded-full bg-blue-500 flex items-center justify-center text-xs font-medium text-white">
-                                                                        {getInitials(submission.user.name)}
-                                                                    </div>
-                                                                    <span className="text-sm font-medium">
-                                                                        {submission.user.name}
-                                                                    </span>
-                                                                    <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                                                                        <Bot className="h-3 w-3 mr-1" /> AI-Generated
-                                                                    </Badge>
-                                                                    {submission.submission_number && submission.submission_number > 1 && (
-                                                                        <Badge variant="outline" className="text-xs">
-                                                                            Submission #{submission.submission_number}
-                                                                        </Badge>
-                                                                    )}
-                                                                </div>
-                                                                {submission.submitted_at && (
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        {new Date(submission.submitted_at).toLocaleString()}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="ml-8 mt-2">
-                                                                {renderContentText(submission.aiText, true)}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* ─── Mixed AI + Manual Contributions Subsection */}
-                                        {mixedSubmissions.length > 0 && (
-                                            <div>
-                                                <h4 className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-3 flex items-center gap-2">
-                                                    <Users className="h-4 w-4" />
-                                                    AI-Assisted with Manual Edits ({mixedSubmissions.length})
-                                                </h4>
-                                                <div className="space-y-3">
-                                                    {mixedSubmissions.map((submission) => (
-                                                        <div
-                                                            key={submission.id}
-                                                            className={`border ${category.borderColor} rounded-lg p-4 bg-card`}
-                                                        >
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                                                                        {getInitials(submission.user.name)}
-                                                                    </div>
-                                                                    <span className="text-sm font-medium">
-                                                                        {submission.user.name}
-                                                                    </span>
-                                                                    <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                                                                        <Bot className="h-3 w-3 mr-1" /> AI-Assisted
-                                                                    </Badge>
-                                                                    <Badge variant={submission.status === 'submitted' ? 'default' : 'secondary'} className="text-xs">
-                                                                        {submission.status === 'submitted' ? 'Submitted' : 'Draft'}
-                                                                    </Badge>
-                                                                </div>
-                                                                {submission.submitted_at && (
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        {new Date(submission.submitted_at).toLocaleString()}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            
-                                                            {/* AI Content (collapsible) */}
-                                                            {submission.aiText && submission.aiText.trim() && (
-                                                                <div className="ml-8 mt-2">
-                                                                    <button
-                                                                        onClick={() => toggleAiContent(`mixed-${submission.id}`)}
-                                                                        className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 mb-1"
-                                                                    >
-                                                                        {showAiContent[`mixed-${submission.id}`] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                                                                        Toggle AI Source Content
-                                                                    </button>
-                                                                    {showAiContent[`mixed-${submission.id}`] && (
-                                                                        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3 mb-2">
-                                                                            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">AI-Generated Source:</p>
-                                                                            {renderContentText(submission.aiText, true)}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {/* Manual Edits */}
-                                                            <div className="ml-8 mt-2">
-                                                                <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Manual Edits:</p>
-                                                                {renderContentText(submission.text, false)}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* ─── Manual Contributions Subsection ───── */}
+                                        {/* ─── Manual Contributions ────────────── */}
                                         {manualSubmissions.length > 0 && (
                                             <div>
                                                 <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                                                     <Users className="h-4 w-4" />
-                                                    Manual Contributions ({manualSubmissions.length})
+                                                    Contributions ({manualSubmissions.length})
                                                 </h4>
                                                 <div className="space-y-3">
                                                     {manualSubmissions.map((submission) => (
@@ -874,64 +586,6 @@ export default function Collaborate({
                                             </div>
                                         )}
 
-                                        {/* ─── Custom Queries (AI-Generated Others) ─── */}
-                                        {category.key === 'others' && (() => {
-                                            const submissionsWithCustomQueries = submissionsLocal.filter(
-                                                (s) => s.custom_queries && s.custom_queries.length > 0
-                                            );
-                                            
-                                            if (submissionsWithCustomQueries.length === 0) {
-                                                return null;
-                                            }
-                                            
-                                            return (
-                                                <div>
-                                                    <h4 className="text-sm font-medium text-violet-700 dark:text-violet-300 mb-3 flex items-center gap-2">
-                                                        <Bot className="h-4 w-4" />
-                                                        AI-Generated Others (Custom Queries)
-                                                    </h4>
-                                                    <div className="space-y-4">
-                                                        {submissionsWithCustomQueries.map((submission) =>
-                                                            submission.custom_queries.map((query) => (
-                                                                <div
-                                                                    key={query.id}
-                                                                    className="border border-violet-200 dark:border-violet-800 rounded-lg p-4 bg-violet-50/30 dark:bg-violet-950/10"
-                                                                >
-                                                                    <div className="flex items-center justify-between mb-2">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <div className="size-6 rounded-full bg-violet-500 flex items-center justify-center text-xs font-medium text-white">
-                                                                                {getInitials(submission.user.name)}
-                                                                            </div>
-                                                                            <span className="text-sm font-medium">
-                                                                                {submission.user.name}
-                                                                            </span>
-                                                                            <Badge variant="secondary" className="text-xs bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
-                                                                                <Bot className="h-3 w-3 mr-1" /> AI Query
-                                                                            </Badge>
-                                                                        </div>
-                                                                        <span className="text-xs text-muted-foreground">
-                                                                            {new Date(query.created_at).toLocaleString()}
-                                                                        </span>
-                                                                    </div>
-                                                                    <p className="text-sm font-medium text-muted-foreground mt-2 mb-1">
-                                                                        Prompt: {query.prompt}
-                                                                    </p>
-                                                                    <ul className="space-y-1 ml-8">
-                                                                        {query.response.map((point: string, i: number) => (
-                                                                            <li key={i} className="flex items-start gap-2 text-sm">
-                                                                                <span className="text-violet-600 dark:text-violet-400 mt-0.5 flex-shrink-0">•</span>
-                                                                                <span>{point}</span>
-                                                                            </li>
-                                                                        ))}
-                                                                    </ul>
-                                                                </div>
-                                                            ))
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
-
                                         {/* ─── Master Synthesis Editor ────────── */}
                                         <div className={`pt-4 border-t ${isEditingThisCategory ? 'border-primary/30 bg-primary/5' : ''}`}>
                                             <h4 className="text-sm font-medium mb-3 flex items-center justify-between">
@@ -956,8 +610,8 @@ export default function Collaborate({
                                                         Master Content (Editable)
                                                     </label>
                                                     <textarea
-                                                        value={masterEditors[category.key]?.manual_content ?? ''}
-                                                        onChange={(e) => updateMasterEditor(category.key, 'manual_content', e.target.value)}
+                                                        value={masterEditors[category.key] ?? ''}
+                                                        onChange={(e) => updateMasterEditor(category.key, e.target.value)}
                                                         rows={10}
                                                         className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                     />
@@ -967,22 +621,6 @@ export default function Collaborate({
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {/* ─── AI Generate button (for draft users) ─ */}
-                                        {!hasSubmitted && userDraft && (
-                                            <div className="pt-4 border-t">
-                                                <Button
-                                                    onClick={handleGenerateAiSynthesis}
-                                                    disabled={isAiGenerating}
-                                                    variant="outline"
-                                                    className="w-full flex items-center justify-center gap-2 border-dashed"
-                                                >
-                                                    {isAiGenerating && <Loader2 className="size-4 animate-spin" />}
-                                                    <Bot className="size-4" />
-                                                    Generate AI-Assisted Synthesis for My Draft
-                                                </Button>
-                                            </div>
-                                        )}
                                     </TabsContent>
                                 );
                             })}
@@ -1044,20 +682,10 @@ export default function Collaborate({
                                         {category.label}
                                     </h4>
                                     <div className="space-y-2">
-                                        {masterEditors[category.key]?.ai_content && masterEditors[category.key].ai_content.trim() && (
-                                            <div>
-                                                <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">AI Reference:</p>
-                                                <textarea
-                                                    value={masterEditors[category.key].ai_content}
-                                                    rows={4}
-                                                    className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                                />
-                                            </div>
-                                        )}
                                         <div>
                                             <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Master Content:</p>
                                             <textarea
-                                                value={masterEditors[category.key]?.manual_content ?? ''}
+                                                value={masterEditors[category.key] ?? ''}
                                                 rows={6}
                                                 className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                             />

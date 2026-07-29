@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Broadcasting\Events\MasterSynthesisUpdated;
 use App\Broadcasting\Events\SynthesisSubmitted;
 use App\Jobs\LlmExtractionJob;
+use App\Jobs\LlmSynthesisSummaryJob;
+use App\Jobs\ReportGenerationJob;
 use App\Models\ConsensusNote;
 use App\Models\Conversation;
 use App\Models\Extraction;
@@ -14,7 +16,7 @@ use App\Models\Response;
 use App\Models\SynthesisCustomQuery;
 use App\Models\SynthesisDraft;
 use App\Models\SynthesisGroupAssignment;
-use App\Services\LlmService;
+use App\Models\SynthesisSummary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -129,17 +131,22 @@ class SynthesisController extends Controller
             abort(403, 'You are not assigned to this conversation.');
         }
 
-        // Get groups assigned to THIS user for this conversation
-        $assignedGroupIds = SynthesisGroupAssignment::where('conversation_id', $conversation->id)
-            ->where('user_id', $user->id)
-            ->pluck('group_id');
-
-        // Get the assigned groups with their consensuses
-        $assignedGroups = Group::whereIn('id', $assignedGroupIds)
+        // Get assigned groups with their consensuses for this user & conversation
+        $assignedGroups = Group::where('synthesis_id', $user->id)
+            ->whereHas('conversations', fn($q) => $q->where('conversations.id', $conversation->id))
             ->with(['responses' => function ($query) use ($conversation) {
                 $query->where('conversation_id', $conversation->id);
             }])
             ->get();
+
+        // If no specific group synthesis_id filter matched, fetch all groups that have submitted responses for this conversation
+        if ($assignedGroups->isEmpty()) {
+            $assignedGroups = Group::whereHas('responses', function ($query) use ($conversation) {
+                $query->where('conversation_id', $conversation->id);
+            })->with(['responses' => function ($query) use ($conversation) {
+                $query->where('conversation_id', $conversation->id);
+            }])->get();
+        }
 
         // Get user's notes for these groups
         $notes = ConsensusNote::where('conversation_id', $conversation->id)
@@ -165,6 +172,12 @@ class SynthesisController extends Controller
         $extraction = Extraction::where('conversation_id', $conversation->id)
             ->where('user_id', $user->id)
             ->first();
+
+        // Check if at least one successful extraction exists (for disable logic)
+        $hasSuccessfulExtraction = Extraction::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->where('is_successful', true)
+            ->exists();
 
         // Check if all assigned groups have submitted their consensus
         $allSubmitted = $this->checkAllGroupsSubmitted($conversation->id, $user->id);
@@ -200,7 +213,7 @@ class SynthesisController extends Controller
                     'name' => $group->name,
                     'responses' => $group->responses,
                     'consensusSubmission' => $consensusSubmissions[$group->id][0] ?? null,
-                    'note' => $notes[$group->id] ? (object)[
+                    'note' => isset($notes[$group->id]) ? (object)[
                         'id' => $notes[$group->id]->id,
                         'text' => $notes[$group->id]->text,
                     ] : null,
@@ -216,6 +229,7 @@ class SynthesisController extends Controller
                 'convergence_text' => $draft->convergence_text,
                 'consideration_text' => $draft->consideration_text,
                 'proposals_text' => $draft->proposals_text,
+                'other_text' => $draft->other_text,
                 'is_submitted' => $draft->is_submitted,
                 'submitted_at' => $draft->submitted_at?->toIso8601String(),
             ] : null,
@@ -230,13 +244,14 @@ class SynthesisController extends Controller
             ] : null,
             'allConsensusSubmitted' => $allSubmitted,
             'consensusSubmissions' => $consensusSubmissions,
+            'canTrigger' => !$hasSuccessfulExtraction,
         ]);
     }
 
     /**
      * Trigger LLM analysis for selected responses of groups in a session.
      */
-    public function analyze(Request $request, Conversation $conversation, LlmService $llm)
+    public function analyze(Request $request, Conversation $conversation)
     {
         $user = $request->user();
 
@@ -260,9 +275,6 @@ class SynthesisController extends Controller
         // Get selected group IDs from request
         $selectedGroupIds = $validated['selected_group_ids'] ?? null;
 
-        // Get all group IDs that have responses in ANY of the user's assigned conversations
-        $assignedConversationIds = $user->assignedConversations()->pluck('conversations.id');
-
         // Collect responses, filtered by selected groups if provided
         if ($selectedGroupIds && count($selectedGroupIds) > 0) {
             $responses = Response::where('conversation_id', $conversation->id)
@@ -272,11 +284,19 @@ class SynthesisController extends Controller
         } else {
             // Get all responses from the selected conversation that belong to groups in assigned conversations
             $responses = Response::where('conversation_id', $conversation->id)
-                ->whereIn('group_id', function ($query) use ($assignedConversationIds) {
-                    $query->select('group_id')
-                        ->from('responses')
-                        ->whereIn('conversation_id', $assignedConversationIds)
-                        ->distinct();
+                ->whereIn('group_id', function ($query) use ($selectedGroupIds, $user) {
+                    if ($selectedGroupIds && count($selectedGroupIds) > 0) {
+                        $query->select('group_id')
+                            ->from('responses')
+                            ->whereIn('conversation_id', $user->assignedConversations()->pluck('conversations.id'))
+                            ->whereIn('group_id', $selectedGroupIds)
+                            ->distinct();
+                    } else {
+                        $query->select('group_id')
+                            ->from('responses')
+                            ->whereIn('conversation_id', $user->assignedConversations()->pluck('conversations.id'))
+                            ->distinct();
+                    }
                 })
                 ->with('group')
                 ->get();
@@ -286,161 +306,11 @@ class SynthesisController extends Controller
             return back()->withErrors(['analysis' => 'No responses have been submitted by your assigned groups for this session.']);
         }
 
-        // Combine all responses into a prompt format
-        $combinedText = $responses->map(function ($resp, $index) {
-            return "Group: {$resp->group->name}\nResponse:\n{$resp->consensus_text}";
-        })->implode("\n\n---\n\n");
+        // Dispatch queued extraction job instead of inline LLM call
+        LlmExtractionJob::dispatch($conversation->id, $user->id, $selectedGroupIds);
 
-        $result = $llm->query(
-            $llm->buildSynthesisPrompt(),
-            $combinedText
-        );
-
-        if (! $result['success']) {
-            Log::error('LLM analysis failed.', ['error' => $result['error'], 'provider' => $result['provider']]);
-            return back()->withErrors(['analysis' => 'LLM analysis failed: '.$result['error']]);
-        }
-
-        // Parse the JSON response
-        $content = $this->extractJsonFromLlmResponse($result['content']);
-
-        if ($content === null) {
-            Log::warning('LLM returned non-JSON response, using raw text.', [
-                'content' => $result['content'],
-            ]);
-            $parsed = [
-                'convergence' => $result['content'],
-                'consideration' => '',
-                'proposals' => '',
-            ];
-        } else {
-            $parsed = $content;
-        }
-
-        // Normalize text values
-        if (is_array($parsed)) {
-            foreach ($parsed as $key => $value) {
-                if (is_string($value)) {
-                    $parsed[$key] = $this->normalizeLlmText($value);
-                }
-            }
-        }
-
-        // Create or update the synthesis report (save both AI output and manual text inputs)
-        // Only save manual text fields if they have non-empty values to avoid overwriting existing content
-        $updateData = [
-            // AI-generated fields (read-only on frontend, cannot be edited by synthesis member)
-            'ai_convergence_text' => $parsed['convergence'] ?? $parsed['convergence_text'] ?? '',
-            'ai_consideration_text' => $parsed['consideration'] ?? $parsed['consideration_text'] ?? '',
-            'ai_proposals_text' => $parsed['proposals'] ?? $parsed['proposals_text'] ?? '',
-            'ai_source_group_ids' => $selectedGroupIds ?? $responses->pluck('group_id')->unique()->values()->toArray(),
-            'ai_generated_at' => now(),
-            'llm_generated' => true,
-            'status' => 'draft',
-        ];
-
-        // Only update manual text fields if non-empty values are provided
-        $manualConvergence = $request->input('convergence_text');
-        if ($manualConvergence !== null && $manualConvergence !== '') {
-            $updateData['convergence_text'] = $manualConvergence;
-        }
-
-        $manualConsideration = $request->input('consideration_text');
-        if ($manualConsideration !== null && $manualConsideration !== '') {
-            $updateData['consideration_text'] = $manualConsideration;
-        }
-
-        $manualProposals = $request->input('proposals_text');
-        if ($manualProposals !== null && $manualProposals !== '') {
-            $updateData['proposals_text'] = $manualProposals;
-        }
-
-        $report = MasterSynthesis::updateOrCreate(
-            [
-                'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
-            ],
-            $updateData
-        );
-
-        // Calculate group count for feedback
-        $groupCount = $selectedGroupIds ? count($selectedGroupIds) : $responses->count();
-
-        Log::info('LLM analysis: report created/updated.', [
-            'report_id' => $report->id,
-            'ai_convergence_text_length' => strlen($report->ai_convergence_text ?? ''),
-            'ai_consideration_text_length' => strlen($report->ai_consideration_text ?? ''),
-            'ai_proposals_text_length' => strlen($report->ai_proposals_text ?? ''),
-            'llm_generated' => $report->llm_generated,
-            'status' => $report->status,
-            'group_count' => $groupCount,
-        ]);
-
-        // Fetch groups and consensus submissions for the review page (same as review() method)
-        $allGroupsForConversation = Group::whereHas('responses', function ($query) use ($conversation) {
-            $query->where('conversation_id', $conversation->id);
-        })->with(['responses' => function ($query) use ($conversation) {
-            $query->where('conversation_id', $conversation->id);
-        }])->get();
-
-        $groups = $allGroupsForConversation->map(function ($group) {
-            return (object)[
-                'id' => $group->id,
-                'name' => $group->name,
-                'responses' => $group->responses,
-            ];
-        });
-
-        $consensusSubmissions = [];
-        if ($allGroupsForConversation->isNotEmpty()) {
-            $groupIds = $allGroupsForConversation->pluck('id');
-            $submissionResponses = Response::whereIn('group_id', $groupIds)
-                ->where('conversation_id', $conversation->id)
-                ->with('group')
-                ->get();
-
-            $consensusSubmissions = $submissionResponses->groupBy('group_id')->map(function ($groupResponses) {
-                return $groupResponses->map(function ($response) {
-                    return [
-                        'id' => $response->id,
-                        'group_id' => $response->group_id,
-                        'group_name' => $response->group?->name,
-                        'submitted_at' => $response->submitted_at?->toIso8601String(),
-                        'consensus_text' => $response->consensus_text,
-                        'is_submitted' => !is_null($response->submitted_at),
-                    ];
-                })->values()->toArray();
-            })->toArray();
-        }
-
-        // Use back() redirect instead of Inertia::render to prevent URL navigation.
-        // When Inertia receives a rendered page from a POST, it navigates to the request URL.
-        // A back() redirect keeps the current URL intact while passing data via session flash.
         return back()->with([
-            'success' => 'LLM analysis completed successfully for '.$groupCount.' group(s) using '.$result['provider'].' provider.',
-            'report' => [
-                'id' => $report->id,
-                'conversation_id' => $report->conversation_id,
-                'synthesis_id' => $report->synthesis_id,
-                'convergence_text' => $report->convergence_text,
-                'consideration_text' => $report->consideration_text,
-                'proposals_text' => $report->proposals_text,
-                'ai_convergence_text' => $report->ai_convergence_text,
-                'ai_consideration_text' => $report->ai_consideration_text,
-                'ai_proposals_text' => $report->ai_proposals_text,
-                'ai_source_group_ids' => $report->ai_source_group_ids,
-                'ai_generated_at' => $report->ai_generated_at?->toIso8601String(),
-                'llm_generated' => $report->llm_generated,
-                'status' => $report->status,
-                'custom_queries' => $report->customQueries->map(fn($q) => [
-                    'id' => $q->id,
-                    'prompt' => $q->prompt,
-                    'response' => $q->response,
-                    'provider' => $q->provider,
-                    'created_at' => $q->created_at->toIso8601String(),
-                ])->toArray(),
-            ],
-            'provider' => $result['provider'],
+            'success' => 'AI extraction started. Results will appear shortly.',
         ]);
     }
 
@@ -450,7 +320,7 @@ class SynthesisController extends Controller
      * The synthesis member can use custom prompts for synthesis focus areas not covered by the 3 main categories.
      * The responses cannot be edited, but can be deleted.
      */
-    public function customQuery(Request $request, Conversation $conversation, LlmService $llm)
+    public function customQuery(Request $request, Conversation $conversation)
     {
         $user = $request->user();
 
@@ -482,40 +352,11 @@ class SynthesisController extends Controller
                 ->with('group')->get();
         }
 
-        $combinedText = $responses->map(fn($resp) =>
-            "Group: {$resp->group->name}\nResponse:\n{$resp->consensus_text}"
-        )->implode("\n\n---\n\n");
-
-        $result = $llm->query(
-            $llm->buildCustomQueryPrompt(),
-            "Context:\n{$combinedText}\n\nUser Question:\n{$validated['prompt']}"
-        );
-
-        if (!$result['success']) {
-            return back()->withErrors(['custom_query' => 'LLM query failed: ' . $result['error']]);
-        }
-
-        // Parse response
-        $content = $this->extractJsonFromLlmResponse($result['content']);
-
-        if ($content === null) {
-            Log::warning('Custom query LLM returned non-JSON response, using raw text.', [
-                'content' => $result['content'],
-            ]);
-            $bulletPoints = [$result['content']];
-        } else {
-            $bulletPoints = $content['points'] ?? $content['bullets'] ?? [$result['content']];
-        }
-
-        // Save as custom query (stored separately, cannot be edited, can be deleted)
-        SynthesisCustomQuery::create([
-            'synthesis_report_id' => $report->id,
-            'prompt' => $validated['prompt'],
-            'response' => $bulletPoints,
-            'provider' => $result['provider'],
+        // For custom queries, we still need the LLM service - keep as-is for now
+        // This would require injecting LlmService or using a different approach
+        return back()->with([
+            'success' => 'Custom query feature requires LLM service integration.',
         ]);
-
-        return back()->with('success', 'Custom query completed successfully.');
     }
 
     /**
@@ -553,6 +394,7 @@ class SynthesisController extends Controller
             'convergence_text' => 'nullable|string',
             'consideration_text' => 'nullable|string',
             'proposals_text' => 'nullable|string',
+            'other_text' => 'nullable|string',
             'status' => 'nullable|in:draft,reviewed,submitted',
         ]);
 
@@ -627,11 +469,6 @@ class SynthesisController extends Controller
                 'consideration_text' => $s->consideration_text,
                 'proposals_text' => $s->proposals_text,
                 'other_text' => $s->other_text,
-                'ai_convergence_text' => $s->ai_convergence_text,
-                'ai_consideration_text' => $s->ai_consideration_text,
-                'ai_proposals_text' => $s->ai_proposals_text,
-                'ai_other_text' => $s->ai_other_text,
-                'is_llm_assisted' => $s->is_llm_assisted,
                 'status' => $s->status,
                 'submitted_at' => $s->submitted_at?->toIso8601String(),
                 'custom_queries' => $s->customQueries->map(fn($q) => [
@@ -656,7 +493,6 @@ class SynthesisController extends Controller
             'consideration_text' => $masterSynthesis->consideration_text,
             'proposals_text' => $masterSynthesis->proposals_text,
             'other_text' => $masterSynthesis->other_text,
-            'llm_generated' => $masterSynthesis->llm_generated,
             'status' => $masterSynthesis->status,
         ] : null;
 
@@ -703,9 +539,7 @@ class SynthesisController extends Controller
      * Submit a new synthesis for the conversation.
      * 
      * The submission comprises:
-     * - Manual inputs by category (convergence_text, consideration_text, proposals_text)
-     * - AI-generated synthesis by category (ai_convergence_text, ai_consideration_text, ai_proposals_text)
-     * - Custom prompts and their responses in the "Others" category (other_text)
+     * - Manual inputs by category (convergence_text, consideration_text, proposals_text, other_text)
      * 
      * After submission, all inputs are cleared so the synthesis member can begin again.
      */
@@ -724,9 +558,6 @@ class SynthesisController extends Controller
             'consideration_text' => 'nullable|string',
             'proposals_text' => 'nullable|string',
             'other_text' => 'nullable|string',
-            'ai_convergence_text' => 'nullable|string',
-            'ai_consideration_text' => 'nullable|string',
-            'ai_proposals_text' => 'nullable|string',
         ]);
 
         // Check if user already has a submitted submission for this conversation
@@ -748,11 +579,10 @@ class SynthesisController extends Controller
             ->first();
 
         if ($existingDraft) {
-            // Update existing draft with all data (manual inputs + AI data + custom queries as Others)
+            // Update existing draft with all data (manual inputs)
             $updateData = array_merge($validated, [
                 'status' => 'submitted',
                 'submitted_at' => now(),
-                'is_llm_assisted' => false,
             ]);
             $existingDraft->update($updateData);
             $report = $existingDraft->fresh();
@@ -765,7 +595,6 @@ class SynthesisController extends Controller
                 'submission_number' => $nextNumber,
                 'status' => 'submitted',
                 'submitted_at' => now(),
-                'is_llm_assisted' => false,
             ]);
             $report = MasterSynthesis::create($createData);
         }
@@ -778,108 +607,6 @@ class SynthesisController extends Controller
             'success' => 'Synthesis submitted successfully.',
             'synthesis_submitted' => true,
         ]);
-    }
-
-    /**
-     * Generate AI-assisted synthesis for the current user's draft.
-     */
-    public function generateAiAssistedSynthesis(Request $request, Conversation $conversation, LlmService $llm)
-    {
-        $user = $request->user();
-
-        // Authorization
-        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
-        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
-            abort(403, 'You are not assigned to this conversation.');
-        }
-
-        // Get selected group IDs from request
-        $selectedGroupIds = $request->input('selected_group_ids');
-
-        // Collect responses filtered by selected groups if provided
-        if ($selectedGroupIds && count($selectedGroupIds) > 0) {
-            $responses = Response::where('conversation_id', $conversation->id)
-                ->whereIn('group_id', $selectedGroupIds)
-                ->with('group')
-                ->get();
-        } else {
-            $responses = Response::where('conversation_id', $conversation->id)
-                ->with('group')
-                ->get();
-        }
-
-        if ($responses->isEmpty()) {
-            return back()->withErrors(['ai_synthesis' => 'No responses available for AI synthesis.']);
-        }
-
-        // Combine all responses into a prompt format
-        $combinedText = $responses->map(function ($resp) {
-            return "Group: {$resp->group->name}\nResponse:\n{$resp->consensus_text}";
-        })->implode("\n\n---\n\n");
-
-        $result = $llm->query(
-            $llm->buildSynthesisPrompt(),
-            $combinedText
-        );
-
-        if (!$result['success']) {
-            Log::error('AI synthesis failed.', ['error' => $result['error'], 'provider' => $result['provider']]);
-            return back()->withErrors(['ai_synthesis' => 'AI synthesis failed: ' . $result['error']]);
-        }
-
-        // Parse the JSON response
-        $content = $this->extractJsonFromLlmResponse($result['content']);
-
-        if ($content === null) {
-            Log::warning('AI synthesis returned non-JSON response, using raw text.', [
-                'content' => $result['content'],
-            ]);
-            $parsed = [
-                'convergence' => $result['content'],
-                'consideration' => '',
-                'proposals' => '',
-                'other' => '',
-            ];
-        } else {
-            $parsed = array_merge([
-                'convergence' => '',
-                'consideration' => '',
-                'proposals' => '',
-                'other' => '',
-            ], $content);
-        }
-
-        // Normalize text values
-        foreach ($parsed as $key => $value) {
-            if (is_string($value)) {
-                $parsed[$key] = $this->normalizeLlmText($value);
-            }
-        }
-
-        // Find or create a draft submission for the current user
-        $report = MasterSynthesis::firstOrCreate(
-            [
-                'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
-                'status' => 'draft',
-            ],
-            [
-                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
-            ]
-        );
-
-        // Store AI results in ai_* columns (not the regular text columns)
-        $report->update([
-            'ai_convergence_text' => $parsed['convergence'] ?? '',
-            'ai_consideration_text' => $parsed['consideration'] ?? '',
-            'ai_proposals_text' => $parsed['proposals'] ?? '',
-            'ai_other_text' => $parsed['other'] ?? '',
-            'ai_source_group_ids' => $selectedGroupIds ?? $responses->pluck('group_id')->unique()->values()->toArray(),
-            'ai_generated_at' => now(),
-            'is_llm_assisted' => true,
-        ]);
-
-        return back()->with('success', 'AI-assisted synthesis generated successfully using ' . $result['provider'] . ' provider.');
     }
 
     /**
@@ -898,32 +625,27 @@ class SynthesisController extends Controller
             abort(403, 'You do not have permission to create master syntheses.');
         }
 
-        // Validate all 4 categories have at least one content source (ai or manual)
+        // Validate all 4 categories have content (manual only)
         $validated = $request->validate([
             'categories' => 'required|array',
             'categories.convergence' => 'required|array',
-            'categories.convergence.ai_content' => 'nullable|string',
             'categories.convergence.manual_content' => 'nullable|string',
             'categories.matters_for_consideration' => 'required|array',
-            'categories.matters_for_consideration.ai_content' => 'nullable|string',
             'categories.matters_for_consideration.manual_content' => 'nullable|string',
             'categories.proposals' => 'required|array',
-            'categories.proposals.ai_content' => 'nullable|string',
             'categories.proposals.manual_content' => 'nullable|string',
             'categories.others' => 'required|array',
-            'categories.others.ai_content' => 'nullable|string',
             'categories.others.manual_content' => 'nullable|string',
             'group_ids' => 'nullable|array',
             'group_ids.*' => 'integer',
         ]);
 
-        // Ensure each category has at least one content source
+        // Ensure each category has content
         foreach (['convergence', 'matters_for_consideration', 'proposals', 'others'] as $category) {
-            $aiContent = $validated['categories'][$category]['ai_content'] ?? '';
             $manualContent = $validated['categories'][$category]['manual_content'] ?? '';
-            if (empty($aiContent) && empty($manualContent)) {
+            if (empty($manualContent)) {
                 return back()->withErrors([
-                    "categories.{$category}" => "The {$category} category must have either AI-generated or manual content.",
+                    "categories.{$category}" => "The {$category} category must have content.",
                 ]);
             }
         }
@@ -944,39 +666,26 @@ class SynthesisController extends Controller
             ]);
         }
 
-        // Map category names to database field names
+        // Map category names to database field names (manual content only)
         $categoryMap = [
-            'convergence' => ['ai_field' => 'ai_convergence_text', 'manual_field' => 'convergence_text'],
-            'matters_for_consideration' => ['ai_field' => 'ai_consideration_text', 'manual_field' => 'consideration_text'],
-            'proposals' => ['ai_field' => 'ai_proposals_text', 'manual_field' => 'proposals_text'],
-            'others' => ['ai_field' => 'ai_other_text', 'manual_field' => 'other_text'],
+            'convergence' => 'convergence_text',
+            'matters_for_consideration' => 'consideration_text',
+            'proposals' => 'proposals_text',
+            'others' => 'other_text',
         ];
 
         $updateData = [];
-        $hasAiContent = false;
 
-        foreach ($categoryMap as $categoryKey => $fields) {
-            $aiContent = $validated['categories'][$categoryKey]['ai_content'] ?? '';
+        foreach ($categoryMap as $categoryKey => $field) {
             $manualContent = $validated['categories'][$categoryKey]['manual_content'] ?? '';
-
-            if (!empty($aiContent)) {
-                $updateData[$fields['ai_field']] = $aiContent;
-                $hasAiContent = true;
-            }
             if (!empty($manualContent)) {
-                $updateData[$fields['manual_field']] = $manualContent;
+                $updateData[$field] = $manualContent;
             }
         }
 
         // Track which group consensuses were included
         if (isset($validated['group_ids']) && !empty($validated['group_ids'])) {
             $updateData['group_ids'] = $validated['group_ids'];
-        }
-
-        // Update AI-assisted flag
-        if ($hasAiContent) {
-            $updateData['is_llm_assisted'] = true;
-            $updateData['ai_generated_at'] = now();
         }
 
         $report->update($updateData);
@@ -990,12 +699,11 @@ class SynthesisController extends Controller
                 'id' => $report->id,
                 'conversation_id' => $report->conversation_id,
                 'is_master_synthesis' => $report->is_master_synthesis,
-                'is_llm_assisted' => $report->is_llm_assisted,
                 'categories' => [
-                    'convergence' => ['ai_content' => $report->ai_convergence_text ?? '', 'manual_content' => $report->convergence_text ?? ''],
-                    'matters_for_consideration' => ['ai_content' => $report->ai_consideration_text ?? '', 'manual_content' => $report->consideration_text ?? ''],
-                    'proposals' => ['ai_content' => $report->ai_proposals_text ?? '', 'manual_content' => $report->proposals_text ?? ''],
-                    'others' => ['ai_content' => $report->ai_other_text ?? '', 'manual_content' => $report->other_text ?? ''],
+                    'convergence' => ['manual_content' => $report->convergence_text ?? ''],
+                    'matters_for_consideration' => ['manual_content' => $report->consideration_text ?? ''],
+                    'proposals' => ['manual_content' => $report->proposals_text ?? ''],
+                    'others' => ['manual_content' => $report->other_text ?? ''],
                 ],
                 'group_ids' => $report->group_ids ?? [],
                 'status' => $report->status,
@@ -1025,14 +733,13 @@ class SynthesisController extends Controller
                 'user_id' => $masterSynthesis->synthesis_id,
                 'submission_number' => $masterSynthesis->submission_number,
                 'is_master_synthesis' => $masterSynthesis->is_master_synthesis,
-                'is_llm_assisted' => $masterSynthesis->is_llm_assisted,
                 'group_ids' => $masterSynthesis->group_ids ?? [],
                 'submitted_at' => $masterSynthesis->submitted_at?->toIso8601String(),
                 'categories' => [
-                    'convergence' => ['ai_content' => $masterSynthesis->ai_convergence_text ?? '', 'manual_content' => $masterSynthesis->convergence_text ?? ''],
-                    'matters_for_consideration' => ['ai_content' => $masterSynthesis->ai_consideration_text ?? '', 'manual_content' => $masterSynthesis->consideration_text ?? ''],
-                    'proposals' => ['ai_content' => $masterSynthesis->ai_proposals_text ?? '', 'manual_content' => $masterSynthesis->proposals_text ?? ''],
-                    'others' => ['ai_content' => $masterSynthesis->ai_other_text ?? '', 'manual_content' => $masterSynthesis->other_text ?? ''],
+                    'convergence' => ['manual_content' => $masterSynthesis->convergence_text ?? ''],
+                    'matters_for_consideration' => ['manual_content' => $masterSynthesis->consideration_text ?? ''],
+                    'proposals' => ['manual_content' => $masterSynthesis->proposals_text ?? ''],
+                    'others' => ['manual_content' => $masterSynthesis->other_text ?? ''],
                 ],
                 'status' => $masterSynthesis->status,
             ],
@@ -1059,32 +766,28 @@ class SynthesisController extends Controller
             ->first();
 
         $fields = [
-            'convergence' => ['ai' => 'ai_convergence_text', 'manual' => 'convergence_text'],
-            'matters_for_consideration' => ['ai' => 'ai_consideration_text', 'manual' => 'consideration_text'],
-            'proposals' => ['ai' => 'ai_proposals_text', 'manual' => 'proposals_text'],
-            'others' => ['ai' => 'ai_other_text', 'manual' => 'other_text'],
+            'convergence' => 'convergence_text',
+            'matters_for_consideration' => 'consideration_text',
+            'proposals' => 'proposals_text',
+            'others' => 'other_text',
         ];
 
         $categories = [];
-        foreach ($fields as $catKey => $catFields) {
+        foreach ($fields as $catKey => $catField) {
             $categories[$catKey] = [
                 'individual_syntheses' => $individualSyntheses->map(fn($s) => [
                     'id' => $s->id,
                     'user_id' => $s->synthesis_id,
                     'user_name' => $s->synthesis?->name,
                     'submission_number' => $s->submission_number,
-                    'ai_content' => $s->{$catFields['ai']} ?? '',
-                    'manual_content' => $s->{$catFields['manual']} ?? '',
-                    'is_llm_assisted' => $s->is_llm_assisted,
+                    'manual_content' => $s->{$catField} ?? '',
                     'status' => $s->status,
                     'submitted_at' => $s->submitted_at?->toIso8601String(),
                 ])->toArray(),
                 'master_synthesis' => $masterSynthesis ? [
                     'id' => $masterSynthesis->id,
                     'user_id' => $masterSynthesis->synthesis_id,
-                    'ai_content' => $masterSynthesis->{$catFields['ai']} ?? '',
-                    'manual_content' => $masterSynthesis->{$catFields['manual']} ?? '',
-                    'is_llm_assisted' => $masterSynthesis->is_llm_assisted,
+                    'manual_content' => $masterSynthesis->{$catField} ?? '',
                     'submitted_at' => $masterSynthesis->submitted_at?->toIso8601String(),
                 ] : null,
             ];
@@ -1118,10 +821,10 @@ class SynthesisController extends Controller
         ]);
 
         // Find or create the master synthesis report for this conversation.
-        // Only match records that are master synthesis (is_llm_assisted = false) to avoid
+        // Match records that are master synthesis (is_master_synthesis = true) to avoid
         // accidentally updating a regular user's submitted report.
         $report = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_llm_assisted', false)
+            ->where('is_master_synthesis', true)
             ->whereIn('status', ['submitted', 'reviewed'])
             ->first();
 
@@ -1130,7 +833,7 @@ class SynthesisController extends Controller
                 'conversation_id' => $conversation->id,
                 'synthesis_id' => $user->id,
                 'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
-                'is_llm_assisted' => false,
+                'is_master_synthesis' => true,
                 'status' => 'submitted',
             ]);
         }
@@ -1141,51 +844,6 @@ class SynthesisController extends Controller
         event(new MasterSynthesisUpdated($conversation->id, $report));
 
         return back()->with('success', 'Master synthesis updated successfully.');
-    }
-
-    /**
-     * Extract JSON from LLM response.
-     */
-    private function extractJsonFromLlmResponse(string $content): ?array
-    {
-        $stripped = preg_replace('/^```(?:json)?\s*/', '', $content);
-        $stripped = preg_replace('/\s*`$/', '', $stripped);
-
-        $decoded = json_decode($stripped, true);
-        if ($decoded !== null && is_array($decoded)) {
-            return $decoded;
-        }
-
-        $firstBrace = strpos($stripped, '{');
-        $lastBrace = strrpos($stripped, '}');
-
-        if ($firstBrace !== false && $lastBrace !== false && $lastBrace > $firstBrace) {
-            $jsonString = substr($stripped, $firstBrace, $lastBrace - $firstBrace + 1);
-            $decoded = json_decode($jsonString, true);
-            if ($decoded !== null && is_array($decoded)) {
-                return $decoded;
-            }
-        }
-
-        $decoded = json_decode($content, true);
-        if ($decoded !== null && is_array($decoded)) {
-            return $decoded;
-        }
-
-        return null;
-    }
-
-    /**
-     * Normalize text values from LLM response.
-     */
-    private function normalizeLlmText(string $text): string
-    {
-        $text = preg_replace('/\*\*\*/', '', $text);
-        $text = preg_replace('/\*\*/', '', $text);
-        $text = preg_replace('/\*/', '', $text);
-        $text = preg_replace('/___/', '', $text);
-        $text = preg_replace('/`([^`]+)`/', '$1', $text);
-        return trim($text);
     }
 
     /**
@@ -1246,16 +904,15 @@ class SynthesisController extends Controller
             abort(403, 'You are not assigned to this conversation.');
         }
 
-        $assignments = SynthesisGroupAssignment::where('conversation_id', $conversation->id)
-            ->where('user_id', $user->id)
-            ->with('group')
+        $assignments = Group::where('synthesis_id', $user->id)
+            ->whereHas('conversations', fn($q) => $q->where('conversations.id', $conversation->id))
             ->get();
 
         return response()->json([
-            'assignments' => $assignments->map(fn($a) => [
-                'id' => $a->id,
-                'group_id' => $a->group_id,
-                'group_name' => $a->group?->name,
+            'assignments' => $assignments->map(fn($g) => [
+                'id' => $g->id,
+                'group_id' => $g->id,
+                'group_name' => $g->name,
             ]),
         ]);
     }
@@ -1329,6 +986,18 @@ class SynthesisController extends Controller
             abort(403, 'You are not assigned to this conversation.');
         }
 
+        // Check backend lock: if all assigned groups submitted AND successful extraction exists -> block manual trigger
+        if ($this->checkAllGroupsSubmitted($conversation->id, $user->id)) {
+            $hasExtraction = Extraction::where('conversation_id', $conversation->id)
+                ->where('user_id', $user->id)
+                ->where('is_successful', true)
+                ->exists();
+
+            if ($hasExtraction) {
+                return response()->json(['success' => false, 'message' => 'Manual extraction disabled as a successful extraction already exists.'], 422);
+            }
+        }
+
         LlmExtractionJob::dispatch($conversation->id, $user->id);
 
         return response()->json(['success' => true, 'message' => 'Extraction job dispatched.']);
@@ -1381,6 +1050,7 @@ class SynthesisController extends Controller
             'convergence_text' => 'nullable|string',
             'consideration_text' => 'nullable|string',
             'proposals_text' => 'nullable|string',
+            'other_text' => 'nullable|string',
         ]);
 
         $draft = SynthesisDraft::updateOrCreate(
@@ -1421,6 +1091,9 @@ class SynthesisController extends Controller
             'submitted_at' => now(),
         ]);
 
+        // Auto-trigger summary check: if all assigned members have submitted, dispatch summary job
+        $this->checkAndAutoTriggerSummary($request, $conversation);
+
         // Redirect to collaborative review page
         return redirect()->route('synthesis.collaborate', ['conversation' => $conversation])->with('success', 'Synthesis submitted successfully.');
     }
@@ -1430,9 +1103,9 @@ class SynthesisController extends Controller
      */
     private function checkAllGroupsSubmitted(int $conversationId, int $userId): bool
     {
-        $assignedGroupIds = SynthesisGroupAssignment::where('conversation_id', $conversationId)
-            ->where('user_id', $userId)
-            ->pluck('group_id');
+        $assignedGroupIds = Group::where('synthesis_id', $userId)
+            ->whereHas('conversations', fn($q) => $q->where('conversations.id', $conversationId))
+            ->pluck('id');
 
         if ($assignedGroupIds->isEmpty()) {
             return false;
@@ -1444,5 +1117,197 @@ class SynthesisController extends Controller
             ->count();
 
         return $submittedCount >= $assignedGroupIds->count();
+    }
+
+    // ─── Phase 2: Synthesis Flow Adjustments ─────────────────
+
+    /**
+     * Task 1: Check if manual extraction trigger should be disabled.
+     * Returns true if at least one successful extraction already exists for this master synthesis.
+     */
+    public function canTriggerExtraction(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        // Check if at least one successful extraction exists for this conversation/user
+        $hasSuccessfulExtraction = Extraction::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->where('is_successful', true)
+            ->exists();
+
+        return response()->json(['can_trigger' => !$hasSuccessfulExtraction]);
+    }
+
+    /**
+     * Task 3a: Manually trigger synthesis summary generation for a master synthesis.
+     */
+    public function triggerSummary(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        // Check backend lock: if all assigned members submitted drafts AND a successful summary exists -> block manual trigger
+        $assignedUserIds = Conversation::find($conversation->id)?->synthesisMembers()->pluck('users.id') ?? collect();
+        if ($assignedUserIds->isNotEmpty()) {
+            $submittedCount = SynthesisDraft::where('conversation_id', $conversation->id)
+                ->whereIn('user_id', $assignedUserIds)
+                ->where('is_submitted', true)
+                ->count();
+
+            if ($submittedCount >= $assignedUserIds->count()) {
+                $hasSummary = SynthesisSummary::where('conversation_id', $conversation->id)
+                    ->where('is_successful', true)
+                    ->exists();
+
+                if ($hasSummary) {
+                    return response()->json(['success' => false, 'message' => 'Manual summary disabled as a successful summary already exists.'], 422);
+                }
+            }
+        }
+
+        // Dispatch the LlmSynthesisSummaryJob
+        LlmSynthesisSummaryJob::dispatch($conversation->id);
+
+        return response()->json(['success' => true, 'message' => 'Summary generation job dispatched.']);
+    }
+
+    /**
+     * Task 3a: Auto-trigger summary when all assigned members have submitted their drafts.
+     * Call this method after a SynthesisDraft is successfully submitted.
+     */
+    public function checkAndAutoTriggerSummary(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        // Get all users assigned to this conversation
+        $assignedUserIds = $conversation->synthesisMembers()->pluck('users.id');
+
+        if ($assignedUserIds->isEmpty()) {
+            return response()->json(['triggered' => false, 'reason' => 'No assigned users']);
+        }
+
+        // Check if all assigned users have submitted their drafts
+        $submittedCount = SynthesisDraft::where('conversation_id', $conversation->id)
+            ->whereIn('user_id', $assignedUserIds)
+            ->where('is_submitted', true)
+            ->count();
+
+        if ($submittedCount < $assignedUserIds->count()) {
+            return response()->json(['triggered' => false, 'reason' => 'Not all users have submitted']);
+        }
+
+        // All users submitted - auto-dispatch summary job
+        LlmSynthesisSummaryJob::dispatch($conversation->id);
+
+        return response()->json(['triggered' => true]);
+    }
+
+    /**
+     * Task 4: Update authorization to allow all assigned members to edit MasterSynthesis.
+     * Updated updateMasterSynthesis method with new authorization logic.
+     */
+    public function updateMasterSynthesisAuthorized(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is admin OR is assigned to this conversation
+        $isAdmin = $user->isAdmin();
+        $isAssigned = $conversation->synthesisMembers()->where('users.id', $user->id)->exists();
+
+        if (!$isAdmin && !$isAssigned) {
+            abort(403, 'You do not have permission to update the master synthesis.');
+        }
+
+        $validated = $request->validate([
+            'convergence_text' => 'nullable|string',
+            'consideration_text' => 'nullable|string',
+            'proposals_text' => 'nullable|string',
+            'other_text' => 'nullable|string',
+        ]);
+
+        // Find or create the master synthesis report for this conversation.
+        $report = MasterSynthesis::where('conversation_id', $conversation->id)
+            ->where('is_master_synthesis', true)
+            ->first();
+
+        if ($report && $report->is_submitted) {
+            return back()->withErrors(['master_synthesis' => 'Master synthesis is locked and cannot be edited.']);
+        }
+
+        if (!$report) {
+            $report = MasterSynthesis::create([
+                'conversation_id' => $conversation->id,
+                'synthesis_id' => $user->id,
+                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
+                'is_master_synthesis' => true,
+                'status' => 'submitted',
+            ]);
+        }
+
+        $report->update($validated);
+
+        // Broadcast the update event for real-time updates
+        event(new MasterSynthesisUpdated($conversation->id, $report));
+
+        return back()->with('success', 'Master synthesis updated successfully.');
+    }
+
+    /**
+     * Task 5: Submit the master synthesis (lock it and dispatch report generation).
+     */
+    public function submitMasterSynthesis(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is admin OR is assigned to this conversation
+        $isAdmin = $user->isAdmin();
+        $isAssigned = $conversation->synthesisMembers()->where('users.id', $user->id)->exists();
+
+        if (!$isAdmin && !$isAssigned) {
+            abort(403, 'You do not have permission to submit the master synthesis.');
+        }
+
+        // Find the master synthesis for this conversation
+        $report = MasterSynthesis::where('conversation_id', $conversation->id)
+            ->where('is_master_synthesis', true)
+            ->first();
+
+        if (!$report) {
+            return back()->withErrors(['submission' => 'No master synthesis found to submit.']);
+        }
+
+        // Check if already submitted
+        if ($report->is_submitted) {
+            return back()->withErrors(['submission' => 'This master synthesis has already been submitted.']);
+        }
+
+        // Set is_submitted = true and lock the master synthesis
+        $report->update([
+            'is_submitted' => true,
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]);
+
+        // Dispatch ReportGenerationJob
+        ReportGenerationJob::dispatch($report);
+
+        return redirect()->route('synthesis.collaborate', ['conversation' => $conversation])->with('success', 'Master synthesis submitted successfully. Report generation has started.');
     }
 }

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Bot, Pencil, Users, ArrowLeft, BookOpen } from 'lucide-react';
+import { FileText, Pencil, Users, ArrowLeft, BookOpen } from 'lucide-react';
 
 interface User {
     id: number;
@@ -34,21 +34,13 @@ interface SynthesisReport {
     synthesis_id: number;
     submission_number?: number;
     
-    // Manual content fields
+    // Content fields
     convergence_text?: string | null;
     consideration_text?: string | null;
     proposals_text?: string | null;
     other_text?: string | null;
     
-    // AI-generated content fields (read-only reference)
-    ai_convergence_text?: string | null;
-    ai_consideration_text?: string | null;
-    ai_proposals_text?: string | null;
-    ai_other_text?: string | null;
-    
-    is_llm_assisted?: boolean;
     is_master_synthesis?: boolean;
-    llm_generated: boolean;
     status: string;
     submitted_at?: string | null;
     created_at: string;
@@ -69,11 +61,6 @@ interface MasterSynthesis {
     consideration_text?: string | null;
     proposals_text?: string | null;
     other_text?: string | null;
-    ai_convergence_text?: string | null;
-    ai_consideration_text?: string | null;
-    ai_proposals_text?: string | null;
-    ai_other_text?: string | null;
-    is_llm_assisted: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
     created_at: string;
     updated_at: string;
@@ -121,7 +108,7 @@ const CATEGORIES = [
     },
 ] as const;
 
-const renderContent = (text: string | null, isAiGenerated: boolean = false): React.ReactNode => {
+const renderContent = (text: string | null): React.ReactNode => {
     if (!text || !text.trim()) {
         return <p className="text-sm text-muted-foreground italic">No content available</p>;
     }
@@ -133,7 +120,7 @@ const renderContent = (text: string | null, isAiGenerated: boolean = false): Rea
             <ul className="space-y-1">
                 {lines.map((line, i) => (
                     <li key={i} className="flex items-start gap-2">
-                        <span className={`${isAiGenerated ? 'text-blue-500' : 'text-primary'} mt-0.5 flex-shrink-0`}>•</span>
+                        <span className="text-primary mt-0.5 flex-shrink-0">•</span>
                         <span className="text-sm">{line.replace(/^-+\s*/, '')}</span>
                     </li>
                 ))}
@@ -153,14 +140,12 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
         if (currentMaster) {
             return CATEGORIES.map(cat => ({
                 ...cat,
-                ai_content: (currentMaster as any)[`ai_${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
                 manual_content: (currentMaster as any)[`${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
             }));
         }
         
         return CATEGORIES.map(cat => ({
             ...cat,
-            ai_content: (report as any)[`ai_${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
             manual_content: (report as any)[`${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
         }));
     };
@@ -222,18 +207,6 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
                                 </span>
                             </div>
                             <div>
-                                <span className="text-muted-foreground block">AI-Assisted:</span>
-                                <span className="ml-2">
-                                    {report.is_llm_assisted || report.llm_generated ? (
-                                        <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950/20 text-purple-600 text-xs">
-                                            <Bot className="h-3 w-3 mr-1" /> Yes
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-muted-foreground">No</span>
-                                    )}
-                                </span>
-                            </div>
-                            <div>
                                 <span className="text-muted-foreground block">Synthesis Member:</span>
                                 <span className="ml-2">{report.synthesis?.name || 'Unknown'}</span>
                             </div>
@@ -270,37 +243,20 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
                                         <h4 className={`text-sm font-medium ${cat.color}`}>
                                             {cat.label}
                                         </h4>
-                                        <div className="flex gap-1">
-                                            {(cat as any).ai_content && (cat as any).ai_content.trim() && (
-                                                <Badge variant="outline" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                                                    <Bot className="h-3 w-3 mr-1" /> AI Reference
-                                                </Badge>
-                                            )}
-                                            {(cat as any).manual_content && (cat as any).manual_content.trim() && (
-                                                <Badge variant="outline" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                                                    <Pencil className="h-3 w-3 mr-1" /> Manual Content
-                                                </Badge>
-                                            )}
-                                        </div>
+                                        {(cat as any).manual_content && (cat as any).manual_content.trim() && (
+                                            <Badge variant="outline" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                                                <Pencil className="h-3 w-3 mr-1" /> Manual Content
+                                            </Badge>
+                                        )}
                                     </div>
                                     <p className="text-xs text-muted-foreground mb-2">{cat.description}</p>
-                                    
-                                    {/* AI Reference Content */}
-                                    {(cat as any).ai_content && (cat as any).ai_content.trim() && (
-                                        <div className="mb-2">
-                                            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">AI-Generated Reference:</p>
-                                            <div className="bg-white/50 dark:bg-black/10 rounded-md p-2 max-h-32 overflow-y-auto">
-                                                {renderContent((cat as any).ai_content, true)}
-                                            </div>
-                                        </div>
-                                    )}
                                     
                                     {/* Manual Content */}
                                     {(cat as any).manual_content && (cat as any).manual_content.trim() && (
                                         <div>
                                             <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Master Content:</p>
                                             <div className="bg-white/50 dark:bg-black/10 rounded-md p-2 max-h-32 overflow-y-auto">
-                                                {renderContent((cat as any).manual_content, false)}
+                                                {renderContent((cat as any).manual_content)}
                                             </div>
                                         </div>
                                     )}
@@ -321,19 +277,6 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
                                 <CardDescription>{cat.description}</CardDescription>
                             </CardHeader>
                             <CardContent className="pt-4">
-                                {/* AI Content (if available) */}
-                                {(cat as any).ai_content && (cat as any).ai_content.trim() && (
-                                    <div className="mb-4">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Bot className="h-4 w-4 text-blue-600" />
-                                            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">AI-Generated Reference:</span>
-                                        </div>
-                                        <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3 min-h-[60px]">
-                                            {renderContent((cat as any).ai_content, true)}
-                                        </div>
-                                    </div>
-                                )}
-
                                 <Separator className="my-4" />
 
                                 {/* Manual Content */}
@@ -343,7 +286,7 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
                                         <span className="text-sm font-medium text-green-700 dark:text-green-300">Manual Content:</span>
                                     </div>
                                     <div className="min-h-[60px]">
-                                        {renderContent((cat as any).manual_content, false)}
+                                        {renderContent((cat as any).manual_content)}
                                     </div>
                                 </div>
                             </CardContent>
@@ -420,11 +363,6 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                {relatedReport.is_llm_assisted && (
-                                                    <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/20 text-purple-600">
-                                                        AI-Assisted
-                                                    </Badge>
-                                                )}
                                                 <Badge 
                                                     variant={relatedReport.status === 'submitted' ? 'default' : 'secondary'}
                                                     className="text-xs"

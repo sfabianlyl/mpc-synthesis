@@ -4,13 +4,14 @@ namespace App\Models;
 
 // \Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\ConsensusNote;
+use App\Models\Diocese;
 use App\Models\Extraction;
-use App\Models\SynthesisDraft;
-use App\Models\SynthesisGroupAssignment;
+
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -23,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $email
  * @property string $role
+ * @property int|null $diocese_id
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -40,8 +42,9 @@ use Illuminate\Support\Carbon;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ConsensusNote> $consensusNotes
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Extraction> $extractions
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisDraft> $synthesisDrafts
+ * @property-read Diocese|null $diocese
  */
-#[Fillable(['name', 'email', 'password', 'role'])]
+#[Fillable(['name', 'email', 'password', 'role', 'diocese_id'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -70,6 +73,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is a pastoral role member.
+     */
+    public function isPastoral(): bool
+    {
+        return $this->hasRole('pastoral');
+    }
+
+    /**
+     * Check if user is a discernment role member.
+     */
+    public function isDiscernment(): bool
+    {
+        return $this->hasRole('discernment');
+    }
+
+    /**
      * Check if user is a synthesis team member.
      *
      * Deprecated: Previously included 'secretary' as a fallback for backward compatibility.
@@ -94,6 +113,14 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->hasRole('admin');
+    }
+
+    /**
+     * Get the diocese this user belongs to.
+     */
+    public function diocese(): BelongsTo
+    {
+        return $this->belongsTo(Diocese::class, 'diocese_id');
     }
 
     /**
@@ -138,13 +165,6 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
-    /**
-     * Get the synthesis group assignments for this user.
-     */
-    public function synthesisGroupAssignments(): HasMany
-    {
-        return $this->hasMany(SynthesisGroupAssignment::class, 'user_id');
-    }
 
     /**
      * Get the consensus notes written by this user.

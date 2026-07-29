@@ -2,13 +2,13 @@
 
 namespace Database\Seeders;
 
-use App\Models\Event;
 use App\Models\Conversation;
-use App\Models\User;
+use App\Models\Event;
 use App\Models\Group;
-use App\Models\Response;
 use App\Models\MasterSynthesis;
+use App\Models\Response;
 use App\Models\SynthesisCustomQuery;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -20,6 +20,10 @@ class DatabaseSeeder extends Seeder
     {
         // ─── 1. Admin User ──────────────────────────────────────────
         $this->call(AdminUserSeeder::class);
+
+        // ─── 1b. Dioceses & Pastoral/Discernment Members ────────────
+        $this->call(DiocesesSeeder::class);
+        $this->call(PastoralAndDiscernmentMembersSeeder::class);
 
         // ─── 2. Create Event: Malaysian Pastoral Convention (MPC) ───
         $event = Event::create([
@@ -56,45 +60,45 @@ class DatabaseSeeder extends Seeder
         // ─── 4. Create 18 Synthesis Team Members (Users with role 'synthesis') ──
         $synthesisMembers = [];
         $synthesisMembers[] = User::factory()->create([
-                'name' => "Gregory Pravin Rajah",
-                'email' => "greg@gerejakatolik.my",
-                'role' => 'synthesis',
-            ]);
+            'name' => 'Gregory Pravin Rajah',
+            'email' => 'greg@gerejakatolik.my',
+            'role' => 'synthesis',
+        ]);
         $synthesisMembers[] = User::factory()->create([
-                'name' => "Salomi, Rgs",
-                'email' => "salomi@gerejakatolik.my",
-                'role' => 'synthesis',
-            ]);
+            'name' => 'Salomi, Rgs',
+            'email' => 'salomi@gerejakatolik.my',
+            'role' => 'synthesis',
+        ]);
         $synthesisMembers[] = User::factory()->create([
-                'name' => "Thomas Paul",
-                'email' => "thomas@gerejakatolik.my",
-                'role' => 'synthesis',
-            ]);
+            'name' => 'Thomas Paul',
+            'email' => 'thomas@gerejakatolik.my',
+            'role' => 'synthesis',
+        ]);
         $synthesisMembers[] = User::factory()->create([
-                'name' => "Anna Teresa",
-                'email' => "anna@gerejakatolik.my",
-                'role' => 'synthesis',
-            ]);
+            'name' => 'Anna Teresa',
+            'email' => 'anna@gerejakatolik.my',
+            'role' => 'synthesis',
+        ]);
         $synthesisMembers[] = User::factory()->create([
-                'name' => "Bernadine",
-                'email' => "bernadine@gerejakatolik.my",
-                'role' => 'synthesis',
-            ]);
+            'name' => 'Bernadine',
+            'email' => 'bernadine@gerejakatolik.my',
+            'role' => 'synthesis',
+        ]);
         $synthesisMembers[] = User::factory()->create([
-                'name' => "Gerald",
-                'email' => "gerald@gerejakatolik.my",
-                'role' => 'synthesis',
-            ]);
+            'name' => 'Gerald',
+            'email' => 'gerald@gerejakatolik.my',
+            'role' => 'synthesis',
+        ]);
         $synthesisMembers[] = User::factory()->create([
-                'name' => "Francisco",
-                'email' => "kiko@gerejakatolik.my",
-                'role' => 'synthesis',
-            ]);
+            'name' => 'Francisco',
+            'email' => 'kiko@gerejakatolik.my',
+            'role' => 'synthesis',
+        ]);
         $synthesisMembers[] = User::factory()->create([
-                'name' => "Sr Retta",
-                'email' => "retta@gerejakatolik.my",
-                'role' => 'synthesis',
-            ]);
+            'name' => 'Sr Retta',
+            'email' => 'retta@gerejakatolik.my',
+            'role' => 'synthesis',
+        ]);
         for ($i = 9; $i <= 18; $i++) {
             $synthesisMembers[] = User::factory()->create([
                 'name' => "Synthesis Member {$i}",
@@ -102,7 +106,6 @@ class DatabaseSeeder extends Seeder
                 'role' => 'synthesis',
             ]);
         }
-        
 
         // ─── 4b. Create 10 Admin Users ──
         for ($i = 1; $i <= 10; $i++) {
@@ -170,7 +173,7 @@ class DatabaseSeeder extends Seeder
             'As a group we have discerned that the job description of the parish priest must be listed out in detail and made available to the public. The role of the parish priest can not and should be vague nor up to each parish priest to decide for himself. In order to uphold the integrity of the priesthood and the transparency and accountability of the priest, priests too must be reviewed formally, of their work by the bishop and the parish community. Methods and processes driven by each parish priest must also be evaluated to identify if synodality is resisted or incorporated in their ministry. Our group does present this consensus as an attack on the clergy but as a safeguarding measure against some bad apples in the bunch.',
         ];
 
-        foreach ($consensusTexts as $index=>$consensus){
+        foreach ($consensusTexts as $index => $consensus) {
             Response::create([
                 'conversation_id' => $conversations[0]->id,
                 'group_id' => $groups[$index]->id,
@@ -184,17 +187,10 @@ class DatabaseSeeder extends Seeder
         $report1 = MasterSynthesis::create([
             'conversation_id' => $cis2->id,
             'synthesis_id' => $synthesisMembers[0]->id,
-            // AI-generated content
-            'ai_convergence_text' => "- Strong concern about lack of pastoral accompaniment for families.\n- Recognition that Catholic families are losing their identity in a secular media landscape.\n- Call for more leadership training and cultural understanding across Sabah, Sarawak, and Semenanjung.\n- Urgent need for young people (ages 25-45) to take up leadership roles alongside the older generation.",
-            'ai_consideration_text' => "- Need for trained, qualified, and certified personnel for pastoral work to prevent burnout.\n- Funding challenges for employing more lay workers and redefining monetary priorities.\n- Tension between addressing taboo topics and protecting victims from further harm.",
-            'ai_proposals_text' => "- Establish parish hubs for family support (counselling, after-school programmes, grief groups).\n- Deploy full-time dedicated persons to accompany families in irregular circumstances.\n- Redefine roles to enable young and older generations to work together in tandem.\n- Train, qualify, and certify clergy and laity for specialised pastoral missions.",
-            'ai_source_group_ids' => [1, 2, 3, 4],
-            'ai_generated_at' => now()->subDays(4),
             // User-written content
-            'convergence_text' => "The groups strongly converge on the need for enhanced pastoral accompaniment for families.",
-            'consideration_text' => "Key tensions include funding and training requirements for pastoral missions.",
-            'proposals_text' => "We propose establishing dedicated family support hubs across all parishes.",
-            'llm_generated' => true,
+            'convergence_text' => 'The groups strongly converge on the need for enhanced pastoral accompaniment for families.',
+            'consideration_text' => 'Key tensions include funding and training requirements for pastoral missions.',
+            'proposals_text' => 'We propose establishing dedicated family support hubs across all parishes.',
             'status' => 'submitted',
         ]);
 
@@ -202,17 +198,10 @@ class DatabaseSeeder extends Seeder
         $report2 = MasterSynthesis::create([
             'conversation_id' => $cis2->id,
             'synthesis_id' => $synthesisMembers[1]->id,
-            // AI-generated content
-            'ai_convergence_text' => "- Divided but earnest discussion on listening to the voices of the 'excluded', including taboo topics.\n- Unanimous agreement on the need for more employed lay workers, with funding as a key concern.\n- Call for clear job descriptions for parish priests and formal review mechanisms for accountability and synodality.",
-            'ai_consideration_text' => "- Risk of questioning the integrity of victims and survivors if taboo topics are opened.\n- Funding constraints and whether current priorities reflect true mission commitment.\n- Balancing transparency/accountability with pastoral sensitivity for clergy.",
-            'ai_proposals_text' => "- Create safe havens and outlets for victims and survivors, with proper training for church responders.\n- Conduct a deep dive into cost and funding allocation for clergy vs. lay workforce.\n- Publish detailed job descriptions for parish priests and establish formal review processes.",
-            'ai_source_group_ids' => [5, 6, 7],
-            'ai_generated_at' => now()->subDays(4),
             // User-written content
-            'convergence_text' => "There is strong agreement on the need for trained lay workers and safe spaces for victims.",
-            'consideration_text' => "Funding priorities and accountability mechanisms require further discussion.",
-            'proposals_text' => "Establish formal review processes for parish priests and deep-dive into funding allocation.",
-            'llm_generated' => true,
+            'convergence_text' => 'There is strong agreement on the need for trained lay workers and safe spaces for victims.',
+            'consideration_text' => 'Funding priorities and accountability mechanisms require further discussion.',
+            'proposals_text' => 'Establish formal review processes for parish priests and deep-dive into funding allocation.',
             'status' => 'submitted',
         ]);
 

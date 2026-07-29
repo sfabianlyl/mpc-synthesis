@@ -23,10 +23,25 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import type { NavItem } from '@/types';
+import { RoleSwitcher, getModeNavigation, DiscernmentMode } from '@/components/role-switcher';
 
-function useNavItems(): NavItem[] {
-    const { auth } = usePage().props;
+function useNavItems(): { items: NavItem[]; isDiscernment: boolean; mode: DiscernmentMode } {
+    const { auth } = usePage().props as any;
     const role = auth?.user?.role;
+    const isDiscernment = role === 'discernment';
+
+    // Get the current discernment mode
+    const getMode = (): DiscernmentMode => {
+        if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('discernment-mode');
+            if (stored === 'pastoral' || stored === 'synthesis') {
+                return stored;
+            }
+        }
+        return 'pastoral';
+    };
+
+    const mode = getMode();
 
     const items: NavItem[] = [
         {
@@ -35,6 +50,13 @@ function useNavItems(): NavItem[] {
             icon: LayoutGrid,
         },
     ];
+
+    // For discernment users, add RoleSwitcher and mode-based navigation
+    if (isDiscernment) {
+        const baseItems = [items[0]];
+        const modeItems = getModeNavigation(mode, baseItems);
+        return { items: modeItems, isDiscernment: true, mode };
+    }
 
     // Authenticated users can submit responses
     if (role === 'synthesis' || role === 'drafter' || role === 'admin') {
@@ -50,6 +72,25 @@ function useNavItems(): NavItem[] {
         items.push({
             title: 'Synthesis Dashboard',
             href: '/synthesis',
+            icon: ClipboardList,
+        });
+    }
+
+    // Pastoral-specific navigation
+    if (role === 'pastoral') {
+        items.push({
+            title: 'Pastoral Dashboard',
+            href: '/pastoral/dashboard',
+            icon: Users,
+        });
+        items.push({
+            title: 'Pastoral Reports',
+            href: '/pastoral/reports',
+            icon: FileText,
+        });
+        items.push({
+            title: 'Decisions',
+            href: '/pastoral/decisions',
             icon: ClipboardList,
         });
     }
@@ -72,19 +113,19 @@ function useNavItems(): NavItem[] {
         });
     }
 
-    return items;
+    return { items, isDiscernment: false, mode };
 }
 
 const footerNavItems: NavItem[] = [
     {
         title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
+        href: 'https://laravel.com/docs/starter-kits',
         icon: BookOpen,
     },
 ];
 
 export function AppSidebar() {
-    const mainNavItems = useNavItems();
+    const { items, isDiscernment } = useNavItems();
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -100,9 +141,20 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
-                <NavMain items={mainNavItems} />
-            </SidebarContent>
+            {/* RoleSwitcher for discernment users */}
+            {isDiscernment && (
+                <SidebarContent>
+                    <RoleSwitcher />
+                    <NavMain items={items} />
+                </SidebarContent>
+            )}
+
+            {/* Regular sidebar content for non-discernment users */}
+            {!isDiscernment && (
+                <SidebarContent>
+                    <NavMain items={items} />
+                </SidebarContent>
+            )}
 
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />

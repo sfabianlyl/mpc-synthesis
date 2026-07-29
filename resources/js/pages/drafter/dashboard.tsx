@@ -17,7 +17,6 @@ interface User {
 
 /**
  * SynthesisReport represents an individual synthesis submission.
- * Each report can have both AI-generated and manually crafted content.
  */
 interface SynthesisReport {
     id: number;
@@ -26,21 +25,13 @@ interface SynthesisReport {
     synthesis_id: number;
     submission_number?: number;
     
-    // Manual content fields
+    // Content fields
     convergence_text?: string | null;
     consideration_text?: string | null;
     proposals_text?: string | null;
     other_text?: string | null;
     
-    // AI-generated content fields (read-only reference)
-    ai_convergence_text?: string | null;
-    ai_consideration_text?: string | null;
-    ai_proposals_text?: string | null;
-    ai_other_text?: string | null;
-    
-    is_llm_assisted?: boolean;
     is_master_synthesis?: boolean;
-    llm_generated: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
     submitted_at?: string | null;
     created_at: string;
@@ -62,11 +53,6 @@ interface MasterSynthesis {
     consideration_text?: string | null;
     proposals_text?: string | null;
     other_text?: string | null;
-    ai_convergence_text?: string | null;
-    ai_consideration_text?: string | null;
-    ai_proposals_text?: string | null;
-    ai_other_text?: string | null;
-    is_llm_assisted: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
     booklet_file_path?: string | null;
     created_at: string;
@@ -228,7 +214,6 @@ export default function Dashboard({ reports, masterSyntheses, documents, events,
                                     <TableRow>
                                         <TableHead>Conversation</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead>AI-Assisted</TableHead>
                                         <TableHead>Last Updated</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -250,15 +235,6 @@ export default function Dashboard({ reports, masterSyntheses, documents, events,
                                                 >
                                                     {ms.status}
                                                 </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {ms.is_llm_assisted ? (
-                                                    <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/20 text-purple-600">
-                                                        Yes
-                                                    </Badge>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground">No</span>
-                                                )}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground text-sm">
                                                 {new Date(ms.updated_at).toLocaleString()}
