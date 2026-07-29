@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Broadcasting\Events\MasterSynthesisUpdated;
 use App\Broadcasting\Events\SynthesisSubmitted;
 use App\Jobs\LlmExtractionJob;
+use App\Jobs\LlmSynthesisDraftJob;
 use App\Jobs\LlmSynthesisSummaryJob;
 use App\Jobs\ReportGenerationJob;
 use App\Models\ConsensusNote;
@@ -16,7 +17,9 @@ use App\Models\Response;
 use App\Models\SynthesisCustomQuery;
 use App\Models\SynthesisDraft;
 use App\Models\SynthesisGroupAssignment;
+use App\Models\SynthesisKeyPoint;
 use App\Models\SynthesisSummary;
+use App\Services\LlmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -315,6 +318,27 @@ class SynthesisController extends Controller
     }
 
     /**
+     * Generate AI-assisted synthesis for notes (summarizes user ConsensusNotes into SynthesisDraft).
+     */
+    public function generateAiAssistedSynthesis(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        // Dispatch background synthesis job to summarize consensus notes into user draft
+        LlmSynthesisDraftJob::dispatch($conversation->id, $user->id);
+
+        return back()->with([
+            'success' => 'AI synthesis from notes started. Your draft will update shortly.',
+        ]);
+    }
+
+    /**
      * Handle a custom LLM query from the synthesis review page.
      * 
      * The synthesis member can use custom prompts for synthesis focus areas not covered by the 3 main categories.
@@ -450,34 +474,28 @@ class SynthesisController extends Controller
             ];
         });
 
-        // Fetch all submissions for this conversation
-        $submissions = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->with(['synthesis', 'customQueries'])
-            ->orderBy('submission_number')
+        // Fetch all submitted SynthesisDraft records for this conversation
+        $drafts = SynthesisDraft::where('conversation_id', $conversation->id)
+            ->with('user')
+            ->orderBy('updated_at')
             ->get();
 
-        $submissions = $submissions->map(function ($s) {
+        $submissions = $drafts->map(function ($d) {
             return [
-                'id' => $s->id,
-                'submission_number' => $s->submission_number,
+                'id' => $d->id,
+                'submission_number' => 1,
                 'user' => [
-                    'id' => $s->synthesis->id,
-                    'name' => $s->synthesis->name,
-                    'email' => $s->synthesis->email,
+                    'id' => $d->user->id,
+                    'name' => $d->user->name,
+                    'email' => $d->user->email,
                 ],
-                'convergence_text' => $s->convergence_text,
-                'consideration_text' => $s->consideration_text,
-                'proposals_text' => $s->proposals_text,
-                'other_text' => $s->other_text,
-                'status' => $s->status,
-                'submitted_at' => $s->submitted_at?->toIso8601String(),
-                'custom_queries' => $s->customQueries->map(fn($q) => [
-                    'id' => $q->id,
-                    'prompt' => $q->prompt,
-                    'response' => $q->response,
-                    'provider' => $q->provider,
-                    'created_at' => $q->created_at->toIso8601String(),
-                ]),
+                'convergence_text' => $d->convergence_text,
+                'consideration_text' => $d->consideration_text,
+                'proposals_text' => $d->proposals_text,
+                'other_text' => $d->other_text,
+                'status' => $d->is_submitted ? 'submitted' : 'draft',
+                'submitted_at' => $d->submitted_at?->toIso8601String(),
+                'custom_queries' => [],
             ];
         });
 
@@ -875,6 +893,7 @@ class SynthesisController extends Controller
         $document = (object)[
             'title' => $conversation->title . ' — Synthesis Report',
             'content_json' => null,
+            'emerging_themes' => null,
         ];
 
         $html = view('pdf.synthesis-booklet', [
@@ -946,6 +965,42 @@ class SynthesisController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    /**
+     * Save/update notes for all groups in one batch request.
+     * Accepts an array of { group_id, notes } objects and upserts each.
+     * Returns 204 No Content so the browser doesn't display a JSON popup.
+     */
+    public function saveBatchConsensusNotes(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $validated = $request->validate([
+            'notes' => 'required|array',
+            'notes.*.group_id' => 'required|exists:groups,id',
+            'notes.*.text' => 'nullable|string',
+        ]);
+
+        foreach ($validated['notes'] as $item) {
+            ConsensusNote::updateOrCreate(
+                [
+                    'conversation_id' => $conversation->id,
+                    'user_id' => $user->id,
+                    'group_id' => $item['group_id'],
+                ],
+                ['text' => $item['text'] ?? null]
+            );
+        }
+
+        return response()->noContent();
+    }
+
 
     /**
      * Get all notes for current user's assigned groups.
@@ -1085,11 +1140,46 @@ class SynthesisController extends Controller
             return back()->withErrors(['submission' => 'No draft to submit or already submitted.']);
         }
 
-        // Mark as submitted
+        // Mark draft as submitted
         $draft->update([
             'is_submitted' => true,
             'submitted_at' => now(),
         ]);
+
+        // Sync or create corresponding MasterSynthesis submission so it appears on collaborate.tsx
+        $masterReport = MasterSynthesis::where('conversation_id', $conversation->id)
+            ->where('synthesis_id', $user->id)
+            ->where('is_master_synthesis', false)
+            ->first();
+
+        if ($masterReport) {
+            $masterReport->update([
+                'convergence_text' => $draft->convergence_text,
+                'consideration_text' => $draft->consideration_text,
+                'proposals_text' => $draft->proposals_text,
+                'other_text' => $draft->other_text,
+                'status' => 'submitted',
+                'is_submitted' => true,
+                'submitted_at' => now(),
+            ]);
+        } else {
+            $nextNumber = MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id);
+            $masterReport = MasterSynthesis::create([
+                'conversation_id' => $conversation->id,
+                'synthesis_id' => $user->id,
+                'submission_number' => $nextNumber,
+                'convergence_text' => $draft->convergence_text,
+                'consideration_text' => $draft->consideration_text,
+                'proposals_text' => $draft->proposals_text,
+                'other_text' => $draft->other_text,
+                'is_master_synthesis' => false,
+                'status' => 'submitted',
+                'is_submitted' => true,
+                'submitted_at' => now(),
+            ]);
+        }
+
+        event(new SynthesisSubmitted($conversation->id, $masterReport));
 
         // Auto-trigger summary check: if all assigned members have submitted, dispatch summary job
         $this->checkAndAutoTriggerSummary($request, $conversation);
@@ -1309,5 +1399,110 @@ class SynthesisController extends Controller
         ReportGenerationJob::dispatch($report);
 
         return redirect()->route('synthesis.collaborate', ['conversation' => $conversation])->with('success', 'Master synthesis submitted successfully. Report generation has started.');
+    }
+
+    /**
+     * Extract key points from master synthesis using LLM.
+     */
+    public function extractKeyPoints(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $validated = $request->validate([
+            'max_key_points' => 'required|integer|min:1|max:10',
+            'master_synthesis_id' => 'required|integer',
+        ]);
+
+        // Get the master synthesis
+        $masterSynthesis = MasterSynthesis::where('conversation_id', $conversation->id)
+            ->findOrFail($validated['master_synthesis_id']);
+
+        // Combine all master synthesis content
+        $synthesisContent = collect([
+            'Convergence: ' . ($masterSynthesis->convergence_text ?? ''),
+            'Matters for Consideration: ' . ($masterSynthesis->consideration_text ?? ''),
+            'Proposals: ' . ($masterSynthesis->proposals_text ?? ''),
+            'Others: ' . ($masterSynthesis->other_text ?? ''),
+        ])->filter()->values()->implode("\n\n");
+
+        if (empty(trim($synthesisContent))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No master synthesis content available to extract key points from.',
+            ], 422);
+        }
+
+        // Call LLM service to extract key points
+        $llmService = app(LlmService::class);
+        $result = $llmService->extractKeyPoints($synthesisContent, $validated['max_key_points']);
+
+        // Parse the response into bullet points
+        $keyPointsText = $result['content'];
+        $keyPointsArray = array_filter(
+            array_map('trim', explode("\n", $keyPointsText)),
+            fn($line) => str_starts_with($line, '-')
+        );
+
+        // Store the key points in the database
+        $synthesisKeyPoint = SynthesisKeyPoint::create([
+            'conversation_id' => $conversation->id,
+            'master_synthesis_id' => $masterSynthesis->id,
+            'user_id' => $user->id,
+            'source_category' => 'all',
+            'key_points_text' => $keyPointsText,
+            'key_points' => array_values($keyPointsArray),
+            'requested_count' => $validated['max_key_points'],
+            'provider' => $result['provider'],
+            'status' => $result['success'] ? 'completed' : 'failed',
+            'completed_at' => $result['success'] ? now() : null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'key_points' => [
+                'id' => $synthesisKeyPoint->id,
+                'key_points_text' => $synthesisKeyPoint->key_points_text,
+                'key_points' => $synthesisKeyPoint->key_points ?? [],
+                'requested_count' => $synthesisKeyPoint->requested_count,
+                'provider' => $synthesisKeyPoint->provider,
+            ],
+        ]);
+    }
+
+    /**
+     * Get key points for a conversation.
+     */
+    public function getKeyPoints(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $keyPoints = SynthesisKeyPoint::where('conversation_id', $conversation->id)
+            ->where('master_synthesis_id', $request->input('master_synthesis_id'))
+            ->completed()
+            ->orderByDesc('created_at')
+            ->first();
+
+        return response()->json([
+            'key_point' => $keyPoints ? [
+                'id' => $keyPoints->id,
+                'key_points_text' => $keyPoints->key_points_text,
+                'key_points' => $keyPoints->key_points ?? [],
+                'requested_count' => $keyPoints->requested_count,
+                'provider' => $keyPoints->provider,
+                'created_at' => $keyPoints->created_at?->toIso8601String(),
+            ] : null,
+        ]);
     }
 }

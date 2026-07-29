@@ -63,12 +63,12 @@ export function getPastoralNavigation(): NavItem[] {
         },
         {
             title: 'Pastoral Reports',
-            href: '/pastoral/reports',
+            href: '/pastoral/dashboard',
             icon: null as any,
         },
         {
             title: 'Decisions',
-            href: '/pastoral/decisions',
+            href: '/pastoral/dashboard',
             icon: null as any,
         },
     ];

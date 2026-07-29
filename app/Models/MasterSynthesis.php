@@ -120,7 +120,7 @@ class MasterSynthesis extends Model
      */
     public function customQueries(): HasMany
     {
-        return $this->hasMany(SynthesisCustomQuery::class);
+        return $this->hasMany(SynthesisCustomQuery::class, 'synthesis_report_id');
     }
 
     /**

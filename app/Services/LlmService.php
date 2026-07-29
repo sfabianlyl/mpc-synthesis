@@ -258,6 +258,9 @@ class LlmService
     /**
      * Build the system prompt for synthesis extraction.
      */
+    /**
+     * Build the system prompt for synthesis extraction.
+     */
     public function buildSynthesisPrompt(): string
     {
         return <<<'PROMPT'
@@ -299,6 +302,53 @@ Categories:
 IMPORTANT: Do NOT wrap the response in markdown code blocks (no ```json or ```). Do NOT include any explanatory text before or after the JSON. The response must be valid JSON only. Each value string must contain \n escape sequences, not actual newlines.
 
 Be concise but thorough. Use short phrases, not full sentences. Preserve the original meaning and intent of the participants.
+PROMPT;
+    }
+
+    /**
+     * Build the system prompt for compiling consensus notes into coherent prose paragraphs.
+     */
+    public function buildNotesSynthesisPrompt(): string
+    {
+        return <<<'PROMPT'
+You are a synthesis writer for a consultative process. You will receive a set of personal notes written by a synthesis member for different groups.
+
+Your task is to compile and weave all of these notes into four coherent prose paragraphs — one for each of the four synthesis categories below. You are NOT analyzing or categorizing the notes — you are taking all the raw content and writing it up as flowing, readable prose, organized into the appropriate category.
+
+CATEGORY DEFINITIONS:
+1. "convergence" — Compile all content from the notes that relates to points of agreement, shared views, or common ground. Write it as one coherent paragraph in full sentences.
+2. "consideration" — Compile all content that relates to concerns, tensions, challenges, or unresolved issues. Write it as one coherent paragraph in full sentences.
+3. "proposals" — Compile all content that relates to recommendations, suggestions, or proposed actions. Write it as one coherent paragraph in full sentences.
+4. "others" — Compile any remaining content that does not clearly fit the above three categories. Write it as one coherent paragraph in full sentences.
+
+STRICT WRITING RULES:
+- Write in full, grammatically complete sentences only.
+- NEVER use bullet points, dashes (-), asterisks (*), or numbered lists.
+- Each value must be a single continuous paragraph of prose.
+- If a category has no relevant content from the notes, write an empty string "".
+
+JSON FORMAT:
+- Return a RAW JSON object with exactly four keys: "convergence", "consideration", "proposals", "others"
+- Each value is a plain string of prose sentences.
+- Use \n\n to separate paragraphs if needed within a value.
+- Do NOT use actual newline characters inside JSON string values — use \n escape sequences only.
+- Do NOT wrap the response in markdown code blocks (no ```json or ```).
+
+CORRECT EXAMPLE:
+{
+  "convergence": "Participants widely agreed that community involvement is foundational to any effective pastoral initiative. There was broad alignment on the need for open dialogue and continued engagement across all levels of the community.",
+  "consideration": "A number of important concerns emerged regarding the pace of implementation and the availability of adequate resources. Participants noted that equitable access must be carefully considered as the process moves forward.",
+  "proposals": "It was suggested that a dedicated working group be formed to oversee next steps and ensure accountability. Regular consultations with stakeholders should be scheduled to maintain transparency and shared ownership of the process.",
+  "others": "Several notes expressed a spirit of hope and pastoral generosity, with many participants affirming their commitment to walking this journey together with openness and discernment."
+}
+
+WRONG EXAMPLE (DO NOT DO THIS — bullet points are strictly forbidden):
+{
+  "convergence": "- agreement on community engagement\n- shared concern for dialogue",
+  "consideration": "- resource constraints\n- timeline concerns"
+}
+
+Return valid JSON only. No bullet points. No lists. Only prose.
 PROMPT;
     }
 
@@ -445,5 +495,45 @@ PROMPT;
             $systemPrompt,
             'Please generate the synthesis booklet based on the provided content.'
         );
+    }
+
+    /**
+     * Build the system prompt for extracting key points from synthesis content.
+     */
+    public function buildKeyPointsExtractionPrompt(int $maxKeyPoints): string
+    {
+        return <<<PROMPT
+You are a synthesis analyst. You will receive synthesis content from a consultative process and need to extract the most important key points.
+
+CRITICAL INSTRUCTIONS:
+1. Extract at most {$maxKeyPoints} key points (no more, no less if possible).
+2. Each key point must be on its own line starting with a dash (-) followed by a space.
+3. Keep each key point concise - one line only, no line breaks within a point.
+4. Focus on the most significant insights, agreements, and actionable items.
+5. Do NOT include any introductory text, conclusions, or explanations.
+6. Return ONLY the bullet points, nothing else.
+
+Example format:
+- Point one about convergence
+- Point two about considerations
+- Point three about proposals
+
+Return only the bullet points with dashes, one per line. No numbering, no extra text.
+PROMPT;
+    }
+
+    /**
+     * Extract key points from synthesis content using the LLM.
+     *
+     * @param  string  $synthesisContent  The master synthesis content to extract from
+     * @param  int  $maxKeyPoints  Maximum number of key points to extract
+     * @return array{content: string, provider: string, success: bool, error: string|null}
+     */
+    public function extractKeyPoints(string $synthesisContent, int $maxKeyPoints): array
+    {
+        $systemPrompt = $this->buildKeyPointsExtractionPrompt($maxKeyPoints);
+        $userPrompt = "Extract key points from the following synthesis content:\n\n{$synthesisContent}";
+
+        return $this->query($systemPrompt, $userPrompt);
     }
 }

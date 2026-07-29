@@ -135,14 +135,22 @@ export default function Review({
         [conversation?.id]
     );
 
-    const debouncedSaveNote = useMemo(
-        () => debounce((groupId: number, text: string) => {
+    // Debounced batch save: saves ALL current notes in one request using fetch
+    // so that quickly tabbing between boxes doesn't lose unsaved changes.
+    const debouncedSaveNotes = useMemo(
+        () => debounce((notes: Record<number, string>) => {
             if (!conversation?.id) return;
-            router.post(`/synthesis/consensus-note/${conversation.id}`, {
-                group_id: groupId,
-                notes: text,
-            }, {
-                preserveScroll: true,
+            const payload = Object.entries(notes).map(([groupId, text]) => ({
+                group_id: Number(groupId),
+                text,
+            }));
+            fetch(`/synthesis/consensus-notes-batch/${conversation.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                },
+                body: JSON.stringify({ notes: payload }),
             });
         }, 2000),
         [conversation?.id]
@@ -156,10 +164,14 @@ export default function Review({
         debouncedSaveDraft(field, value);
     };
 
-    // Handle note changes with autosave
+    // Handle note changes with autosave — passes entire updated notes map
+    // to the debounced batch saver so all boxes are captured in one request.
     const handleNoteChange = (groupId: number, text: string) => {
-        setGroupNotes((prev) => ({ ...prev, [groupId]: text }));
-        debouncedSaveNote(groupId, text);
+        setGroupNotes((prev) => {
+            const updated = { ...prev, [groupId]: text };
+            debouncedSaveNotes(updated);
+            return updated;
+        });
     };
 
     // Trigger LLM extraction

@@ -85,12 +85,12 @@ function useNavItems(): { items: NavItem[]; isDiscernment: boolean; mode: Discer
         });
         items.push({
             title: 'Pastoral Reports',
-            href: '/pastoral/reports',
+            href: '/pastoral/dashboard',
             icon: FileText,
         });
         items.push({
             title: 'Decisions',
-            href: '/pastoral/decisions',
+            href: '/pastoral/dashboard',
             icon: ClipboardList,
         });
     }

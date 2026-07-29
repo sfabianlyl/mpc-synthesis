@@ -118,7 +118,7 @@ export default function Dashboard({ currentMode }: PageProps) {
                                         <ArrowRight className="size-4 text-muted-foreground" />
                                     </div>
                                 </Link>
-                                <Link href="/pastoral/reports" className="block">
+                                <Link href="/pastoral/dashboard" className="block">
                                     <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <FileText className="size-4 text-muted-foreground" />
@@ -127,7 +127,7 @@ export default function Dashboard({ currentMode }: PageProps) {
                                         <ArrowRight className="size-4 text-muted-foreground" />
                                     </div>
                                 </Link>
-                                <Link href="/pastoral/decisions" className="block">
+                                <Link href="/pastoral/dashboard" className="block">
                                     <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <ClipboardList className="size-4 text-muted-foreground" />

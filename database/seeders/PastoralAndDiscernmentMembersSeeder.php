@@ -19,7 +19,7 @@ class PastoralAndDiscernmentMembersSeeder extends Seeder
 
         // First names for generating user accounts
         $pastoralFirstNames = [
-            'Antonio', 'Maria', 'Jose', 'Rosa', 'Carlos',
+            'daryl', 'Maria', 'Jose', 'Rosa', 'Carlos',
             'Ana', 'Pedro', 'Luz', 'Juan', 'Carmen',
             'Miguel', 'Teresa', 'Francisco', 'Isabel', 'Diego',
         ];
@@ -33,7 +33,7 @@ class PastoralAndDiscernmentMembersSeeder extends Seeder
         foreach ($dioceses as $diocese) {
             for ($i = 1; $i <= 3; $i++) {
                 $firstName = $pastoralFirstNames[($diocese->id - 1) * 3 + $i - 1] ?? 'Pastoral';
-                $email = strtolower($firstName.'.pastoral'.$i.'@'.strtolower($diocese->code).'.example.com');
+                $email = strtolower($firstName.'@'.'gerejakatolik.my');
 
                 User::firstOrCreate(
                     ['email' => $email],
@@ -52,12 +52,12 @@ class PastoralAndDiscernmentMembersSeeder extends Seeder
         foreach ($dioceses as $diocese) {
             for ($i = 1; $i <= 2; $i++) {
                 $firstName = $discernmentFirstNames[($diocese->id - 1) * 2 + $i - 1] ?? 'Discernment';
-                $email = strtolower($firstName.'.discernment'.$i.'@'.strtolower($diocese->code).'.example.com');
+                $email = strtolower($firstName.'@'.'gerejakatolik.my');
 
                 User::firstOrCreate(
                     ['email' => $email],
                     [
-                        'name' => $firstName.' Discernment '.$i,
+                        'name' => $firstName.' Discernment ',
                         'role' => 'discernment',
                         'diocese_id' => $diocese->id,
                         'password' => bcrypt('password'),

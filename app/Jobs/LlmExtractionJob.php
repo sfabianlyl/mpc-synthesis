@@ -41,6 +41,13 @@ class LlmExtractionJob implements ShouldQueue
             ->whereHas('conversations', fn($q) => $q->where('conversations.id', $this->conversationId))
             ->pluck('id');
 
+        if ($assignedGroupIds->isEmpty()) {
+            $assignedGroupIds = Response::where('conversation_id', $this->conversationId)
+                ->whereNotNull('submitted_at')
+                ->pluck('group_id')
+                ->unique();
+        }
+
         // Fetch consensus texts from submitted responses and consensus notes
         $responseConsensusTexts = Response::whereIn('group_id', $assignedGroupIds)
             ->where('conversation_id', $this->conversationId)
@@ -49,8 +56,7 @@ class LlmExtractionJob implements ShouldQueue
             ->filter()
             ->implode("\n\n---\n\n");
 
-        $noteConsensusTexts = ConsensusNote::whereIn('group_id', $assignedGroupIds)
-            ->where('conversation_id', $this->conversationId)
+        $noteConsensusTexts = ConsensusNote::where('conversation_id', $this->conversationId)
             ->where('user_id', $this->userId)
             ->whereNotNull('text')
             ->pluck('text')

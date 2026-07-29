@@ -1,9 +1,10 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { CheckCircle2, XCircle, Loader2, FileText, Users, Sparkles, ChevronDown, ChevronUp, Pencil, Clock, MessageSquare } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, FileText, Users, Sparkles, ChevronDown, ChevronUp, Pencil, Clock, MessageSquare, Brain } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import type { SynthesisSubmission, MasterSynthesisReport, EnrichedDocumentChunk } from '@/types/models';
@@ -167,6 +168,11 @@ export default function Collaborate({
     // Expand all master synthesis state
     const [showAllMasterSynthesis, setShowAllMasterSynthesis] = useState(false);
     
+    // Key points extraction state
+    const [keyPointsCount, setKeyPointsCount] = useState(5);
+    const [keyPointsText, setKeyPointsText] = useState('');
+    const [isExtractingKeyPoints, setIsExtractingKeyPoints] = useState(false);
+    
     // Active editing category indicator (for real-time collaboration)
     const [activeEditingCategory, setActiveEditingCategory] = useState<string | null>(null);
 
@@ -237,10 +243,16 @@ export default function Collaborate({
         }, {});
 
     // Group submissions by category for display
-    const getSubmissionsByCategory = useCallback((category: string) => {
+    const getSubmissionsByCategory = useCallback((categoryKey: string) => {
+        const fieldName = categoryKey === 'consideration' 
+            ? 'consideration_text' 
+            : categoryKey === 'others' 
+            ? 'other_text' 
+            : `${categoryKey}_text`;
+
         return submissionsLocal.map((s) => ({
             ...s,
-            text: (s as unknown as Record<string, unknown>)[`${category}_text`] as string | null,
+            text: (s as unknown as Record<string, unknown>)[fieldName] as string | null,
         }));
     }, [submissionsLocal]);
 
@@ -359,6 +371,34 @@ export default function Collaborate({
 
     // Check if current user can edit (admin or drafter role)
     const canEditMaster = currentUser.role === 'admin' || currentUser.role === 'drafter';
+
+    // Extract key points handler
+    const handleExtractKeyPoints = () => {
+        if (!masterSynthesisLocal?.id) {
+            return;
+        }
+
+        setIsExtractingKeyPoints(true);
+        router.post(
+            `/synthesis/extract-key-points/${conversation.id}`,
+            {
+                max_key_points: keyPointsCount,
+                master_synthesis_id: masterSynthesisLocal.id,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: (page: any) => {
+                    setIsExtractingKeyPoints(false);
+                    if (page.props.keyPoints?.key_points_text) {
+                        setKeyPointsText(page.props.keyPoints.key_points_text);
+                    }
+                },
+                onError: () => {
+                    setIsExtractingKeyPoints(false);
+                },
+            }
+        );
+    };
 
     return (
         <>
@@ -703,7 +743,70 @@ export default function Collaborate({
                     )}
                 </Card>
 
-                {/* ─── Action Bar ─────────────────────────────────── */}
+                {/* ─── Extract Key Points ─────────────────────────── */}
+                {masterSynthesisLocal?.id && (
+                    <Card className="border-sidebar-border/50">
+                        <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
+                            <CardTitle className="text-lg flex items-center gap-2">
+                                <Brain className="size-5 text-purple-600 dark:text-purple-400" />
+                                Extract Key Points from Master Synthesis
+                            </CardTitle>
+                            <CardDescription>
+                                Use AI to extract the most important key points from the master synthesis content
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6 space-y-4">
+                            {/* Number input and button row */}
+                            <div className="flex items-center gap-4 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor="key-points-count" className="text-sm font-medium whitespace-nowrap">
+                                        Number of Key Points:
+                                    </label>
+                                    <Input
+                                        id="key-points-count"
+                                        type="number"
+                                        min={1}
+                                        max={10}
+                                        value={keyPointsCount}
+                                        onChange={(e) => setKeyPointsCount(parseInt(e.target.value) || 1)}
+                                        className="w-20"
+                                    />
+                                </div>
+                                <Button
+                                    onClick={handleExtractKeyPoints}
+                                    disabled={isExtractingKeyPoints || !masterSynthesisLocal.id}
+                                    className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700"
+                                >
+                                    {isExtractingKeyPoints && <Loader2 className="size-4 animate-spin" />}
+                                    <Sparkles className="size-4" />
+                                    Extract Key Points
+                                </Button>
+                            </div>
+
+                            {/* Key Points Textarea */}
+                            {(keyPointsText || isExtractingKeyPoints) && (
+                                <div>
+                                    <label className="text-sm font-medium mb-1 block flex items-center gap-2">
+                                        <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                        Extracted Key Points (Editable)
+                                    </label>
+                                    <textarea
+                                        value={keyPointsText}
+                                        onChange={(e) => setKeyPointsText(e.target.value)}
+                                        rows={8}
+                                        placeholder={isExtractingKeyPoints ? 'Extracting key points...' : 'Key points will appear here...'}
+                                        className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Edit the extracted key points as needed. Each point should be on its own line starting with a dash (-).
+                                    </p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* ─── Action Bar ─────────────��───────────────────── */}
                 <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4 border-t">
                     <div className="flex items-center gap-3">
                         <Link href={`/synthesis/review/${conversation.id}`}>

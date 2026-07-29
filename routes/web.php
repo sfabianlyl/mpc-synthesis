@@ -44,6 +44,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         // Consensus notes
         Route::post('consensus-note/{conversation}', [SynthesisController::class, 'saveConsensusNote'])->name('consensus-note.save');
+        Route::post('consensus-notes-batch/{conversation}', [SynthesisController::class, 'saveBatchConsensusNotes'])->name('consensus-notes.batch');
         Route::get('consensus-notes/{conversation}', [SynthesisController::class, 'getConsensusNotes'])->name('consensus-notes');
         
         // Extraction
@@ -92,6 +93,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('report/{report}/submit', [SynthesisController::class, 'submit'])->name('report.submit');
         Route::post('custom-query/{conversation}', [SynthesisController::class, 'customQuery'])->name('custom-query');
         Route::delete('custom-query/{query}', [SynthesisController::class, 'deleteCustomQuery'])->name('custom-query.delete');
+        
+        // Key Points Extraction
+        Route::post('extract-key-points/{conversation}', [SynthesisController::class, 'extractKeyPoints'])->name('extract-key-points');
+        Route::get('key-points/{conversation}', [SynthesisController::class, 'getKeyPoints'])->name('key-points');
         
         // Export Booklet
         Route::get('export-booklet/{conversation}', [SynthesisController::class, 'exportBooklet'])->name('export-booklet');

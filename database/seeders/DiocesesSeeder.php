@@ -15,15 +15,16 @@ class DiocesesSeeder extends Seeder
     public function run(): void
     {
         $dioceses = [
-            ['code' => 'DIOS1', 'name' => 'Archdiocese of Manila'],
-            ['code' => 'DIOS2', 'name' => 'Diocese of Cubao'],
-            ['code' => 'DIOS3', 'name' => 'Diocese of Pasig'],
-            ['code' => 'DIOS4', 'name' => 'Archdiocese of Cebu'],
-            ['code' => 'DIOS5', 'name' => 'Diocese of Lapu-Lapu'],
-            ['code' => 'DIOS6', 'name' => 'Archdiocese of Davao'],
-            ['code' => 'DIOS7', 'name' => 'Diocese of Zamboanga'],
-            ['code' => 'DIOS8', 'name' => 'Archdiocese of Lingayen-Dagupan'],
-            ['code' => 'DIOS9', 'name' => 'Diocese of San Carlos'],
+            ['code' => 'DIOS1', 'name' => 'Archdiocese of Kuala Lumpur'],
+            ['code' => 'DIOS2', 'name' => 'Diocese of Penang'],
+            ['code' => 'DIOS3', 'name' => 'Diocese of Melaka-Johore'],
+            ['code' => 'DIOS4', 'name' => 'Archdiocese of Kuching'],
+            ['code' => 'DIOS5', 'name' => 'Diocese of Sibu'],
+
+            ['code' => 'DIOS7', 'name' => 'Diocese of Miri'],
+            ['code' => 'DIOS6', 'name' => 'Archdiocese of Kota Kinabalu'],
+            ['code' => 'DIOS8', 'name' => 'Diocese of Sandakan'],
+            ['code' => 'DIOS9', 'name' => 'Diocese of Keningau'],
         ];
 
         foreach ($dioceses as $diocese) {
