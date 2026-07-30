@@ -34,6 +34,7 @@ interface SynthesisDraft {
     convergence_text: string | null;
     consideration_text: string | null;
     proposals_text: string | null;
+    other_text: string | null;
     is_submitted: boolean;
     submitted_at: string | null;
 }
@@ -67,11 +68,19 @@ export default function Review({
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [analysisMessage, setAnalysisMessage] = useState('');
     const [extractionDisabled, setExtractionDisabled] = useState(false);
+    
+    // Local state for extraction results (for immediate display)
+    const [extractionResults, setExtractionResults] = useState<{
+        convergence_text: string | null;
+        consideration_text: string | null;
+        proposals_text: string | null;
+    } | null>(null);
 
     // Local state for draft fields
     const [convergenceText, setConvergenceText] = useState(draft?.convergence_text ?? '');
     const [considerationText, setConsiderationText] = useState(draft?.consideration_text ?? '');
     const [proposalsText, setProposalsText] = useState(draft?.proposals_text ?? '');
+    const [othersText, setOthersText] = useState(draft?.other_text ?? '');
 
     // Local state for notes per group
     const [groupNotes, setGroupNotes] = useState<Record<number, string>>(() => {
@@ -106,12 +115,16 @@ export default function Review({
             return;
         }
 
-        router.get(`/synthesis/can-trigger-extraction/${conversation.id}`, {}, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const canTrigger = page.props.canTrigger;
-                setExtractionDisabled(canTrigger === false);
+        fetch(`/synthesis/can-trigger-extraction/${conversation.id}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
             },
+        }).then(res => res.json()).then(data => {
+            setExtractionDisabled(data.can_trigger === false);
+        }).catch(() => {
+            setExtractionDisabled(false);
         });
     }, [conversation?.id, extraction?.is_successful, initialCanTrigger]);
 
@@ -121,15 +134,24 @@ export default function Review({
             setConvergenceText(draft.convergence_text ?? '');
             setConsiderationText(draft.consideration_text ?? '');
             setProposalsText(draft.proposals_text ?? '');
+            setOthersText(draft.other_text ?? '');
         }
     }, [draft]);
 
-    // Debounced save handlers with 2s delay
+    // Debounced save handlers with 2s delay — uses fetch to avoid Inertia popup
     const debouncedSaveDraft = useMemo(
         () => debounce((field: string, value: string) => {
             if (!conversation?.id) return;
-            router.patch(`/synthesis/draft/${conversation.id}`, { [field]: value }, {
-                preserveScroll: true,
+            fetch(`/synthesis/draft/${conversation.id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ [field]: value }),
+            }).catch(() => {
+                // Silently fail — autosave errors should not disrupt the user
             });
         }, 2000),
         [conversation?.id]
@@ -151,16 +173,19 @@ export default function Review({
                     'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
                 },
                 body: JSON.stringify({ notes: payload }),
+            }).catch(() => {
+                // Silently fail
             });
         }, 2000),
         [conversation?.id]
     );
 
     // Handle draft field changes with autosave
-    const handleDraftChange = (field: 'convergence_text' | 'consideration_text' | 'proposals_text', value: string) => {
+    const handleDraftChange = (field: 'convergence_text' | 'consideration_text' | 'proposals_text' | 'other_text', value: string) => {
         if (field === 'convergence_text') setConvergenceText(value);
         if (field === 'consideration_text') setConsiderationText(value);
         if (field === 'proposals_text') setProposalsText(value);
+        if (field === 'other_text') setOthersText(value);
         debouncedSaveDraft(field, value);
     };
 
@@ -174,62 +199,118 @@ export default function Review({
         });
     };
 
-    // Trigger LLM extraction
-    const handleTriggerExtraction = () => {
+    // Trigger LLM extraction — synchronous call with immediate result display
+    const handleTriggerExtraction = async () => {
         if (!conversation?.id) return;
         setIsExtracting(true);
-        router.post(`/synthesis/extract/${conversation.id}`, {}, {
-            preserveScroll: true,
-            onSuccess: () => {
+        setAnalysisStatus('idle');
+        setExtractionResults(null);
+        try {
+            const res = await fetch(`/synthesis/extract-sync/${conversation.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                    'Accept': 'application/json',
+                },
+            });
+            const data = await res.json();
+            if (data.success) {
+                setExtractionResults({
+                    convergence_text: data.convergence_text ?? null,
+                    consideration_text: data.consideration_text ?? null,
+                    proposals_text: data.proposals_text ?? null,
+                });
                 setAnalysisStatus('success');
-                setAnalysisMessage('Extraction job dispatched. Results will appear shortly.');
-                setTimeout(() => setAnalysisStatus('idle'), 3000);
-            },
-            onError: () => {
+                setAnalysisMessage('Extraction completed successfully.');
+                setTimeout(() => {
+                    setAnalysisStatus('idle');
+                    setAnalysisMessage('');
+                }, 5000);
+            } else {
                 setAnalysisStatus('error');
-                setAnalysisMessage('Failed to trigger extraction.');
-            },
-        });
+                setAnalysisMessage(data.message || 'Failed to extract.');
+            }
+        } catch {
+            setAnalysisStatus('error');
+            setAnalysisMessage('Failed to extract.');
+        } finally {
+            setIsExtracting(false);
+        }
     };
 
-    // Trigger LLM synthesis (from notes)
-    const handleTriggerSynthesis = () => {
+    // Trigger LLM synthesis (from notes) — synchronous call with immediate result display
+    const handleTriggerSynthesis = async () => {
         if (!conversation?.id || !draft?.id) return;
         setIsSynthesizing(true);
-        // Use the existing ai-synthesis endpoint with draft data
-        router.post(`/synthesis/ai-synthesis/${conversation.id}`, {
-            selected_group_ids: [],
-            convergence_text: convergenceText,
-            consideration_text: considerationText,
-            proposals_text: proposalsText,
-        }, {
-            preserveScroll: true,
-            onSuccess: () => {
+        setAnalysisStatus('idle');
+        try {
+            const res = await fetch(`/synthesis/synthesize-draft-sync/${conversation.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    selected_group_ids: [],
+                    convergence_text: convergenceText,
+                    consideration_text: considerationText,
+                    proposals_text: proposalsText,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                // Update the draft fields with the LLM results
+                setConvergenceText(data.convergence_text ?? convergenceText);
+                setConsiderationText(data.consideration_text ?? considerationText);
+                setProposalsText(data.proposals_text ?? proposalsText);
+                setOthersText(data.other_text ?? othersText);
                 setAnalysisStatus('success');
                 setAnalysisMessage('Synthesis generated successfully.');
-                setTimeout(() => setAnalysisStatus('idle'), 3000);
-            },
-            onError: () => {
+                setTimeout(() => {
+                    setAnalysisStatus('idle');
+                    setAnalysisMessage('');
+                }, 5000);
+            } else {
                 setAnalysisStatus('error');
-                setAnalysisMessage('Failed to generate synthesis.');
-            },
-        });
+                setAnalysisMessage(data.message || 'Failed to generate synthesis.');
+            }
+        } catch {
+            setAnalysisStatus('error');
+            setAnalysisMessage('Failed to generate synthesis.');
+        } finally {
+            setIsSynthesizing(false);
+        }
     };
 
-    // Submit draft
+    // Submit draft — uses fetch to avoid Inertia popup
     const handleSubmitDraft = () => {
         if (!conversation?.id) return;
         setIsSubmitting(true);
-        router.post(`/synthesis/submit-draft/${conversation.id}`, {}, {
-            preserveScroll: true,
-            onSuccess: () => {
+        fetch(`/synthesis/submit-draft/${conversation.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                'Accept': 'application/json',
+            },
+        }).then(res => res.json()).then(data => {
+            if (data.success) {
                 setAnalysisStatus('success');
-                setAnalysisMessage('Synthesis submitted successfully.');
-            },
-            onError: () => {
+                setAnalysisMessage(data.message || 'Synthesis submitted successfully.');
+                setTimeout(() => setAnalysisStatus('idle'), 3000);
+                // Reload page to reflect changes
+                window.location.href = `/synthesis/collaborate/${conversation.id}`;
+            } else {
                 setAnalysisStatus('error');
-                setAnalysisMessage('Failed to submit synthesis.');
-            },
+                setAnalysisMessage(data.message || 'Failed to submit synthesis.');
+            }
+        }).catch(() => {
+            setAnalysisStatus('error');
+            setAnalysisMessage('Failed to submit synthesis.');
+        }).finally(() => {
+            setIsSubmitting(false);
         });
     };
 
@@ -424,25 +505,25 @@ export default function Review({
                                     </p>
                                 )}
 
-                                {/* Display extraction results (read-only) */}
-                                {extraction?.is_successful && (
+                                {/* Display extraction results (read-only) — shows sync results or API extraction */}
+                                {(extractionResults || extraction?.is_successful) && (
                                     <>
                                         <div>
                                             <label className="text-sm font-medium text-blue-700">Convergence</label>
                                             <div className="bg-blue-50/50 border rounded-md p-3 min-h-[60px] mt-1">
-                                                {renderExtractionText(extraction.convergence_text)}
+                                                {renderExtractionText(extractionResults?.convergence_text ?? extraction?.convergence_text ?? null)}
                                             </div>
                                         </div>
                                         <div>
                                             <label className="text-sm font-medium text-purple-700">Matters for Consideration</label>
                                             <div className="bg-purple-50/50 border rounded-md p-3 min-h-[60px] mt-1">
-                                                {renderExtractionText(extraction.consideration_text)}
+                                                {renderExtractionText(extractionResults?.consideration_text ?? extraction?.consideration_text ?? null)}
                                             </div>
                                         </div>
                                         <div>
                                             <label className="text-sm font-medium text-green-700">Proposals</label>
                                             <div className="bg-green-50/50 border rounded-md p-3 min-h-[60px] mt-1">
-                                                {renderExtractionText(extraction.proposals_text)}
+                                                {renderExtractionText(extractionResults?.proposals_text ?? extraction?.proposals_text ?? null)}
                                             </div>
                                         </div>
                                     </>
@@ -504,6 +585,18 @@ export default function Review({
                                         disabled={isDraftSubmitted}
                                         rows={6}
                                         placeholder="Concrete suggestions or recommendations..."
+                                    />
+                                </div>
+
+                                {/* Others */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Others</label>
+                                    <Textarea
+                                        value={othersText}
+                                        onChange={(e) => handleDraftChange('other_text', e.target.value)}
+                                        disabled={isDraftSubmitted}
+                                        rows={6}
+                                        placeholder="Other syntheses not mentioned..."
                                     />
                                 </div>
                             </CardContent>

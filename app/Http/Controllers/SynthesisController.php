@@ -537,10 +537,26 @@ class SynthesisController extends Controller
             })->toArray();
         }
 
+        // Fetch SynthesisSummary for this conversation
+        $synthesisSummary = SynthesisSummary::where('conversation_id', $conversation->id)->first();
+
+        $synthesisSummaryData = $synthesisSummary ? [
+            'id' => $synthesisSummary->id,
+            'convergence_summary' => $synthesisSummary->convergence_summary,
+            'consideration_summary' => $synthesisSummary->consideration_summary,
+            'proposals_summary' => $synthesisSummary->proposals_summary,
+            'other_summary' => $synthesisSummary->other_summary,
+            'status' => $synthesisSummary->status,
+            'is_successful' => $synthesisSummary->is_successful,
+            'provider' => $synthesisSummary->provider,
+            'generated_at' => $synthesisSummary->generated_at?->toIso8601String(),
+        ] : null;
+
         return Inertia::render('synthesis/collaborate', [
             'conversation' => $conversation,
             'submissions' => $submissions,
             'masterSynthesis' => $masterSynthesisData,
+            'synthesisSummary' => $synthesisSummaryData,
             'groups' => $groups,
             'responses' => $groups->flatMap->responses,
             'consensusSubmissions' => $consensusSubmissions,
@@ -625,243 +641,6 @@ class SynthesisController extends Controller
             'success' => 'Synthesis submitted successfully.',
             'synthesis_submitted' => true,
         ]);
-    }
-
-    /**
-     * Store a master synthesis report for the conversation.
-     * 
-     * Master synthesis represents the "synthesis of synthesis" crafted collaboratively during
-     * the Collaborative Review session. It requires all 4 categories to have content.
-     * Only users with synthesis role can create master syntheses.
-     */
-    public function storeMasterSynthesis(Request $request, Conversation $conversation)
-    {
-        $user = $request->user();
-
-        // Authorization: only users with synthesis/drafter/admin role can create master syntheses
-        if (!$user->isAdmin() && $user->role !== 'drafter') {
-            abort(403, 'You do not have permission to create master syntheses.');
-        }
-
-        // Validate all 4 categories have content (manual only)
-        $validated = $request->validate([
-            'categories' => 'required|array',
-            'categories.convergence' => 'required|array',
-            'categories.convergence.manual_content' => 'nullable|string',
-            'categories.matters_for_consideration' => 'required|array',
-            'categories.matters_for_consideration.manual_content' => 'nullable|string',
-            'categories.proposals' => 'required|array',
-            'categories.proposals.manual_content' => 'nullable|string',
-            'categories.others' => 'required|array',
-            'categories.others.manual_content' => 'nullable|string',
-            'group_ids' => 'nullable|array',
-            'group_ids.*' => 'integer',
-        ]);
-
-        // Ensure each category has content
-        foreach (['convergence', 'matters_for_consideration', 'proposals', 'others'] as $category) {
-            $manualContent = $validated['categories'][$category]['manual_content'] ?? '';
-            if (empty($manualContent)) {
-                return back()->withErrors([
-                    "categories.{$category}" => "The {$category} category must have content.",
-                ]);
-            }
-        }
-
-        // Find or create the master synthesis report for this conversation
-        $report = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
-            ->first();
-
-        if (!$report) {
-            $report = MasterSynthesis::create([
-                'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
-                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
-                'is_master_synthesis' => true,
-                'status' => 'submitted',
-                'submitted_at' => now(),
-            ]);
-        }
-
-        // Map category names to database field names (manual content only)
-        $categoryMap = [
-            'convergence' => 'convergence_text',
-            'matters_for_consideration' => 'consideration_text',
-            'proposals' => 'proposals_text',
-            'others' => 'other_text',
-        ];
-
-        $updateData = [];
-
-        foreach ($categoryMap as $categoryKey => $field) {
-            $manualContent = $validated['categories'][$categoryKey]['manual_content'] ?? '';
-            if (!empty($manualContent)) {
-                $updateData[$field] = $manualContent;
-            }
-        }
-
-        // Track which group consensuses were included
-        if (isset($validated['group_ids']) && !empty($validated['group_ids'])) {
-            $updateData['group_ids'] = $validated['group_ids'];
-        }
-
-        $report->update($updateData);
-
-        // Broadcast the update event for real-time updates
-        event(new MasterSynthesisUpdated($conversation->id, $report));
-
-        return response()->json([
-            'success' => true,
-            'master_synthesis' => [
-                'id' => $report->id,
-                'conversation_id' => $report->conversation_id,
-                'is_master_synthesis' => $report->is_master_synthesis,
-                'categories' => [
-                    'convergence' => ['manual_content' => $report->convergence_text ?? ''],
-                    'matters_for_consideration' => ['manual_content' => $report->consideration_text ?? ''],
-                    'proposals' => ['manual_content' => $report->proposals_text ?? ''],
-                    'others' => ['manual_content' => $report->other_text ?? ''],
-                ],
-                'group_ids' => $report->group_ids ?? [],
-                'status' => $report->status,
-                'submitted_at' => $report->submitted_at?->toIso8601String(),
-            ],
-        ]);
-    }
-
-    /**
-     * Get the master synthesis for a given conversation.
-     * Returns null or empty structure if no master synthesis exists.
-     */
-    public function getMasterSynthesis(Conversation $conversation)
-    {
-        $masterSynthesis = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
-            ->first();
-
-        if (!$masterSynthesis) {
-            return response()->json(['master_synthesis' => null, 'has_master_synthesis' => false]);
-        }
-
-        return response()->json([
-            'master_synthesis' => [
-                'id' => $masterSynthesis->id,
-                'conversation_id' => $masterSynthesis->conversation_id,
-                'user_id' => $masterSynthesis->synthesis_id,
-                'submission_number' => $masterSynthesis->submission_number,
-                'is_master_synthesis' => $masterSynthesis->is_master_synthesis,
-                'group_ids' => $masterSynthesis->group_ids ?? [],
-                'submitted_at' => $masterSynthesis->submitted_at?->toIso8601String(),
-                'categories' => [
-                    'convergence' => ['manual_content' => $masterSynthesis->convergence_text ?? ''],
-                    'matters_for_consideration' => ['manual_content' => $masterSynthesis->consideration_text ?? ''],
-                    'proposals' => ['manual_content' => $masterSynthesis->proposals_text ?? ''],
-                    'others' => ['manual_content' => $masterSynthesis->other_text ?? ''],
-                ],
-                'status' => $masterSynthesis->status,
-            ],
-            'has_master_synthesis' => true,
-        ]);
-    }
-
-    /**
-     * Get all syntheses (individual + master) grouped by category for a conversation.
-     * Distinguishes between individual syntheses and master syntheses.
-     */
-    public function getSynthesesByCategory(Conversation $conversation)
-    {
-        // Fetch individual syntheses (non-master)
-        $individualSyntheses = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', false)
-            ->with('synthesis')
-            ->orderBy('submission_number')
-            ->get();
-
-        // Fetch master synthesis (if exists)
-        $masterSynthesis = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
-            ->first();
-
-        $fields = [
-            'convergence' => 'convergence_text',
-            'matters_for_consideration' => 'consideration_text',
-            'proposals' => 'proposals_text',
-            'others' => 'other_text',
-        ];
-
-        $categories = [];
-        foreach ($fields as $catKey => $catField) {
-            $categories[$catKey] = [
-                'individual_syntheses' => $individualSyntheses->map(fn($s) => [
-                    'id' => $s->id,
-                    'user_id' => $s->synthesis_id,
-                    'user_name' => $s->synthesis?->name,
-                    'submission_number' => $s->submission_number,
-                    'manual_content' => $s->{$catField} ?? '',
-                    'status' => $s->status,
-                    'submitted_at' => $s->submitted_at?->toIso8601String(),
-                ])->toArray(),
-                'master_synthesis' => $masterSynthesis ? [
-                    'id' => $masterSynthesis->id,
-                    'user_id' => $masterSynthesis->synthesis_id,
-                    'manual_content' => $masterSynthesis->{$catField} ?? '',
-                    'submitted_at' => $masterSynthesis->submitted_at?->toIso8601String(),
-                ] : null,
-            ];
-        }
-
-        return response()->json([
-            'conversation_id' => $conversation->id,
-            'categories' => $categories,
-            'individual_synthesis_count' => $individualSyntheses->count(),
-            'has_master_synthesis' => $masterSynthesis !== null,
-        ]);
-    }
-
-    /**
-     * Update the master synthesis report (for drafter/admin role).
-     */
-    public function updateMasterSynthesis(Request $request, Conversation $conversation)
-    {
-        $user = $request->user();
-
-        // Only allow drafter or admin to update master synthesis
-        if (!$user->isAdmin() && $user->role !== 'drafter') {
-            abort(403, 'You do not have permission to update the master synthesis.');
-        }
-
-        $validated = $request->validate([
-            'convergence_text' => 'nullable|string',
-            'consideration_text' => 'nullable|string',
-            'proposals_text' => 'nullable|string',
-            'other_text' => 'nullable|string',
-        ]);
-
-        // Find or create the master synthesis report for this conversation.
-        // Match records that are master synthesis (is_master_synthesis = true) to avoid
-        // accidentally updating a regular user's submitted report.
-        $report = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
-            ->whereIn('status', ['submitted', 'reviewed'])
-            ->first();
-
-        if (!$report) {
-            $report = MasterSynthesis::create([
-                'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
-                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
-                'is_master_synthesis' => true,
-                'status' => 'submitted',
-            ]);
-        }
-
-        $report->update($validated);
-
-        // Broadcast the update event for real-time updates
-        event(new MasterSynthesisUpdated($conversation->id, $report));
-
-        return back()->with('success', 'Master synthesis updated successfully.');
     }
 
     /**
@@ -1059,6 +838,215 @@ class SynthesisController extends Controller
     }
 
     /**
+     * Synchronous LLM extraction — returns parsed JSON directly for immediate display.
+     */
+    public function extractSync(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        // Get all group consensuses for this user's assigned groups
+        $assignedGroupIds = \App\Models\Group::where('synthesis_id', $user->id)
+            ->whereHas('conversations', fn($q) => $q->where('conversations.id', $conversation->id))
+            ->pluck('id');
+
+        if ($assignedGroupIds->isEmpty()) {
+            $assignedGroupIds = Response::where('conversation_id', $conversation->id)
+                ->whereNotNull('submitted_at')
+                ->pluck('group_id')
+                ->unique();
+        }
+
+        // Fetch consensus texts from submitted responses and consensus notes
+        $responseConsensusTexts = Response::whereIn('group_id', $assignedGroupIds)
+            ->where('conversation_id', $conversation->id)
+            ->whereNotNull('submitted_at')
+            ->pluck('consensus_text')
+            ->filter()
+            ->implode("\n\n---\n\n");
+
+        $noteConsensusTexts = ConsensusNote::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->whereNotNull('text')
+            ->pluck('text')
+            ->filter()
+            ->implode("\n\n---\n\n");
+
+        $consensusTexts = trim($responseConsensusTexts . ($noteConsensusTexts ? "\n\n---\n\n" . $noteConsensusTexts : ''));
+
+        if (empty($consensusTexts)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No consensus text available for extraction.',
+            ], 422);
+        }
+
+        // Call LLM synchronously
+        $llm = app(LlmService::class);
+        $result = $llm->query(
+            $llm->buildSynthesisPrompt(),
+            $consensusTexts
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'LLM extraction failed: '.$result['error'],
+                'provider' => $result['provider'],
+            ], 500);
+        }
+
+        // Parse JSON response
+        $content = $this->extractJsonFromLlmResponse($result['content']);
+
+        if ($content === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid LLM response format.',
+                'provider' => $result['provider'],
+            ], 500);
+        }
+
+        // Also store the extraction as a record (for background job compatibility)
+        Extraction::updateOrCreate(
+            ['conversation_id' => $conversation->id, 'user_id' => $user->id],
+            [
+                'convergence_text' => $content['convergence'] ?? $content['convergence_text'] ?? '',
+                'consideration_text' => $content['consideration'] ?? $content['consideration_text'] ?? '',
+                'proposals_text' => $content['proposals'] ?? $content['proposals_text'] ?? '',
+                'provider' => $result['provider'],
+                'is_successful' => true,
+                'extracted_at' => now(),
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'convergence_text' => $content['convergence'] ?? $content['convergence_text'] ?? '',
+            'consideration_text' => $content['consideration'] ?? $content['consideration_text'] ?? '',
+            'proposals_text' => $content['proposals'] ?? $content['proposals_text'] ?? '',
+            'provider' => $result['provider'],
+        ]);
+    }
+
+    /**
+     * Synchronous LLM synthesis for draft — returns parsed JSON directly.
+     */
+    public function synthesizeDraftSync(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $validated = $request->validate([
+            'selected_group_ids' => 'nullable|array',
+            'selected_group_ids.*' => 'exists:groups,id',
+            'convergence_text' => 'nullable|string',
+            'consideration_text' => 'nullable|string',
+            'proposals_text' => 'nullable|string',
+        ]);
+
+        // Gather consensus notes from selected groups (or all if none selected)
+        $groupIds = $validated['selected_group_ids'] ?? [];
+        if (empty($groupIds)) {
+            $groupIds = ConsensusNote::where('conversation_id', $conversation->id)
+                ->where('user_id', $user->id)
+                ->pluck('group_id')
+                ->unique()
+                ->toArray();
+        }
+
+        $notes = ConsensusNote::whereIn('group_id', $groupIds)
+            ->where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->whereNotNull('text')
+            ->where('text', '!=', '')
+            ->get();
+
+        // Also include user's own draft fields as input
+        $draft = SynthesisDraft::where('conversation_id', $conversation->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        $formattedNotes = $notes->map(function ($note) use ($draft) {
+            $groupName = $note->group ? $note->group->name : 'Group ' . $note->group_id;
+            $text = $note->text;
+            // Append user's existing draft content for this group if available
+            if ($draft) {
+                $draftTexts = collect([
+                    'Convergence: ' . ($draft->convergence_text ?? ''),
+                    'Consideration: ' . ($draft->consideration_text ?? ''),
+                    'Proposals: ' . ($draft->proposals_text ?? ''),
+                ])->filter()->implode('\n');
+                $text .= "\n\nUser's existing draft:\n" . $draftTexts;
+            }
+            return sprintf("=== Note for %s ===\n%s", $groupName, $text);
+        })->implode("\n\n---\n\n");
+
+        if (empty($formattedNotes) && empty(trim($validated['convergence_text'] ?? ''))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No content available for synthesis.',
+            ], 422);
+        }
+
+        // Call LLM synchronously
+        $llm = app(LlmService::class);
+        $result = $llm->query(
+            $llm->buildNotesSynthesisPrompt(),
+            $formattedNotes ?: ($validated['convergence_text'] ?? '')
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'LLM synthesis failed: '.$result['error'],
+                'provider' => $result['provider'],
+            ], 500);
+        }
+
+        // Parse JSON response
+        $content = $this->extractJsonFromLlmResponse($result['content']);
+
+        if ($content === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid LLM response format.',
+                'provider' => $result['provider'],
+            ], 500);
+        }
+
+        // Update the draft in the database
+        SynthesisDraft::updateOrCreate(
+            ['conversation_id' => $conversation->id, 'user_id' => $user->id],
+            [
+                'convergence_text' => $content['convergence'] ?? $content['convergence_text'] ?? $validated['convergence_text'] ?? '',
+                'consideration_text' => $content['consideration'] ?? $content['consideration_text'] ?? $validated['consideration_text'] ?? '',
+                'proposals_text' => $content['proposals'] ?? $content['proposals_text'] ?? $validated['proposals_text'] ?? '',
+                'other_text' => $content['others'] ?? $content['other_text'] ?? ($draft?->other_text ?? ''),
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'convergence_text' => $content['convergence'] ?? $content['convergence_text'] ?? '',
+            'consideration_text' => $content['consideration'] ?? $content['consideration_text'] ?? '',
+            'proposals_text' => $content['proposals'] ?? $content['proposals_text'] ?? '',
+            'other_text' => $content['others'] ?? $content['other_text'] ?? ($draft?->other_text ?? ''),
+            'provider' => $result['provider'],
+        ]);
+    }
+
+    /**
      * Get extraction for current user.
      */
     public function getExtractions(Request $request, Conversation $conversation)
@@ -1146,40 +1134,8 @@ class SynthesisController extends Controller
             'submitted_at' => now(),
         ]);
 
-        // Sync or create corresponding MasterSynthesis submission so it appears on collaborate.tsx
-        $masterReport = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('synthesis_id', $user->id)
-            ->where('is_master_synthesis', false)
-            ->first();
-
-        if ($masterReport) {
-            $masterReport->update([
-                'convergence_text' => $draft->convergence_text,
-                'consideration_text' => $draft->consideration_text,
-                'proposals_text' => $draft->proposals_text,
-                'other_text' => $draft->other_text,
-                'status' => 'submitted',
-                'is_submitted' => true,
-                'submitted_at' => now(),
-            ]);
-        } else {
-            $nextNumber = MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id);
-            $masterReport = MasterSynthesis::create([
-                'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
-                'submission_number' => $nextNumber,
-                'convergence_text' => $draft->convergence_text,
-                'consideration_text' => $draft->consideration_text,
-                'proposals_text' => $draft->proposals_text,
-                'other_text' => $draft->other_text,
-                'is_master_synthesis' => false,
-                'status' => 'submitted',
-                'is_submitted' => true,
-                'submitted_at' => now(),
-            ]);
-        }
-
-        event(new SynthesisSubmitted($conversation->id, $masterReport));
+        // Individual draft submissions are stored in SynthesisDraft only - they are separate from MasterSynthesis.
+        // No need to create/update MasterSynthesis here.
 
         // Auto-trigger summary check: if all assigned members have submitted, dispatch summary job
         $this->checkAndAutoTriggerSummary($request, $conversation);
@@ -1273,6 +1229,195 @@ class SynthesisController extends Controller
     }
 
     /**
+     * Synchronous LLM synthesis summary — returns parsed JSON directly for immediate display.
+     */
+    public function summarySync(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $validated = $request->validate([
+            'master_synthesis_id' => 'required|integer',
+            'category' => 'required|in:convergence,consideration,proposals,others',
+        ]);
+
+        // Find all submitted SynthesisDraft records for this conversation
+        $drafts = SynthesisDraft::where('conversation_id', $conversation->id)
+            ->where('is_submitted', true)
+            ->get();
+
+        if ($drafts->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No submitted drafts available for summary.',
+            ], 422);
+        }
+
+        // Compile the draft content for LLM summarization
+        $draftContent = $drafts->map(function ($draft) {
+            return sprintf(
+                "=== Draft by User %d ===\nConvergence: %s\n\nMatters for Consideration: %s\n\nProposals: %s\n\nOthers: %s\n",
+                $draft->user_id,
+                $draft->convergence_text ?? '(none)',
+                $draft->consideration_text ?? '(none)',
+                $draft->proposals_text ?? '(none)',
+                $draft->other_text ?? '(none)'
+            );
+        })->implode("\n\n---\n\n");
+
+        // Build the system prompt for summary generation
+        $systemPrompt = match ($validated['category']) {
+            'convergence' => <<<'PROMPT'
+You are a senior synthesis analyst. You will receive multiple submitted synthesis drafts from different participants in a consultative process.
+
+Your task is to generate a concise summary of the points of convergence/agreement across all submitted drafts.
+
+Return your response as a JSON object with exactly this key:
+{
+  "convergence_summary": "Summary of convergences/agreements across all drafts"
+}
+
+Be concise but thorough. Preserve the original meaning and intent of all participants. Highlight areas of consensus.
+PROMPT,
+            'consideration' => <<<'PROMPT'
+You are a senior synthesis analyst. You will receive multiple submitted synthesis drafts from different participants in a consultative process.
+
+Your task is to generate a concise summary of the matters for consideration/concerns across all submitted drafts.
+
+Return your response as a JSON object with exactly this key:
+{
+  "consideration_summary": "Summary of matters for consideration/concerns across all drafts"
+}
+
+Be concise but thorough. Preserve the original meaning and intent of all participants. Highlight areas of concern while acknowledging agreements.
+PROMPT,
+            'proposals' => <<<'PROMPT'
+You are a senior synthesis analyst. You will receive multiple submitted synthesis drafts from different participants in a consultative process.
+
+Your task is to generate a concise summary of the proposals/recommendations across all submitted drafts.
+
+Return your response as a JSON object with exactly this key:
+{
+  "proposals_summary": "Summary of proposals/recommendations across all drafts"
+}
+
+Be concise but thorough. Preserve the original meaning and intent of all participants. Group similar proposals together.
+PROMPT,
+            'others' => <<<'PROMPT'
+You are a senior synthesis analyst. You will receive multiple submitted synthesis drafts from different participants in a consultative process.
+
+Your task is to generate a concise summary of any other themes or topics across all submitted drafts that don't fit the main categories.
+
+Return your response as a JSON object with exactly this key:
+{
+  "other_summary": "Summary of any other themes or topics across all drafts"
+}
+
+Be concise but thorough. Preserve the original meaning and intent of all participants.
+PROMPT,
+        };
+
+        // Call LLM synchronously
+        $llm = app(LlmService::class);
+        $result = $llm->query($systemPrompt, $draftContent);
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'LLM summary failed: '.$result['error'],
+                'provider' => $result['provider'],
+            ], 500);
+        }
+
+        // Parse JSON response
+        $content = $this->extractJsonFromLlmResponse($result['content']);
+
+        if ($content === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid LLM response format.',
+                'provider' => $result['provider'],
+            ], 500);
+        }
+
+        // Also store/update the summary in the database for background job compatibility
+        $summaryField = $validated['category'] . '_summary';
+        $existingSummary = SynthesisSummary::where('conversation_id', $conversation->id)->first();
+
+        if ($existingSummary) {
+            $existingSummary->update([
+                $summaryField => $content[$summaryField] ?? null,
+                'provider' => $result['provider'],
+                'is_successful' => true,
+                'generated_at' => now(),
+            ]);
+        } else {
+            $summaryData = [
+                'conversation_id' => $conversation->id,
+                $summaryField => $content[$summaryField] ?? null,
+                'provider' => $result['provider'],
+                'is_successful' => true,
+                'generated_at' => now(),
+            ];
+            SynthesisSummary::create($summaryData);
+        }
+
+        return response()->json([
+            'success' => true,
+            $summaryField => $content[$summaryField] ?? null,
+            'provider' => $result['provider'],
+        ]);
+    }
+
+    /**
+     * Get the SynthesisSummary for a conversation.
+     */
+    public function getSynthesisSummary(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization: check if user is assigned to this conversation or is admin
+        $conversationIds = $user->assignedConversations()->pluck('conversations.id');
+        if (!$user->isAdmin() && !$conversationIds->contains($conversation->id)) {
+            abort(403, 'You are not assigned to this conversation.');
+        }
+
+        $synthesisSummary = SynthesisSummary::where('conversation_id', $conversation->id)->first();
+
+        \Log::info('[DEBUG] getSynthesisSummary: fetched summary', [
+            'conversation_id' => $conversation->id,
+            'summary' => $synthesisSummary ? [
+                'id' => $synthesisSummary->id,
+                'convergence_summary' => $synthesisSummary->convergence_summary,
+                'consideration_summary' => $synthesisSummary->consideration_summary,
+                'proposals_summary' => $synthesisSummary->proposals_summary,
+                'other_summary' => $synthesisSummary->other_summary,
+                'status' => $synthesisSummary->status,
+                'is_successful' => $synthesisSummary->is_successful,
+            ] : null,
+        ]);
+
+        return response()->json([
+            'summary' => $synthesisSummary ? [
+                'id' => $synthesisSummary->id,
+                'convergence_summary' => $synthesisSummary->convergence_summary,
+                'consideration_summary' => $synthesisSummary->consideration_summary,
+                'proposals_summary' => $synthesisSummary->proposals_summary,
+                'other_summary' => $synthesisSummary->other_summary,
+                'status' => $synthesisSummary->status,
+                'is_successful' => $synthesisSummary->is_successful,
+                'provider' => $synthesisSummary->provider,
+                'generated_at' => $synthesisSummary->generated_at?->toIso8601String(),
+            ] : null,
+        ]);
+    }
+
+    /**
      * Task 3a: Auto-trigger summary when all assigned members have submitted their drafts.
      * Call this method after a SynthesisDraft is successfully submitted.
      */
@@ -1307,98 +1452,6 @@ class SynthesisController extends Controller
         LlmSynthesisSummaryJob::dispatch($conversation->id);
 
         return response()->json(['triggered' => true]);
-    }
-
-    /**
-     * Task 4: Update authorization to allow all assigned members to edit MasterSynthesis.
-     * Updated updateMasterSynthesis method with new authorization logic.
-     */
-    public function updateMasterSynthesisAuthorized(Request $request, Conversation $conversation)
-    {
-        $user = $request->user();
-
-        // Authorization: check if user is admin OR is assigned to this conversation
-        $isAdmin = $user->isAdmin();
-        $isAssigned = $conversation->synthesisMembers()->where('users.id', $user->id)->exists();
-
-        if (!$isAdmin && !$isAssigned) {
-            abort(403, 'You do not have permission to update the master synthesis.');
-        }
-
-        $validated = $request->validate([
-            'convergence_text' => 'nullable|string',
-            'consideration_text' => 'nullable|string',
-            'proposals_text' => 'nullable|string',
-            'other_text' => 'nullable|string',
-        ]);
-
-        // Find or create the master synthesis report for this conversation.
-        $report = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
-            ->first();
-
-        if ($report && $report->is_submitted) {
-            return back()->withErrors(['master_synthesis' => 'Master synthesis is locked and cannot be edited.']);
-        }
-
-        if (!$report) {
-            $report = MasterSynthesis::create([
-                'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
-                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
-                'is_master_synthesis' => true,
-                'status' => 'submitted',
-            ]);
-        }
-
-        $report->update($validated);
-
-        // Broadcast the update event for real-time updates
-        event(new MasterSynthesisUpdated($conversation->id, $report));
-
-        return back()->with('success', 'Master synthesis updated successfully.');
-    }
-
-    /**
-     * Task 5: Submit the master synthesis (lock it and dispatch report generation).
-     */
-    public function submitMasterSynthesis(Request $request, Conversation $conversation)
-    {
-        $user = $request->user();
-
-        // Authorization: check if user is admin OR is assigned to this conversation
-        $isAdmin = $user->isAdmin();
-        $isAssigned = $conversation->synthesisMembers()->where('users.id', $user->id)->exists();
-
-        if (!$isAdmin && !$isAssigned) {
-            abort(403, 'You do not have permission to submit the master synthesis.');
-        }
-
-        // Find the master synthesis for this conversation
-        $report = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
-            ->first();
-
-        if (!$report) {
-            return back()->withErrors(['submission' => 'No master synthesis found to submit.']);
-        }
-
-        // Check if already submitted
-        if ($report->is_submitted) {
-            return back()->withErrors(['submission' => 'This master synthesis has already been submitted.']);
-        }
-
-        // Set is_submitted = true and lock the master synthesis
-        $report->update([
-            'is_submitted' => true,
-            'status' => 'submitted',
-            'submitted_at' => now(),
-        ]);
-
-        // Dispatch ReportGenerationJob
-        ReportGenerationJob::dispatch($report);
-
-        return redirect()->route('synthesis.collaborate', ['conversation' => $conversation])->with('success', 'Master synthesis submitted successfully. Report generation has started.');
     }
 
     /**

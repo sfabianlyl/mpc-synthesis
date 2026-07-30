@@ -5,6 +5,7 @@ use App\Http\Controllers\DocumentRetrievalController;
 use App\Http\Controllers\DrafterController;
 use App\Http\Controllers\PastoralController;
 use App\Http\Controllers\ResponseController;
+use App\Http\Controllers\MasterSynthesisController;
 use App\Http\Controllers\SynthesisController;
 use Illuminate\Support\Facades\Route;
 
@@ -62,13 +63,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         // Summary jobs
         Route::post('trigger-summary/{conversation}', [SynthesisController::class, 'triggerSummary'])->name('trigger-summary');
+        Route::get('summary/{conversation}', [SynthesisController::class, 'getSynthesisSummary'])->name('summary');
         Route::post('check-auto-trigger-summary/{conversation}', [SynthesisController::class, 'checkAndAutoTriggerSummary'])->name('check-auto-trigger-summary');
         
+        // Synchronous LLM endpoints (for immediate UI feedback)
+        Route::post('extract-sync/{conversation}', [SynthesisController::class, 'extractSync'])->name('extract-sync');
+        Route::post('synthesize-draft-sync/{conversation}', [SynthesisController::class, 'synthesizeDraftSync'])->name('synthesize-draft-sync');
+        Route::post('summary-sync/{conversation}', [SynthesisController::class, 'summarySync'])->name('summary-sync');
+        
         // Master Synthesis editing (all assigned members can edit)
-        Route::patch('master-synthesis-authorized/{conversation}', [SynthesisController::class, 'updateMasterSynthesisAuthorized'])->name('master-synthesis-authorized.update');
+        Route::post('master-synthesis-authorized/{conversation}', [MasterSynthesisController::class, 'updateAuthorized'])->name('master-synthesis-authorized.update');
         
         // Submit Master Synthesis
-        Route::post('submit-master-synthesis/{conversation}', [SynthesisController::class, 'submitMasterSynthesis'])->name('submit-master-synthesis');
+        Route::post('submit-master-synthesis/{conversation}', [MasterSynthesisController::class, 'submit'])->name('submit-master-synthesis');
         
         // ─── Legacy Routes (kept for backward compatibility) ─────────
         
@@ -79,14 +86,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('ai-synthesis/{conversation}', [SynthesisController::class, 'generateAiAssistedSynthesis'])->name('ai-synthesis');
         
         // Master Synthesis routes
-        Route::get('conversation/{conversation}/master-synthesis', [SynthesisController::class, 'getMasterSynthesis'])->name('master-synthesis.get');
-        Route::post('conversation/{conversation}/master-synthesis', [SynthesisController::class, 'storeMasterSynthesis'])->name('master-synthesis.store');
+        Route::get('conversation/{conversation}/master-synthesis', [MasterSynthesisController::class, 'get'])->name('master-synthesis.get');
+        Route::post('conversation/{conversation}/master-synthesis', [MasterSynthesisController::class, 'store'])->name('master-synthesis.store');
         
         // Category-based synthesis retrieval
-        Route::get('conversation/{conversation}/syntheses-by-category', [SynthesisController::class, 'getSynthesesByCategory'])->name('syntheses-by-category');
+        Route::get('conversation/{conversation}/syntheses-by-category', [MasterSynthesisController::class, 'getSynthesesByCategory'])->name('syntheses-by-category');
         
         // Update master synthesis (drafter/admin only)
-        Route::patch('master-synthesis/{conversation}', [SynthesisController::class, 'updateMasterSynthesis'])->name('master-synthesis.update');
+        Route::patch('master-synthesis/{conversation}', [MasterSynthesisController::class, 'update'])->name('master-synthesis.update');
         
         Route::post('analyze/{conversation}', [SynthesisController::class, 'analyze'])->name('analyze');
         Route::patch('report/{report}', [SynthesisController::class, 'update'])->name('report.update');

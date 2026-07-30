@@ -321,31 +321,12 @@ CATEGORY DEFINITIONS:
 3. "proposals" — Compile all content that relates to recommendations, suggestions, or proposed actions. Write it as one coherent paragraph in full sentences.
 4. "others" — Compile any remaining content that does not clearly fit the above three categories. Write it as one coherent paragraph in full sentences.
 
-STRICT WRITING RULES:
-- Write in full, grammatically complete sentences only.
-- NEVER use bullet points, dashes (-), asterisks (*), or numbered lists.
-- Each value must be a single continuous paragraph of prose.
-- If a category has no relevant content from the notes, write an empty string "".
-
-JSON FORMAT:
-- Return a RAW JSON object with exactly four keys: "convergence", "consideration", "proposals", "others"
-- Each value is a plain string of prose sentences.
-- Use \n\n to separate paragraphs if needed within a value.
-- Do NOT use actual newline characters inside JSON string values — use \n escape sequences only.
-- Do NOT wrap the response in markdown code blocks (no ```json or ```).
-
-CORRECT EXAMPLE:
+EXAMPLE:
 {
   "convergence": "Participants widely agreed that community involvement is foundational to any effective pastoral initiative. There was broad alignment on the need for open dialogue and continued engagement across all levels of the community.",
   "consideration": "A number of important concerns emerged regarding the pace of implementation and the availability of adequate resources. Participants noted that equitable access must be carefully considered as the process moves forward.",
   "proposals": "It was suggested that a dedicated working group be formed to oversee next steps and ensure accountability. Regular consultations with stakeholders should be scheduled to maintain transparency and shared ownership of the process.",
   "others": "Several notes expressed a spirit of hope and pastoral generosity, with many participants affirming their commitment to walking this journey together with openness and discernment."
-}
-
-WRONG EXAMPLE (DO NOT DO THIS — bullet points are strictly forbidden):
-{
-  "convergence": "- agreement on community engagement\n- shared concern for dialogue",
-  "consideration": "- resource constraints\n- timeline concerns"
 }
 
 Return valid JSON only. No bullet points. No lists. Only prose.
@@ -507,18 +488,18 @@ You are a synthesis analyst. You will receive synthesis content from a consultat
 
 CRITICAL INSTRUCTIONS:
 1. Extract at most {$maxKeyPoints} key points (no more, no less if possible).
-2. Each key point must be on its own line starting with a dash (-) followed by a space.
+2. Each key point must be on its own line starting with a number followed by a period and a space (e.g., "1. ", "2. ", "3. ").
 3. Keep each key point concise - one line only, no line breaks within a point.
 4. Focus on the most significant insights, agreements, and actionable items.
 5. Do NOT include any introductory text, conclusions, or explanations.
-6. Return ONLY the bullet points, nothing else.
+6. Return ONLY the numbered key points, nothing else.
 
 Example format:
-- Point one about convergence
-- Point two about considerations
-- Point three about proposals
+1. Point one about convergence
+2. Point two about considerations
+3. Point three about proposals
 
-Return only the bullet points with dashes, one per line. No numbering, no extra text.
+Return only the numbered key points, one per line. No dashes, no extra text.
 PROMPT;
     }
 

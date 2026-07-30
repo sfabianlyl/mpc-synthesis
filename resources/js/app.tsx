@@ -36,9 +36,7 @@ createInertiaApp({
             </TooltipProvider>
         );
     },
-    progress: {
-        color: '#6366f1',
-    },
+    progress: false,
 });
 
 // This will set light / dark modes on load...

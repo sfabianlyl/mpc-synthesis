@@ -92,6 +92,13 @@ PROMPT;
         // Call LLM to generate summary
         $result = $llm->query($systemPrompt, $draftContent);
 
+        \Log::info('[DEBUG] LlmSynthesisSummaryJob: LLM result', [
+            'success' => $result['success'] ?? false,
+            'provider' => $result['provider'] ?? null,
+            'content' => $result['content'] ?? null,
+            'conversation_id' => $this->conversationId,
+        ]);
+
         if (!$result['success']) {
             Log::error('LlmSynthesisSummaryJob failed.', [
                 'error' => $result['error'],
@@ -118,6 +125,11 @@ PROMPT;
         // Parse JSON response
         $content = $this->extractJsonFromLlmResponse($result['content']);
 
+        \Log::info('[DEBUG] LlmSynthesisSummaryJob: parsed JSON content', [
+            'parsed_content' => $content,
+            'conversation_id' => $this->conversationId,
+        ]);
+
         if ($content === null) {
             Log::warning('LlmSynthesisSummaryJob returned non-JSON response.', [
                 'content' => $result['content'],
@@ -141,7 +153,7 @@ PROMPT;
         }
 
         // Store successful summary
-        SynthesisSummary::updateOrCreate(
+        $stored = SynthesisSummary::updateOrCreate(
             ['conversation_id' => $this->conversationId],
             [
                 'convergence_summary' => $content['convergence_summary'] ?? null,
@@ -153,6 +165,18 @@ PROMPT;
                 'generated_at' => now(),
             ]
         );
+
+        \Log::info('[DEBUG] LlmSynthesisSummaryJob: stored summary', [
+            'conversation_id' => $this->conversationId,
+            'stored_summary' => [
+                'id' => $stored->id,
+                'convergence_summary' => $stored->convergence_summary,
+                'consideration_summary' => $stored->consideration_summary,
+                'proposals_summary' => $stored->proposals_summary,
+                'other_summary' => $stored->other_summary,
+                'is_successful' => $stored->is_successful,
+            ],
+        ]);
     }
 
     /**
@@ -164,10 +188,31 @@ PROMPT;
         $stripped = preg_replace('/^```(?:json)?\s*/', '', $content);
         $stripped = preg_replace('/\s*`$/', '', $stripped);
 
-        // Try to decode as JSON
+        // Try to decode as JSON directly first
         $decoded = json_decode($stripped, true);
         if ($decoded !== null && is_array($decoded)) {
             return $decoded;
+        }
+
+        // Handle double-encoded JSON: the LLM may return a JSON string that is itself
+        // a JSON object with escaped quotes (e.g., "{\"convergence_summary\": \"...\"}").
+        // Try decoding the raw content to see if it's a single JSON string.
+        $decoded = json_decode($content, true);
+        if ($decoded !== null && is_array($decoded)) {
+            return $decoded;
+        }
+
+        // Handle double-encoded: try decoding the stripped content as a JSON string
+        // that contains another JSON object. First decode gives us the inner JSON string,
+        // second decode gives us the array.
+        if (str_starts_with($stripped, '"') && str_ends_with($stripped, '"')) {
+            $inner = json_decode($stripped, true);
+            if ($inner !== null && is_string($inner)) {
+                $decoded = json_decode($inner, true);
+                if ($decoded !== null && is_array($decoded)) {
+                    return $decoded;
+                }
+            }
         }
 
         // Try to find JSON object within the content
@@ -180,12 +225,12 @@ PROMPT;
             if ($decoded !== null && is_array($decoded)) {
                 return $decoded;
             }
-        }
 
-        // Fallback: try original content
-        $decoded = json_decode($content, true);
-        if ($decoded !== null && is_array($decoded)) {
-            return $decoded;
+            // Also try decoding the original content for double-encoded case
+            $decoded = json_decode($content, true);
+            if ($decoded !== null && is_array($decoded)) {
+                return $decoded;
+            }
         }
 
         return null;

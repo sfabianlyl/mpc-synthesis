@@ -7,129 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import type { SynthesisSubmission, MasterSynthesisReport, EnrichedDocumentChunk } from '@/types/models';
-
-// ─── Type Definitions ─────────────────────────────────────────────
-
-interface SynthesisMember {
-    id: number;
-    name: string;
-    email: string;
-    avatar?: string;
-    is_online?: boolean;
-    editing_category?: string | null;
-}
-
-/**
- * Grouped synthesis contributions for a single category from all members.
- */
-interface CategoryContributions {
-    manual_content: string;    // Manually crafted content (editable)
-    submissions: Array<{
-        id: number;
-        user: { id: number; name: string };
-        manual_content: string | null;
-        submission_number: number;
-        created_at: string;
-        updated_at: string;
-    }>;
-}
-
-interface MasterSynthesisEditor {
-    convergence: CategoryContributions;
-    matters_for_consideration: CategoryContributions;
-    proposals: CategoryContributions;
-    others: CategoryContributions;
-}
-
-interface PageProps {
-    conversation: any;
-    submissions: SynthesisSubmission[];
-    masterSynthesis: MasterSynthesisReport | null;
-    groups: any[];
-    responses: any[];
-    consensusSubmissions: Record<number, any[]>;
-    currentUser: { id: number; name: string; email: string; role: string };
-    onlineUsers?: SynthesisMember[];
-    retrievedChunks?: EnrichedDocumentChunk[];
-    success?: string;
-    errors?: Record<string, string>;
-}
-
-// ─── Category Configuration ───────────────────────────────────────
-
-const CATEGORIES = [
-    { 
-        key: 'convergence', 
-        label: 'Convergence', 
-        icon: CheckCircle2,
-        description: 'Points of agreement across all groups',
-        color: 'text-emerald-600 dark:text-emerald-400',
-        bgColor: 'bg-emerald-50 dark:bg-emerald-950/20',
-        borderColor: 'border-emerald-200 dark:border-emerald-800',
-    },
-    { 
-        key: 'consideration', 
-        label: 'Matters for Consideration', 
-        icon: FileText,
-        description: 'Critical issues requiring attention',
-        color: 'text-amber-600 dark:text-amber-400',
-        bgColor: 'bg-amber-50 dark:bg-amber-950/20',
-        borderColor: 'border-amber-200 dark:border-amber-800',
-    },
-    { 
-        key: 'proposals', 
-        label: 'Proposals', 
-        icon: Sparkles,
-        description: 'Actionable recommendations and suggestions',
-        color: 'text-blue-600 dark:text-blue-400',
-        bgColor: 'bg-blue-50 dark:bg-blue-950/20',
-        borderColor: 'border-blue-200 dark:border-blue-800',
-    },
-    { 
-        key: 'others', 
-        label: 'Others', 
-        icon: MessageSquare,
-        description: 'Additional insights and observations',
-        color: 'text-violet-600 dark:text-violet-400',
-        bgColor: 'bg-violet-50 dark:bg-violet-950/20',
-        borderColor: 'border-violet-200 dark:border-violet-800',
-    },
-] as const;
-
-// ─── Helper Functions ───────────���─────────────────────────────────
-
-const renderContentText = (text: string | null): React.ReactNode => {
-    if (!text || !text.trim()) {
-        return <p className="text-sm text-muted-foreground italic">No content</p>;
-    }
-
-    const lines = text.split('\n').filter((line) => line.trim());
-
-    if (lines.length > 1) {
-        return (
-            <ul className="space-y-1">
-                {lines.map((line, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                        <span className="text-primary mt-0.5 flex-shrink-0">•</span>
-                        <span className="text-sm">{line.replace(/^-+\s*/, '')}</span>
-                    </li>
-                ))}
-            </ul>
-        );
-    }
-
-    return <p className="text-sm whitespace-pre-wrap">{text}</p>;
-};
-
-const getInitials = (name: string): string => {
-    return name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
-};
+import type { SynthesisSubmission, MasterSynthesisReport } from '@/types/models';
+import type { SynthesisMember, CategoryContributions, CollaboratePageProps, SynthesisSummaryData } from './types';
+import { CATEGORIES, type CategoryKey } from './constants';
+import { renderContentText, getInitials, categoryToFieldName } from './helpers';
 
 // ─── Component ────────────────────────────────────────────────────
 
@@ -137,6 +18,7 @@ export default function Collaborate({
     conversation,
     submissions,
     masterSynthesis,
+    synthesisSummary,
     groups,
     responses,
     consensusSubmissions = {},
@@ -144,7 +26,7 @@ export default function Collaborate({
     onlineUsers = [],
     success: initialSuccess,
     errors: initialErrors,
-}: PageProps) {
+}: CollaboratePageProps) {
     const { flash } = usePage().props as any;
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -160,7 +42,7 @@ export default function Collaborate({
     // Per-category master synthesis editor state
     const [masterEditors, setMasterEditors] = useState<Record<string, string>>({
         convergence: '',
-        matters_for_consideration: '',
+        consideration: '',
         proposals: '',
         others: '',
     });
@@ -172,9 +54,17 @@ export default function Collaborate({
     const [keyPointsCount, setKeyPointsCount] = useState(5);
     const [keyPointsText, setKeyPointsText] = useState('');
     const [isExtractingKeyPoints, setIsExtractingKeyPoints] = useState(false);
+    const [hasLoadedKeyPoints, setHasLoadedKeyPoints] = useState(false);
     
     // Active editing category indicator (for real-time collaboration)
+
+    // SynthesisSummary state
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+    const [summaryLocal, setSummaryLocal] = useState<SynthesisSummaryData | null>(synthesisSummary);
     const [activeEditingCategory, setActiveEditingCategory] = useState<string | null>(null);
+
+    console.log('[DEBUG] Initial synthesisSummary prop:', JSON.stringify(synthesisSummary, null, 2));
+    console.log('[DEBUG] Initial summaryLocal state:', JSON.stringify(summaryLocal, null, 2));
 
     useEffect(() => {
         if (flash?.success) {
@@ -210,7 +100,7 @@ export default function Collaborate({
         if (masterSynthesisLocal) {
             setMasterEditors({
                 convergence: masterSynthesisLocal.convergence_text ?? '',
-                matters_for_consideration: masterSynthesisLocal.consideration_text ?? '',
+                consideration: masterSynthesisLocal.consideration_text ?? '',
                 proposals: masterSynthesisLocal.proposals_text ?? '',
                 others: masterSynthesisLocal.other_text ?? '',
             });
@@ -218,12 +108,33 @@ export default function Collaborate({
             // Reset to empty when no master synthesis exists
             setMasterEditors({
                 convergence: '',
-                matters_for_consideration: '',
+                consideration: '',
                 proposals: '',
                 others: '',
             });
         }
     }, [masterSynthesisLocal]);
+    // Load existing key points on mount or when masterSynthesis changes
+    useEffect(() => {
+        if (!masterSynthesisLocal?.id || hasLoadedKeyPoints) {
+            return;
+        }
+        fetch(`/synthesis/key-points/${conversation.id}?master_synthesis_id=${masterSynthesisLocal.id}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+            },
+        })
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.key_point?.key_points_text) {
+                    setKeyPointsText(data.key_point.key_points_text);
+                    setHasLoadedKeyPoints(true);
+                }
+            })
+            .catch(() => {});
+    }, [masterSynthesisLocal?.id, conversation?.id]);
 
     // Check if current user has a submitted submission
     const hasSubmitted = submissionsLocal.some(
@@ -244,11 +155,7 @@ export default function Collaborate({
 
     // Group submissions by category for display
     const getSubmissionsByCategory = useCallback((categoryKey: string) => {
-        const fieldName = categoryKey === 'consideration' 
-            ? 'consideration_text' 
-            : categoryKey === 'others' 
-            ? 'other_text' 
-            : `${categoryKey}_text`;
+        const fieldName = categoryToFieldName(categoryKey);
 
         return submissionsLocal.map((s) => ({
             ...s,
@@ -303,7 +210,7 @@ export default function Collaborate({
         );
     };
 
-    // Save master synthesis for a specific category
+    // Save master synthesis for a specific category — use authorized route so any assigned member can edit
     const handleSaveMasterCategory = (categoryKey: string) => {
         if (!masterSynthesisLocal?.id && currentUser.role !== 'admin' && currentUser.role !== 'drafter') {
             return;
@@ -313,16 +220,11 @@ export default function Collaborate({
         setActiveEditingCategory(categoryKey);
         setTimeout(() => setActiveEditingCategory(null), 3000);
 
-        const updateData: Record<string, string | null> = {
-            convergence_text: masterEditors.convergence || null,
-            consideration_text: masterEditors.matters_for_consideration || null,
-            proposals_text: masterEditors.proposals || null,
-            other_text: masterEditors.others || null,
-        };
+        const fieldName = categoryKey === 'convergence' ? 'convergence_text' : categoryKey === 'consideration' ? 'consideration_text' : categoryKey === 'proposals' ? 'proposals_text' : 'other_text';
 
-        router.patch(
-            `/synthesis/master-synthesis/${conversation.id}`,
-            { [categoryKey === 'convergence' ? 'convergence_text' : categoryKey === 'consideration' ? 'consideration_text' : categoryKey === 'proposals' ? 'proposals_text' : 'other_text']: masterEditors[categoryKey] || null },
+        router.post(
+            `/synthesis/master-synthesis-authorized/${conversation.id}`,
+            { [fieldName]: masterEditors[categoryKey] ?? null },
             {
                 preserveScroll: true,
                 onSuccess: (page: any) => {
@@ -330,32 +232,38 @@ export default function Collaborate({
                         setMasterSynthesisLocal(page.props.masterSynthesis);
                     }
                 },
+                onError: (errors) => {
+                    console.error('[ERROR] Save master synthesis failed:', errors);
+                    setStatusMessage({ type: 'error', text: 'Failed to save master synthesis. Check console for details.' });
+                },
             }
         );
     };
 
-    // Save all master synthesis categories at once
+    // Save all master synthesis categories at once — use authorized route so any assigned member can edit
     const handleSaveAllMasterCategories = () => {
         if (!masterSynthesisLocal?.id && currentUser.role !== 'admin' && currentUser.role !== 'drafter') {
             return;
         }
 
-        const updateData: Record<string, string | null> = {
-            convergence_text: masterEditors.convergence || null,
-            consideration_text: masterEditors.matters_for_consideration || null,
-            proposals_text: masterEditors.proposals || null,
-            other_text: masterEditors.others || null,
-        };
-
         router.post(
-            `/synthesis/master-synthesis/${conversation.id}`,
-            updateData,
+            `/synthesis/master-synthesis-authorized/${conversation.id}`,
+            {
+                convergence_text: masterEditors.convergence ?? null,
+                consideration_text: masterEditors.consideration ?? null,
+                proposals_text: masterEditors.proposals ?? null,
+                other_text: masterEditors.others ?? null,
+            },
             {
                 preserveScroll: true,
                 onSuccess: (page: any) => {
                     if (page.props.masterSynthesis) {
                         setMasterSynthesisLocal(page.props.masterSynthesis);
                     }
+                },
+                onError: (errors) => {
+                    console.error('[ERROR] Save all master synthesis failed:', errors);
+                    setStatusMessage({ type: 'error', text: 'Failed to save master synthesis. Check console for details.' });
                 },
             }
         );
@@ -373,31 +281,78 @@ export default function Collaborate({
     const canEditMaster = currentUser.role === 'admin' || currentUser.role === 'drafter';
 
     // Extract key points handler
+
+    // Generate SynthesisSummary handler — synchronous call with immediate result display
+    const handleGenerateSynthesisSummary = async (category: string) => {
+        if (!masterSynthesisLocal?.id) {
+            return;
+        }
+
+        setIsGeneratingSummary(true);
+        setStatusMessage(null);
+        try {
+            const res = await fetch(`/synthesis/summary-sync/${conversation.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    master_synthesis_id: masterSynthesisLocal.id,
+                    category: category,
+                }),
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // Update the summaryLocal state with the new category content
+                const summaryField = category + '_summary';
+                setSummaryLocal((prev) => ({
+                    ...(prev || { id: null, generated_at: null }),
+                    id: prev?.id ?? 0,
+                    [summaryField]: data[summaryField] ?? null,
+                    generated_at: new Date().toISOString(),
+                }));
+                setStatusMessage({ type: 'success', text: `Synthesis summary for ${category} generated successfully.` });
+            } else {
+                setStatusMessage({ type: 'error', text: data.message || 'Failed to generate summary.' });
+            }
+        } catch {
+            setStatusMessage({ type: 'error', text: 'An error occurred while generating the summary.' });
+        } finally {
+            setIsGeneratingSummary(false);
+        }
+    };
     const handleExtractKeyPoints = () => {
         if (!masterSynthesisLocal?.id) {
             return;
         }
 
         setIsExtractingKeyPoints(true);
-        router.post(
-            `/synthesis/extract-key-points/${conversation.id}`,
-            {
+        fetch(`/synthesis/extract-key-points/${conversation.id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
                 max_key_points: keyPointsCount,
                 master_synthesis_id: masterSynthesisLocal.id,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: (page: any) => {
-                    setIsExtractingKeyPoints(false);
-                    if (page.props.keyPoints?.key_points_text) {
-                        setKeyPointsText(page.props.keyPoints.key_points_text);
-                    }
-                },
-                onError: () => {
-                    setIsExtractingKeyPoints(false);
-                },
-            }
-        );
+            }),
+        })
+            .then((res) => res.json())
+            .then((data) => {
+                setIsExtractingKeyPoints(false);
+                if (data.success && data.key_points?.key_points_text) {
+                    setKeyPointsText(data.key_points.key_points_text);
+                    setHasLoadedKeyPoints(true);
+                }
+            })
+            .catch(() => {
+                setIsExtractingKeyPoints(false);
+            });
     };
 
     return (
@@ -626,6 +581,47 @@ export default function Collaborate({
                                             </div>
                                         )}
 
+
+                                        {/* ─── SynthesisSummary Display (Non-editable) ────────── */}
+                                        {summaryLocal && summaryLocal.id && (() => {
+                                            const summaryFieldName = category.key + '_summary';
+                                            const categoryContent = (summaryLocal as any)[summaryFieldName];
+                                            // Only show the summary box if this category has content
+                                            if (!categoryContent || !categoryContent.trim()) return null;
+                                            return (
+                                                <div className="mb-4 p-4 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+                                                    <h4 className="text-sm font-medium mb-2 flex items-center justify-between">
+                                                        <span className="flex items-center gap-2">
+                                                            <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                            AI-Generated Synthesis Summary ({category.label})
+                                                        </span>
+                                                        {summaryLocal.generated_at && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Generated: {new Date(summaryLocal.generated_at).toLocaleString()}
+                                                            </span>
+                                                        )}
+                                                    </h4>
+                                                    <div className="whitespace-pre-wrap text-sm text-muted-foreground">
+                                                        {categoryContent}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                        {/* Show trigger button when master synthesis exists (always retriggerable) */}
+                                        {masterSynthesisLocal?.id && (
+                                            <div className="mb-4">
+                                                <Button
+                                                    onClick={() => handleGenerateSynthesisSummary(category.key)}
+                                                    disabled={isGeneratingSummary}
+                                                    variant={summaryLocal?.id ? 'outline' : 'default'}
+                                                    className={`flex items-center gap-2 ${summaryLocal?.id ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                                >
+                                                    {isGeneratingSummary && <Loader2 className="size-4 animate-spin" />}
+                                                    <Sparkles className="size-4" />
+                                                    {summaryLocal?.id ? 'Regenerate' : 'Generate'} Synthesis Summary for {category.label}
+                                                </Button>
+                                            </div>
+                                        )}
                                         {/* ─── Master Synthesis Editor ────────── */}
                                         <div className={`pt-4 border-t ${isEditingThisCategory ? 'border-primary/30 bg-primary/5' : ''}`}>
                                             <h4 className="text-sm font-medium mb-3 flex items-center justify-between">
@@ -714,7 +710,7 @@ export default function Collaborate({
                         </CardTitle>
                     </CardHeader>
                     {showAllMasterSynthesis && masterSynthesisLocal && (
-                        <CardContent className="pt-6 space-y-4">
+                        <CardContent className="pt-6 space-y-6">
                             {CATEGORIES.map((category) => (
                                 <div key={category.key}>
                                     <h4 className={`text-sm font-medium mb-2 flex items-center gap-2 ${category.color}`}>
@@ -722,17 +718,33 @@ export default function Collaborate({
                                         {category.label}
                                     </h4>
                                     <div className="space-y-2">
-                                        <div>
-                                            <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Master Content:</p>
-                                            <textarea
-                                                value={masterEditors[category.key] ?? ''}
-                                                rows={6}
-                                                className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                            />
+                                        <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Master Content:</p>
+                                        <div className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground whitespace-pre-wrap">
+                                            {masterEditors[category.key] ?? 'No content available.'}
                                         </div>
                                     </div>
                                 </div>
                             ))}
+                            {/* Key Points Extraction Output */}
+                            {keyPointsText && (
+                                <div>
+                                    <h4 className="text-sm font-medium mb-2 flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                                        <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                        Extracted Key Points:
+                                    </h4>
+                                    <div className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground whitespace-pre-wrap">
+                                        {keyPointsText.split('\n').filter((line) => line.trim()).map((line, index) => {
+                                            // Strip existing dash/bullet prefix if present for consistent numbering
+                                            const cleanLine = line.replace(/^[0-9]+[\.\)]*\s*|-+\s*/, '').trim();
+                                            return (
+                                                <div key={index} className="mb-1">
+                                                    <span className="font-medium">{index + 1}.</span> {cleanLine}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     )}
                     {showAllMasterSynthesis && (!masterSynthesisLocal || !masterSynthesisLocal.id) && (
@@ -784,7 +796,7 @@ export default function Collaborate({
                             </div>
 
                             {/* Key Points Textarea */}
-                            {(keyPointsText || isExtractingKeyPoints) && (
+                            {(keyPointsText || isExtractingKeyPoints || hasLoadedKeyPoints) && (
                                 <div>
                                     <label className="text-sm font-medium mb-1 block flex items-center gap-2">
                                         <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
@@ -798,7 +810,7 @@ export default function Collaborate({
                                         className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        Edit the extracted key points as needed. Each point should be on its own line starting with a dash (-).
+                                        Edit the extracted key points as needed. Each point should be on its own line starting with a number (e.g., "1. ").
                                     </p>
                                 </div>
                             )}
@@ -806,7 +818,7 @@ export default function Collaborate({
                     </Card>
                 )}
 
-                {/* ─── Action Bar ─────────────��───────────────────── */}
+                {/* ─── Action Bar ───────────────────────────── */}
                 <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4 border-t">
                     <div className="flex items-center gap-3">
                         <Link href={`/synthesis/review/${conversation.id}`}>
@@ -828,7 +840,6 @@ export default function Collaborate({
 }
 
 Collaborate.layout = (page: React.ReactNode) => {
-     
     const props = page as any;
 
     if (!props?.props?.conversation) {
