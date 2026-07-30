@@ -156,8 +156,8 @@ export default function Dashboard({ conversations }: PageProps) {
                                                 </Button>
                                             )}
 
-                                            {/* Decision Draft */}
-                                            <Link href={`/pastoral/decision-draft/${conversation.id}`}>
+                                            {/* Decisions Overview */}
+                                            <Link href={`/pastoral/decisions/${conversation.id}`}>
                                                 <Button
                                                     variant={conversation.user_draft_submitted ? 'outline' : 'default'}
                                                     size="sm"

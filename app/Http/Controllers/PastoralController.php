@@ -91,7 +91,7 @@ class PastoralController extends Controller
     }
 
     /**
-     * Shows decision draft form for a conversation.
+     * Shows decision overview page for a conversation (renders decisions-view).
      */
     public function decisionDraft(Request $request, Conversation $conversation)
     {
@@ -99,13 +99,28 @@ class PastoralController extends Controller
 
         $user = $request->user();
 
-        $existingDraft = DecisionDraft::where('conversation_id', $conversation->id)
-            ->where('user_id', $user->id)
-            ->first();
+        // Master decisions for the conversation
+        $masterDecisions = MasterDecision::where('conversation_id', $conversation->id)
+            ->get();
 
-        return Inertia::render('pastoral/decision-draft', [
-            'conversation' => $conversation,
-            'existingDraft' => $existingDraft,
+        // Decision summaries for the conversation
+        $decisionSummaries = DecisionSummary::where('conversation_id', $conversation->id)
+            ->get();
+
+        // Decision drafts for the conversation
+        $decisionDrafts = DecisionDraft::where('conversation_id', $conversation->id)
+            ->with(['user', 'diocese'])
+            ->get();
+
+        // Dioceses list
+        $dioceses = Diocese::all();
+
+        return Inertia::render('pastoral/decisions-view', [
+            'masterDecisions' => $masterDecisions,
+            'decisionSummaries' => $decisionSummaries,
+            'decisionDrafts' => $decisionDrafts,
+            'dioceses' => $dioceses,
+            'userRole' => $user->role,
         ]);
     }
 
