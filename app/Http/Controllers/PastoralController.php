@@ -170,60 +170,28 @@ class PastoralController extends Controller
 
         $user = $request->user();
 
-        // National level submissions
-        $allNationalSubmissions = DecisionDraft::where('conversation_id', $conversation->id)
-            ->where('is_submitted', true)
-            ->with('user')
-            ->get(['id', 'user_id', 'national_text', 'submitted_at']);
+        // Master decisions for the conversation
+        $masterDecisions = MasterDecision::where('conversation_id', $conversation->id)
+            ->get();
 
-        // National summary
-        $nationalSummary = DecisionSummary::where('conversation_id', $conversation->id)
-            ->where('level', 'national')
-            ->first();
+        // Decision summaries for the conversation
+        $decisionSummaries = DecisionSummary::where('conversation_id', $conversation->id)
+            ->get();
 
-        // National master decision
-        $nationalMasterDecision = MasterDecision::where('conversation_id', $conversation->id)
-            ->where('level', 'national')
-            ->first();
+        // Decision drafts for the conversation
+        $decisionDrafts = DecisionDraft::where('conversation_id', $conversation->id)
+            ->with(['user', 'diocese'])
+            ->get();
 
         // Dioceses list
         $dioceses = Diocese::all();
 
-        // Diocese level submissions grouped by diocese
-        $dioceseSubmissions = DecisionDraft::where('conversation_id', $conversation->id)
-            ->where('is_submitted', true)
-            ->whereNotNull('diocese_id')
-            ->with(['user', 'diocese'])
-            ->get()
-            ->groupBy('diocese_id');
-
-        // Diocese summaries keyed by diocese_id
-        $dioceseSummaries = DecisionSummary::where('conversation_id', $conversation->id)
-            ->where('level', 'diocese')
-            ->get()
-            ->keyBy('diocese_id');
-
-        // Diocese master decisions keyed by diocese_id
-        $dioceseMasterDecisions = MasterDecision::where('conversation_id', $conversation->id)
-            ->where('level', 'diocese')
-            ->get()
-            ->keyBy('diocese_id');
-
-        return Inertia::render('pastoral/decisions', [
-            'conversation' => $conversation,
-            'allNationalSubmissions' => $allNationalSubmissions,
-            'nationalSummary' => $nationalSummary,
-            'nationalMasterDecision' => $nationalMasterDecision,
+        return Inertia::render('pastoral/decisions-view', [
+            'masterDecisions' => $masterDecisions,
+            'decisionSummaries' => $decisionSummaries,
+            'decisionDrafts' => $decisionDrafts,
             'dioceses' => $dioceses,
-            'dioceseSubmissions' => $dioceseSubmissions,
-            'dioceseSummaries' => $dioceseSummaries,
-            'dioceseMasterDecisions' => $dioceseMasterDecisions,
-            'currentUser' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'role' => $user->role,
-                'diocese_id' => $user->diocese_id,
-            ],
+            'userRole' => $user->role,
         ]);
     }
 

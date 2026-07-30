@@ -100,11 +100,13 @@ export default function Dashboard({
                                         <Users className="size-4" /> Collaborative Review
                                     </Button>
                                 </Link>
-                                <Link href={`/synthesis/export-booklet/${selectedConversationId}`} className="w-full">
-                                    <Button variant="outline" className="w-full sm:w-auto flex items-center justify-center gap-2">
-                                        <FileDown className="size-4" /> Export Booklet
-                                    </Button>
-                                </Link>
+                                <Button
+                                    variant="outline"
+                                    className="w-full sm:w-auto flex items-center justify-center gap-2"
+                                    onClick={() => window.open(`/synthesis/export-booklet/${selectedConversationId}`, '_blank')}
+                                >
+                                    <FileDown className="size-4" /> Export Booklet
+                                </Button>
                             </div>
                         )}
 
