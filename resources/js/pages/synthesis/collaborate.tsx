@@ -376,7 +376,7 @@ export default function Collaborate({
                             <li>C. Recommendation: actionable or something clear enough to be put into practical use. Recommendation may also be explained as other required action before being able to address the pertaining matter.</li>
                         </ol>
                         
-                        <h4>Method</h4>
+                        <h4 className="font-semibold">Method</h4>
                         <ol>
                             <li>1. Read the submitted paragraphs</li>
                             <li>2. Then you may use the LLM trigger to assist in the formulation of  FINAL Convergence + Matters for consideration + Proposal</li>

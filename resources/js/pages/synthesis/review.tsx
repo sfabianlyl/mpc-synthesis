@@ -420,7 +420,7 @@ export default function Review({
                         <li>C. Recommendation: actionable or something clear enough to be put into practical use. Recommendation may also be explained as other required action before being able to address the pertaining matter.</li>
                     </ol>
                     
-                    <h4>Method</h4>
+                    <h4 className="font-semibold">Method</h4>
                     <ol>
                         <li>1. Read the consensus paragraphs assigned</li>
                         <li>2. Identify implicit and explicit points from the consensus paragraphs respectively </li>
