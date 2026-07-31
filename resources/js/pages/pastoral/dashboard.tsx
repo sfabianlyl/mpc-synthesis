@@ -43,27 +43,6 @@ export default function Dashboard({ conversations }: PageProps) {
     const { auth } = usePage().props as any;
     const user = auth?.user;
 
-    const handleDownload = async (conversationId: number, fileName: string) => {
-        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '';
-        const response = await fetch(`/pastoral/media/${conversationId}/download?file=${encodeURIComponent(fileName)}`, {
-            method: 'GET',
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-            },
-        });
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        }
-    };
-
     return (
         <>
             <Head title="Pastoral Dashboard" />
@@ -229,22 +208,22 @@ export default function Dashboard({ conversations }: PageProps) {
                                             )}
                                         </div>
 
-                                        {/* Media Downloads */}
+                                        {/* Media Files - Open in New Tab */}
                                         {conversation.media_files && conversation.media_files.length > 0 ? (
                                             <div className="border-t border-sidebar-border/30 pt-3 mt-2">
                                                 <p className="text-xs font-medium text-muted-foreground mb-2">Downloads:</p>
                                                 <div className="flex flex-wrap gap-1">
                                                     {conversation.media_files.map((file) => (
-                                                        <Button
+                                                        <a
                                                             key={file.name}
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="text-xs h-7 gap-1"
-                                                            onClick={() => handleDownload(conversation.id, file.name)}
+                                                            href={file.path}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 px-2 h-7 rounded-md border border-transparent hover:bg-muted/50 transition-colors cursor-pointer"
                                                         >
-                                                            <FileDown className="size-3" />
-                                                            {file.name}
-                                                        </Button>
+                                                            <FileDown className="size-3 text-muted-foreground" />
+                                                            <span className="text-xs">{file.name}</span>
+                                                        </a>
                                                     ))}
                                                 </div>
                                             </div>

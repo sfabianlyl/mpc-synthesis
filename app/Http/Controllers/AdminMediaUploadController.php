@@ -23,35 +23,33 @@ class AdminMediaUploadController extends Controller
             ->map(function ($conversation) {
                 // Get media files from storage/app/public/media/{conversation-title-lowercase}/ folder
                 $mediaFiles = [];
-                if ($conversation->event_id) {
-                    $folder = strtolower(str_replace(' ', '', $conversation->title));
-                    $storagePath = 'media/' . $folder;
-                    
-                    // Check both old location (public/{folder}) and new location (storage/media/{folder})
-                    $oldPath = public_path($folder);
-                    $newPath = storage_path('app/public/' . $storagePath);
-                    
-                    $files = [];
-                    if (is_dir($newPath)) {
-                        $files = scandir($newPath);
-                    } elseif (is_dir($oldPath)) {
-                        // Fallback to old location for backward compatibility
-                        $files = scandir($oldPath);
-                    }
-                    
-                    if ($files) {
-                        foreach ($files as $file) {
-                            if ($file !== '.' && $file !== '..' && is_file(
-                                is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
-                            )) {
-                                $mediaFiles[] = [
-                                    'name' => $file,
-                                    'path' => '/storage/' . $storagePath . '/' . $file,
-                                    'size' => filesize(
-                                        is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
-                                    ),
-                                ];
-                            }
+                $folder = strtolower(str_replace(' ', '', $conversation->title));
+                $storagePath = 'media/' . $folder;
+
+                // Check both old location (public/{folder}) and new location (storage/media/{folder})
+                $oldPath = public_path($folder);
+                $newPath = storage_path('app/public/' . $storagePath);
+
+                $files = [];
+                if (is_dir($newPath)) {
+                    $files = scandir($newPath);
+                } elseif (is_dir($oldPath)) {
+                    // Fallback to old location for backward compatibility
+                    $files = scandir($oldPath);
+                }
+
+                if ($files) {
+                    foreach ($files as $file) {
+                        if ($file !== '.' && $file !== '..' && is_file(
+                            is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
+                        )) {
+                            $mediaFiles[] = [
+                                'name' => $file,
+                                'path' => '/storage/' . $storagePath . '/' . $file,
+                                'size' => filesize(
+                                    is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
+                                ),
+                            ];
                         }
                     }
                 }
