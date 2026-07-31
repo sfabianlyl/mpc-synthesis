@@ -49,7 +49,7 @@ class AdminMediaUploadController extends Controller
                 ];
             });
 
-        return Inertia::render('admin/media-upload', [
+        return Inertia::render('admin/MediaUploadPage', [
             'conversations' => $conversations,
         ]);
     }
