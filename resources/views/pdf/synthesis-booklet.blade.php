@@ -256,7 +256,51 @@
             border-radius: 3px;
             font-size: 0.8em;
         }
-    </style>
+        
+        /* Key Points Section */
+        .key-points-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+        .key-points-section h2 {
+            color: white !important;
+            border-bottom: 2px solid rgba(255,255,255,0.3) !important;
+            margin-top: 0 !important;
+        }
+        .key-point-item {
+            background: rgba(255,255,255,0.1);
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 4px solid rgba(255,255,255,0.5);
+        }
+        .key-point-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* Print styles for PDF export */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                padding: 0;
+                max-width: 100%;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+            .section-break {
+                page-break-inside: avoid;
+            }
+            @page {
+                margin: 2cm;
+            }
+        }
+        </style>
 </head>
 <body>
     {{-- Cover Page --}}
@@ -316,6 +360,40 @@
             <p>{{ $json['priority_proposals'] }}</p>
             @endif
         @endif
+    </div>
+    @endif
+
+    {{-- Key Points Section --}}
+    @if(isset($keyPoints) && $keyPoints->count() > 0)
+    <div class="section-break"></div>
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px; margin-bottom: 30px;">
+        <h2 style="color: white !important; border-bottom: 2px solid rgba(255,255,255,0.3) !important; padding-bottom: 10px; margin-top: 0; margin-bottom: 15px;">📋 Key Points Summary</h2>
+        <p style="margin-bottom: 20px; opacity: 0.9;">The following key points were extracted from the synthesis conversation using AI analysis:</p>
+        
+        @foreach($keyPoints as $keyPoint)
+            <div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                <div style="font-size: 0.85em; opacity: 0.8; margin-bottom: 10px;">
+                    Extracted on {{ \Carbon\Carbon::parse($keyPoint->created_at)->format('M j, Y g:i A') }}
+                    @if($keyPoint->provider)
+                        · via {{ $keyPoint->provider }}
+                    @endif
+                </div>
+                @if(!empty($keyPoint->key_points) && is_array($keyPoint->key_points))
+                    @foreach($keyPoint->key_points as $index => $point)
+                        @if(is_string($point) && trim($point) !== '')
+                        <div style="background: rgba(255,255,255,0.1); padding: 12px 15px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid rgba(255,255,255,0.5);">
+                            <span style="font-weight: bold; margin-right: 8px;">{{ $index + 1 }}.</span>
+                            {{ trim($point) }}
+                        </div>
+                        @endif
+                    @endforeach
+                @elseif(!empty($keyPoint->key_points_text) && trim($keyPoint->key_points_text) !== '')
+                    <div style="background: rgba(255,255,255,0.1); padding: 12px 15px; border-radius: 6px; border-left: 4px solid rgba(255,255,255,0.5);">
+                        {!! nl2br(e(trim($keyPoint->key_points_text))) !!}
+                    </div>
+                @endif
+            </div>
+        @endforeach
     </div>
     @endif
 

@@ -675,9 +675,16 @@ class SynthesisController extends Controller
             'emerging_themes' => null,
         ];
 
+        // Fetch key points for this conversation
+        $keyPoints = SynthesisKeyPoint::where('conversation_id', $conversation->id)
+            ->completed()
+            ->orderByDesc('created_at')
+            ->get();
+
         $html = view('pdf.synthesis-booklet', [
             'document' => $document,
             'reports' => $reports,
+            'keyPoints' => $keyPoints,
         ])->render();
 
         $filename = 'synthesis-booklet-' . $conversation->id . '-' . now()->format('Y-m-d') . '.pdf';

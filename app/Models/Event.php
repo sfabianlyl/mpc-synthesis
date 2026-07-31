@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -19,6 +20,9 @@ use Illuminate\Support\Carbon;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Conversation> $conversations
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, NationalDecisionDraft> $nationalDecisionDrafts
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, DioceseDecisionDraft> $dioceseDecisionDrafts
+ * @property-read MasterDecisionSummary|null $masterDecisionSummary
  */
 class Event extends Model
 {
@@ -40,5 +44,29 @@ class Event extends Model
     public function conversations(): HasMany
     {
         return $this->hasMany(Conversation::class);
+    }
+
+    /**
+     * Get the national decision drafts for this event.
+     */
+    public function nationalDecisionDrafts(): HasMany
+    {
+        return $this->hasMany(NationalDecisionDraft::class);
+    }
+
+    /**
+     * Get the diocese decision drafts for this event.
+     */
+    public function dioceseDecisionDrafts(): HasMany
+    {
+        return $this->hasMany(DioceseDecisionDraft::class);
+    }
+
+    /**
+     * Get the master decision summary for this event.
+     */
+    public function masterDecisionSummary(): HasOne
+    {
+        return $this->hasOne(MasterDecisionSummary::class);
     }
 }

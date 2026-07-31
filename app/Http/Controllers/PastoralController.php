@@ -7,7 +7,12 @@ use App\Models\Conversation;
 use App\Models\DecisionDraft;
 use App\Models\DecisionSummary;
 use App\Models\Diocese;
+use App\Models\DioceseDecisionDraft;
+use App\Models\Event;
 use App\Models\MasterDecision;
+use App\Models\MasterDecisionSummary;
+use App\Models\NationalDecisionDraft;
+use App\Services\LlmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -332,5 +337,282 @@ class PastoralController extends Controller
                 }
             }
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Event-Level Decision Making Methods
+    // ---------------------------------------------------------------------
+
+    /**
+     * GET page for Begin Decision Making.
+     * Fetches existing drafts for the current user and event.
+     */
+    public function decision(Request $request, Event $event)
+    {
+        $this->authorizePastoralAccess($request);
+
+        $user = $request->user();
+
+        $nationalDraft = NationalDecisionDraft::where('event_id', $event->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        $dioceseDraft = DioceseDecisionDraft::where('event_id', $event->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        $userSubmitted = (bool) $nationalDraft?->is_submitted || (bool) $dioceseDraft?->is_submitted;
+
+        return Inertia::render('pastoral/decision', [
+            'event' => $event,
+            'nationalDraft' => $nationalDraft ? [
+                'id' => $nationalDraft->id,
+                'draft_text' => $nationalDraft->draft_text,
+                'is_submitted' => $nationalDraft->is_submitted,
+                'submitted_at' => $nationalDraft->submitted_at?->toIso8601String(),
+            ] : null,
+            'dioceseDraft' => $dioceseDraft ? [
+                'id' => $dioceseDraft->id,
+                'draft_text' => $dioceseDraft->draft_text,
+                'is_submitted' => $dioceseDraft->is_submitted,
+                'submitted_at' => $dioceseDraft->submitted_at?->toIso8601String(),
+            ] : null,
+            'userSubmitted' => $userSubmitted,
+        ]);
+    }
+
+    /**
+     * POST store decision drafts.
+     * Creates or updates NationalDecisionDraft and DioceseDecisionDraft for current user + event.
+     */
+    public function storeDecisionDrafts(Request $request, Event $event)
+    {
+        $this->authorizePastoralAccess($request);
+
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'national_draft_text' => 'nullable|string',
+            'diocese_draft_text' => 'nullable|string',
+            'submit' => 'boolean',
+        ]);
+
+        $isSubmitted = $validated['submit'] ?? false;
+
+        // Update or create NationalDecisionDraft
+        NationalDecisionDraft::updateOrCreate(
+            [
+                'event_id' => $event->id,
+                'user_id' => $user->id,
+            ],
+            [
+                'diocese_id' => $user->diocese_id,
+                'draft_text' => $validated['national_draft_text'] ?? null,
+                'is_submitted' => $isSubmitted,
+                'submitted_at' => $isSubmitted ? now() : null,
+            ]
+        );
+
+        // Update or create DioceseDecisionDraft
+        DioceseDecisionDraft::updateOrCreate(
+            [
+                'event_id' => $event->id,
+                'user_id' => $user->id,
+            ],
+            [
+                'diocese_id' => $user->diocese_id,
+                'draft_text' => $validated['diocese_draft_text'] ?? null,
+                'is_submitted' => $isSubmitted,
+                'submitted_at' => $isSubmitted ? now() : null,
+            ]
+        );
+
+        return back()->with('success', 'Decision drafts saved successfully.');
+    }
+
+    /**
+     * GET page for Collaborative Decision.
+     * Fetches all submitted NationalDecisionDrafts, DioceseDecisionDrafts and MasterDecisionSummary for the event.
+     */
+    public function collaborate(Request $request, Event $event)
+    {
+        $this->authorizePastoralAccess($request);
+
+        // Fetch all submitted NationalDecisionDrafts with user and diocese relationships
+        $nationalDrafts = NationalDecisionDraft::where('event_id', $event->id)
+            ->where('is_submitted', true)
+            ->with(['user', 'diocese'])
+            ->get()
+            ->map(function ($draft) {
+                return [
+                    'id' => $draft->id,
+                    'user_id' => $draft->user_id,
+                    'draft_text' => $draft->draft_text,
+                    'is_submitted' => $draft->is_submitted,
+                    'submitted_at' => $draft->submitted_at?->toIso8601String(),
+                    'created_at' => $draft->created_at?->toIso8601String(),
+                    'user' => $draft->user ? [
+                        'id' => $draft->user->id,
+                        'name' => $draft->user->name,
+                        'email' => $draft->user->email,
+                    ] : null,
+                    'diocese' => $draft->diocese ? [
+                        'id' => $draft->diocese->id,
+                        'name' => $draft->diocese->name,
+                        'code' => $draft->diocese->code,
+                    ] : null,
+                ];
+            });
+
+        // Fetch all submitted DioceseDecisionDrafts with user and diocese relationships
+        $dioceseDrafts = DioceseDecisionDraft::where('event_id', $event->id)
+            ->where('is_submitted', true)
+            ->with(['user', 'diocese'])
+            ->get()
+            ->map(function ($draft) {
+                return [
+                    'id' => $draft->id,
+                    'user_id' => $draft->user_id,
+                    'draft_text' => $draft->draft_text,
+                    'is_submitted' => $draft->is_submitted,
+                    'submitted_at' => $draft->submitted_at?->toIso8601String(),
+                    'created_at' => $draft->created_at?->toIso8601String(),
+                    'user' => $draft->user ? [
+                        'id' => $draft->user->id,
+                        'name' => $draft->user->name,
+                        'email' => $draft->user->email,
+                    ] : null,
+                    'diocese' => $draft->diocese ? [
+                        'id' => $draft->diocese->id,
+                        'name' => $draft->diocese->name,
+                        'code' => $draft->diocese->code,
+                    ] : null,
+                ];
+            });
+
+        // Fetch MasterDecisionSummary for the event
+        $masterDecisionSummary = MasterDecisionSummary::where('event_id', $event->id)->first();
+
+        return Inertia::render('pastoral/collaborate', [
+            'event' => $event,
+            'nationalDrafts' => $nationalDrafts,
+            'masterDecisionSummary' => $masterDecisionSummary ? [
+                'id' => $masterDecisionSummary->id,
+                'master_text' => $masterDecisionSummary->master_text,
+                'is_editable' => $masterDecisionSummary->is_editable,
+                'generated_by' => $masterDecisionSummary->generated_by,
+                'generated_at' => $masterDecisionSummary->generated_at?->toIso8601String(),
+            ] : null,
+            'dioceseDrafts' => $dioceseDrafts,
+        ]);
+    }
+
+    /**
+     * POST generate summary via LLM.
+     * Fetches all submitted NationalDecisionDrafts and uses LlmService to generate a cohesive summary.
+     */
+    public function generateDecisionSummary(Request $request, Event $event, LlmService $llmService): JsonResponse
+    {
+        $this->authorizePastoralAccess($request);
+
+        // Fetch all submitted NationalDecisionDrafts for the event
+        $drafts = NationalDecisionDraft::where('event_id', $event->id)
+            ->where('is_submitted', true)
+            ->get();
+
+        if ($drafts->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'No submitted decision drafts available for summary generation.',
+            ], 422);
+        }
+
+        // Gather all draft_text values
+        $draftTexts = $drafts->map(fn($draft) => "[User: {$draft->user->name}" . ($draft->diocese ? ", Diocese: {$draft->diocese->name}" : '') . "]\n{$draft->draft_text}")->join("\n\n---\n\n");
+
+        $systemPrompt = 'You are a synthesis assistant for a consultative process. Your task is to consolidate multiple decision drafts from pastoral members into a single cohesive master summary. Preserve the key points, agreements, and proposals from all contributors while eliminating redundancies. Output should be well-structured markdown text.';
+
+        $userPrompt = "Please generate a consolidated master decision summary from the following submitted drafts:\n\n{$draftTexts}";
+
+        $result = $llmService->query($systemPrompt, $userPrompt);
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to generate summary: ' . $result['error'],
+            ], 500);
+        }
+
+        // Create or update MasterDecisionSummary with the result
+        $user = $request->user();
+        $masterSummary = MasterDecisionSummary::updateOrCreate(
+            [
+                'event_id' => $event->id,
+            ],
+            [
+                'master_text' => $result['content'],
+                'is_editable' => true,
+                'generated_by' => $result['provider'],
+                'generated_at' => now(),
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'master_text' => $result['content'],
+            'generated_by' => $result['provider'],
+            'master_summary_id' => $masterSummary->id,
+        ]);
+    }
+
+    /**
+     * PATCH save master text.
+     * Updates the MasterDecisionSummary for the event.
+     */
+    public function saveMasterText(Request $request, Event $event): JsonResponse
+    {
+        $this->authorizePastoralAccess($request);
+
+        $validated = $request->validate([
+            'master_text' => 'required|string',
+        ]);
+
+        $masterSummary = MasterDecisionSummary::where('event_id', $event->id)->first();
+
+        if (!$masterSummary) {
+            return response()->json([
+                'success' => false,
+                'error' => 'No master summary exists for this event.',
+            ], 404);
+        }
+
+        $masterSummary->update([
+            'master_text' => $validated['master_text'],
+            'is_editable' => true,
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * GET page for Bishop's Overview.
+     * Fetches MasterDecisionSummary for the event.
+     */
+    public function bishopOverview(Request $request, Event $event)
+    {
+        $this->authorizePastoralAccess($request);
+
+        $masterDecisionSummary = MasterDecisionSummary::where('event_id', $event->id)->first();
+
+        return Inertia::render('pastoral/bishop-overview', [
+            'event' => $event,
+            'masterDecisionSummary' => $masterDecisionSummary ? [
+                'id' => $masterDecisionSummary->id,
+                'master_text' => $masterDecisionSummary->master_text,
+                'is_editable' => $masterDecisionSummary->is_editable,
+                'generated_by' => $masterDecisionSummary->generated_by,
+                'generated_at' => $masterDecisionSummary->generated_at?->toIso8601String(),
+            ] : null,
+        ]);
     }
 }

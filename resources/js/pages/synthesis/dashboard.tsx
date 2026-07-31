@@ -28,6 +28,8 @@ export default function Dashboard({
 }: PageProps) {
     const { flash } = usePage().props as any;
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [bookletUrl, setBookletUrl] = useState<string | null>(null);
+    const [bookletWindow, setBookletWindow] = useState<Window | null>(null);
 
     // Calculate responses stats
     const totalGroups = groups.length;
@@ -100,10 +102,25 @@ export default function Dashboard({
                                         <Users className="size-4" /> Collaborative Review
                                     </Button>
                                 </Link>
+                                {/* Export Booklet with Download PDF */}
+                                {bookletUrl && bookletWindow ? (
+                                    <Button
+                                        variant="outline"
+                                        className="w-full sm:w-auto flex items-center justify-center gap-2"
+                                        onClick={() => bookletWindow?.print()}
+                                    >
+                                        <FileDown className="size-4" /> Download PDF
+                                    </Button>
+                                ) : null}
                                 <Button
                                     variant="outline"
                                     className="w-full sm:w-auto flex items-center justify-center gap-2"
-                                    onClick={() => window.open(`/synthesis/export-booklet/${selectedConversationId}`, '_blank')}
+                                    onClick={() => {
+                                        const url = `/synthesis/export-booklet/${selectedConversationId}`;
+                                        const win = window.open(url, '_blank');
+                                        setBookletUrl(url);
+                                        setBookletWindow(win);
+                                    }}
                                 >
                                     <FileDown className="size-4" /> Export Booklet
                                 </Button>

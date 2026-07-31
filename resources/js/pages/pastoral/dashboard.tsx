@@ -4,10 +4,13 @@ import {
     BookOpen,
     CheckCircle2,
     ClipboardList,
+    FileDown,
     FileText,
     LayoutGrid,
     Lock,
     ScrollText,
+    Shield,
+    Users,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +25,8 @@ interface Conversation {
     event_title: string | null;
     has_reports: boolean;
     user_draft_submitted: boolean;
+    event_id: number | null;
+    media_files: Array<{ name: string; path: string; size: number }>;
 }
 
 interface PageProps {
@@ -37,6 +42,27 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 export default function Dashboard({ conversations }: PageProps) {
     const { auth } = usePage().props as any;
     const user = auth?.user;
+
+    const handleDownload = async (conversationId: number, fileName: string) => {
+        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '';
+        const response = await fetch(`/pastoral/media/${conversationId}/download?file=${encodeURIComponent(fileName)}`, {
+            method: 'GET',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+            },
+        });
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+    };
 
     return (
         <>
@@ -82,7 +108,7 @@ export default function Dashboard({ conversations }: PageProps) {
                                 <CheckCircle2 className="h-5 w-5 text-violet-600" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium">Drafts Submitted</p>
+                                <p className="text-sm font-medium">Decisions Submitted</p>
                                 <p className="text-xs text-muted-foreground">
                                     {conversations.filter((c) => c.user_draft_submitted).length} of {conversations.length}
                                 </p>
@@ -132,11 +158,40 @@ export default function Dashboard({ conversations }: PageProps) {
                                                 {conversation.user_draft_submitted && (
                                                     <Badge variant="outline" className="text-xs px-2 py-0.5 bg-violet-50 dark:bg-violet-950/20 text-violet-700 border-violet-200 dark:border-violet-800 flex items-center gap-1">
                                                         <Lock className="size-3" />
-                                                        Draft Submitted
+                                                        Decision Submitted
                                                     </Badge>
                                                 )}
                                             </div>
                                         </div>
+
+                                        {/* Action Buttons */}
+                                        {conversation.event_id && (
+                                            <div className="flex flex-wrap gap-2 mt-3">
+                                                <Link href={`/pastoral/decision/${conversation.event_id}`}>
+                                                    <Button variant="default" size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                                                        <FileText className="size-4" />
+                                                        Begin Decision Making
+                                                        <ArrowRight className="size-3" />
+                                                    </Button>
+                                                </Link>
+                                                
+                                                <Link href={`/pastoral/collaborate/${conversation.event_id}`}>
+                                                    <Button variant="outline" size="sm" className="gap-2">
+                                                        <Users className="size-4" />
+                                                        Collaborative Decision
+                                                        <ArrowRight className="size-3" />
+                                                    </Button>
+                                                </Link>
+                                                
+                                                <Link href={`/pastoral/bishop-overview/${conversation.event_id}`}>
+                                                    <Button variant="outline" size="sm" className="gap-2">
+                                                        <Shield className="size-4" />
+                                                        Bishop's Overview
+                                                        <ArrowRight className="size-3" />
+                                                    </Button>
+                                                </Link>
+                                            </div>
+                                        )}
                                     </CardHeader>
                                     <CardContent className="border-t border-sidebar-border/30 pt-4">
                                         <div className="flex flex-wrap gap-2">
@@ -155,29 +210,28 @@ export default function Dashboard({ conversations }: PageProps) {
                                                     Reports Not Ready
                                                 </Button>
                                             )}
-
-                                            {/* Decisions Overview */}
-                                            <Link href={`/pastoral/decisions/${conversation.id}`}>
-                                                <Button
-                                                    variant={conversation.user_draft_submitted ? 'outline' : 'default'}
-                                                    size="sm"
-                                                    className="gap-2"
-                                                >
-                                                    <ClipboardList className="size-4" />
-                                                    {conversation.user_draft_submitted ? 'View My Draft' : 'Submit Decision Draft'}
-                                                    <ArrowRight className="size-3" />
-                                                </Button>
-                                            </Link>
-
-                                            {/* Decisions Overview */}
-                                            <Link href={`/pastoral/decisions/${conversation.id}`}>
-                                                <Button variant="ghost" size="sm" className="gap-2">
-                                                    <ScrollText className="size-4" />
-                                                    Decisions Overview
-                                                    <ArrowRight className="size-3" />
-                                                </Button>
-                                            </Link>
                                         </div>
+
+                                        {/* Media Downloads */}
+                                        {conversation.media_files && conversation.media_files.length > 0 ? (
+                                            <div className="border-t border-sidebar-border/30 pt-3 mt-2">
+                                                <p className="text-xs font-medium text-muted-foreground mb-2">Downloads:</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {conversation.media_files.map((file) => (
+                                                        <Button
+                                                            key={file.name}
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-xs h-7 gap-1"
+                                                            onClick={() => handleDownload(conversation.id, file.name)}
+                                                        >
+                                                            <FileDown className="size-3" />
+                                                            {file.name}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : null}
                                     </CardContent>
                                 </Card>
                             );

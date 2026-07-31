@@ -351,3 +351,60 @@ export type Stats = {
     draft_reports: number;
     documents_created: number;
 };
+
+/**
+ * NationalDecisionDraft represents a national-level decision draft by a pastoral member for an event.
+ */
+export interface NationalDecisionDraft {
+    id: number;
+    event_id: number;
+    user_id: number;
+    diocese_id: number | null;
+    draft_text: string | null;
+    is_submitted: boolean;
+    submitted_at: string | null;
+    created_at: string;
+    updated_at: string;
+    user?: { id: number; name: string; email: string };
+    diocese?: { id: number; name: string; code: string };
+}
+
+/**
+ * DioceseDecisionDraft represents a diocese-level decision draft by a pastoral member for an event.
+ */
+export interface DioceseDecisionDraft {
+    id: number;
+    event_id: number;
+    user_id: number;
+    diocese_id: number | null;
+    draft_text: string | null;
+    is_submitted: boolean;
+    submitted_at: string | null;
+    created_at: string;
+    updated_at: string;
+    user?: { id: number; name: string; email: string };
+    diocese?: { id: number; name: string; code: string };
+}
+
+/**
+ * MasterDecisionSummary represents the consolidated master decision summary for an event.
+ */
+export interface MasterDecisionSummary {
+    id: number;
+    event_id: number;
+    master_text: string | null;
+    is_editable: boolean;
+    generated_by: string | null;
+    generated_at: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * MediaFile represents a downloadable media file from a conversation's media folder.
+ */
+export interface MediaFile {
+    name: string;
+    path: string;
+    size: number;
+}

@@ -153,6 +153,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/decisions/{conversation}', [PastoralController::class, 'decisions'])->name('decisions');
         Route::post('/decision-summary/{conversation}/{level}', [PastoralController::class, 'decisionSummary'])->name('decision-summary');
         Route::patch('/master-decision/{conversation}/{level}', [PastoralController::class, 'updateMasterDecision'])->name('master-decision.update');
+
+        // Event-level decision making routes
+        Route::get('/decision/{event}', [PastoralController::class, 'decision'])->name('decision');
+        Route::post('/decision/{event}', [PastoralController::class, 'storeDecisionDrafts'])->name('decision.store');
+        Route::get('/collaborate/{event}', [PastoralController::class, 'collaborate'])->name('collaborate');
+        Route::post('/collaborate/{event}/generate-summary', [PastoralController::class, 'generateDecisionSummary'])->name('collaborate.generate-summary');
+        Route::patch('/collaborate/{event}/save-master-text', [PastoralController::class, 'saveMasterText'])->name('collaborate.save-master-text');
+        Route::get('/bishop/{event}', [PastoralController::class, 'bishopOverview'])->name('bishop');
     });
 
     // ─── Admin Chat Routes ────────────────────────────────────────────

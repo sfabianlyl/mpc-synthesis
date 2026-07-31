@@ -68,6 +68,8 @@ export default function Review({
     const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [analysisMessage, setAnalysisMessage] = useState('');
     const [extractionDisabled, setExtractionDisabled] = useState(false);
+    const [bookletUrl, setBookletUrl] = useState<string | null>(null);
+    const [bookletWindow, setBookletWindow] = useState<Window | null>(null);
     
     // Local state for extraction results (for immediate display)
     const [extractionResults, setExtractionResults] = useState<{
@@ -360,11 +362,31 @@ export default function Review({
                             </Button>
                         </a>
                         {draft && (
-                            <a href={`/synthesis/export-booklet/${conversation.id}`}>
-                                <Button variant="outline" className="flex items-center gap-2">
+                            <>
+                                {/* Download PDF button - shown when booklet is open */}
+                                {bookletUrl && bookletWindow ? (
+                                    <Button
+                                        variant="outline"
+                                        className="flex items-center gap-2"
+                                        onClick={() => bookletWindow?.print()}
+                                    >
+                                        <FileDown className="size-4" /> Download PDF
+                                    </Button>
+                                ) : null}
+                                {/* Export Booklet button */}
+                                <Button
+                                    variant="outline"
+                                    className="flex items-center gap-2"
+                                    onClick={() => {
+                                        const url = `/synthesis/export-booklet/${conversation.id}`;
+                                        const win = window.open(url, '_blank');
+                                        setBookletUrl(url);
+                                        setBookletWindow(win);
+                                    }}
+                                >
                                     <FileDown className="size-4" /> Export Booklet
                                 </Button>
-                            </a>
+                            </>
                         )}
                     </div>
                 </div>
