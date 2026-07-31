@@ -1565,4 +1565,37 @@ PROMPT,
             ] : null,
         ]);
     }
+
+    private function extractJsonFromLlmResponse(string $content): ?array
+    {
+        // Strip markdown code blocks if present
+        $stripped = preg_replace('/^```(?:json)?\s*/', '', $content);
+        $stripped = preg_replace('/\s*`$/', '', $stripped);
+
+        // Try to decode as JSON
+        $decoded = json_decode($stripped, true);
+        if ($decoded !== null && is_array($decoded)) {
+            return $decoded;
+        }
+
+        // Try to find JSON object within the content
+        $firstBrace = strpos($stripped, '{');
+        $lastBrace = strrpos($stripped, '}');
+
+        if ($firstBrace !== false && $lastBrace !== false && $lastBrace > $firstBrace) {
+            $jsonString = substr($stripped, $firstBrace, $lastBrace - $firstBrace + 1);
+            $decoded = json_decode($jsonString, true);
+            if ($decoded !== null && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        // Fallback: try original content
+        $decoded = json_decode($content, true);
+        if ($decoded !== null && is_array($decoded)) {
+            return $decoded;
+        }
+
+        return null;
+    }
 }
