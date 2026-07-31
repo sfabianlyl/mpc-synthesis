@@ -34,18 +34,16 @@ class SynthesisController extends Controller
         $user = $request->user();
 
         // Get all conversations (sessions) to populate select dropdown - filtered by assignment
-        if ($user->isAdmin()) {
-            $conversations = Conversation::orderBy('created_at', 'desc')->get(['id', 'title', 'status']);
-        } else {
-            $conversationIds = $user->assignedConversations()->pluck('conversations.id');
-            $conversations = Conversation::whereIn('id', $conversationIds)
-                ->orderBy('created_at', 'desc')
-                ->get(['id', 'title', 'status']);
-        }
+        
+        $conversations = Conversation::orderBy('created_at', 'desc')->get(['id', 'title', 'status']);
+        $assignedIds = $user->assignedConversations()->pluck('conversations.id');
+        
+        
 
         if ($conversations->isEmpty()) {
             return Inertia::render('synthesis/dashboard', [
                 'conversations' => [],
+                'assignedIds' => [],
                 'groups' => [],
                 'report' => null,
                 'selectedConversationId' => null,
@@ -61,13 +59,8 @@ class SynthesisController extends Controller
         }
         $selectedConversationId = (int) $selectedConversationId;
 
-        // Validate user has access to selected conversation
-        if (!$user->isAdmin()) {
-            $allowedIds = $user->assignedConversations()->pluck('conversations.id');
-            abort_unless($allowedIds->contains($selectedConversationId), 403, 'Access denied to this conversation.');
-        }
-
         // Get all groups for the selected conversation (not just assigned groups)
+               
         $allGroupsForConversation = Group::whereHas('responses', function ($query) use ($selectedConversationId) {
             $query->where('conversation_id', $selectedConversationId);
         })->with(['responses' => function ($query) use ($selectedConversationId) {
@@ -115,9 +108,9 @@ class SynthesisController extends Controller
         return Inertia::render('synthesis/dashboard', [
             'conversations' => $conversations,
             'groups' => $groups,
-            'report' => $report,
             'selectedConversationId' => $selectedConversationId,
             'consensusSubmissions' => $consensusSubmissions,
+            ''
         ]);
     }
 

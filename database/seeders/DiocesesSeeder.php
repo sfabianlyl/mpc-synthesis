@@ -20,9 +20,8 @@ class DiocesesSeeder extends Seeder
             ['code' => 'DIOS3', 'name' => 'Diocese of Melaka-Johore'],
             ['code' => 'DIOS4', 'name' => 'Archdiocese of Kuching'],
             ['code' => 'DIOS5', 'name' => 'Diocese of Sibu'],
-
-            ['code' => 'DIOS7', 'name' => 'Diocese of Miri'],
-            ['code' => 'DIOS6', 'name' => 'Archdiocese of Kota Kinabalu'],
+            ['code' => 'DIOS6', 'name' => 'Diocese of Miri'],
+            ['code' => 'DIOS7', 'name' => 'Archdiocese of Kota Kinabalu'],
             ['code' => 'DIOS8', 'name' => 'Diocese of Sandakan'],
             ['code' => 'DIOS9', 'name' => 'Diocese of Keningau'],
         ];

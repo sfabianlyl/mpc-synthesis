@@ -409,9 +409,31 @@ export default function Review({
                     </div>
                 )}
 
+                <section className="space-y-4">
+                    {/* Instructions for synthesis members */}
+                    <h2>Individual or Small Group Action</h2>
+ 
+                    <h4>The task is to discern the factors of:</h4>
+                    <ol type="A">
+                        <li>Convergence: Independent points coming together to point toward one clear, unified conclusion or emerging conclusion. </li>
+                        <li>Matters for consideration: A dissenting statement or totally new and unheard of ideas or improved ways of doing existing ideas or objections.</li>
+                        <li>Recommendation: actionable or something clear enough to be put into practical use. Recommendation may also be explained as other required action before being able to address the pertaining matter.</li>
+                    </ol>
+                    
+                    <h4>Method</h4>
+                    <ol>
+                        <li>Read the consensus paragraphs assigned</li>
+                        <li>Identify implicit and explicit points from the consensus paragraphs respectively </li>
+                        <li>Then you may use the LLM trigger to assist in the formulation of Convergence + Matters for consideration + Proposal</li>
+                        <li>Complete in full and proper sentences under Synthesis Editor your Convergence + Matters for consideration + Proposal for further discussion and discernment under collaborative review</li>
+                    </ol>
+                    
+                    
+                </section>
+
                 {/* ─── Left Column: Submitted Consensus + Notes ─────────────── */}
                 <section className="space-y-4">
-                    <h2 className="text-xl font-semibold">Submitted Consensus</h2>
+                    
                     <div className="space-y-4">
                         {assignedGroups.map((group) => (
                             <Card key={group.id}>

@@ -363,10 +363,26 @@ export default function Collaborate({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Collaborative Synthesis Review</h1>
-                        <p className="text-muted-foreground mt-1">
-                            {conversation?.title} — View and compile synthesis from all team members
-                        </p>
+                        
                     </div>
+                    <section className="space-y-4">
+                        {/* Instructions for synthesis members */}
+                        <h2>Group Action</h2>
+    
+                        <h4>The task is to discern the factors of:</h4>
+                        <ol type="A">
+                            <li>Convergence: Independent points coming together to point toward one clear, unified conclusion or emerging conclusion. </li>
+                            <li>Matters for consideration: A dissenting statement or totally new and unheard of ideas or improved ways of doing existing ideas or objections.</li>
+                            <li>Recommendation: actionable or something clear enough to be put into practical use. Recommendation may also be explained as other required action before being able to address the pertaining matter.</li>
+                        </ol>
+                        
+                        <h4>Method</h4>
+                        <ol>
+                            <li>Read the submitted paragraphs</li>
+                            <li>Then you may use the LLM trigger to assist in the formulation of  FINAL Convergence + Matters for consideration + Proposal</li>
+                            <li>Complete in full and proper sentences under Master Content your Convergence + Matters for consideration + Proposal for further discussion and discernment under collaborative review</li>
+                        </ol>
+                    </section>
 
                     <div className="flex items-center gap-4">
                         {/* Back to Review Button */}
