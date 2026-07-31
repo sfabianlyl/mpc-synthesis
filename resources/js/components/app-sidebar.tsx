@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
+    Cloud,
     ClipboardList,
     FileText,
     LayoutGrid,
@@ -110,6 +111,11 @@ function useNavItems(): { items: NavItem[]; isDiscernment: boolean; mode: Discer
             title: 'Admin Panel',
             href: '/admin',
             icon: Shield,
+        });
+        items.push({
+            title: 'Media Upload',
+            href: '/admin/media-upload',
+            icon: Cloud,
         });
     }
 

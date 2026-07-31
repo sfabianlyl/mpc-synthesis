@@ -117,6 +117,52 @@ export default function Dashboard({ conversations }: PageProps) {
                     </Card>
                 </div>
 
+                {/* Event-level Decision Action Buttons */}
+                {(() => {
+                    const eventIds = [...new Set(conversations.filter(c => c.event_id).map(c => c.event_id))];
+                    if (eventIds.length === 0) return null;
+                    
+                    // Use the first event_id if only one, otherwise show a note
+                    const eventId = eventIds[0];
+                    const hasMultipleEvents = eventIds.length > 1;
+                    
+                    return (
+                        <div className="flex flex-col gap-3">
+                            <h2 className="text-lg font-semibold">Event-level Decision Making</h2>
+                            {hasMultipleEvents && (
+                                <p className="text-sm text-muted-foreground">
+                                    Showing buttons for the first event. Conversations span {eventIds.length} events.
+                                </p>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                                <Link href={`/pastoral/decision/${eventId}`}>
+                                    <Button variant="default" size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                                        <FileText className="size-4" />
+                                        Begin Decision Making
+                                        <ArrowRight className="size-3" />
+                                    </Button>
+                                </Link>
+                                
+                                <Link href={`/pastoral/collaborate/${eventId}`}>
+                                    <Button variant="outline" size="sm" className="gap-2">
+                                        <Users className="size-4" />
+                                        Collaborative Decision
+                                        <ArrowRight className="size-3" />
+                                    </Button>
+                                </Link>
+                                
+                                <Link href={`/pastoral/bishop-overview/${eventId}`}>
+                                    <Button variant="outline" size="sm" className="gap-2">
+                                        <Shield className="size-4" />
+                                        Bishop's Overview
+                                        <ArrowRight className="size-3" />
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {/* Conversations List */}
                 <div className="flex flex-col gap-4">
                     <h2 className="text-lg font-semibold">Conversations</h2>
@@ -163,35 +209,6 @@ export default function Dashboard({ conversations }: PageProps) {
                                                 )}
                                             </div>
                                         </div>
-
-                                        {/* Action Buttons */}
-                                        {conversation.event_id && (
-                                            <div className="flex flex-wrap gap-2 mt-3">
-                                                <Link href={`/pastoral/decision/${conversation.event_id}`}>
-                                                    <Button variant="default" size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-                                                        <FileText className="size-4" />
-                                                        Begin Decision Making
-                                                        <ArrowRight className="size-3" />
-                                                    </Button>
-                                                </Link>
-                                                
-                                                <Link href={`/pastoral/collaborate/${conversation.event_id}`}>
-                                                    <Button variant="outline" size="sm" className="gap-2">
-                                                        <Users className="size-4" />
-                                                        Collaborative Decision
-                                                        <ArrowRight className="size-3" />
-                                                    </Button>
-                                                </Link>
-                                                
-                                                <Link href={`/pastoral/bishop-overview/${conversation.event_id}`}>
-                                                    <Button variant="outline" size="sm" className="gap-2">
-                                                        <Shield className="size-4" />
-                                                        Bishop's Overview
-                                                        <ArrowRight className="size-3" />
-                                                    </Button>
-                                                </Link>
-                                            </div>
-                                        )}
                                     </CardHeader>
                                     <CardContent className="border-t border-sidebar-border/30 pt-4">
                                         <div className="flex flex-wrap gap-2">

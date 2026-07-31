@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminMediaUploadController;
 use App\Http\Controllers\DocumentRetrievalController;
 use App\Http\Controllers\DrafterController;
 use App\Http\Controllers\PastoralController;
@@ -168,6 +169,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [AdminController::class, 'chat'])->name('/');
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('.details');
         Route::post('/message', [AdminController::class, 'chatMessage'])->name('.message');
+    });
+
+    // ─── Admin Media Upload Routes ──────────────────────────────────────
+    Route::middleware('role:admin')->prefix('admin/media-upload')->name('admin.media-upload.')->group(function () {
+        Route::get('/', [AdminMediaUploadController::class, 'index'])->name('');
+        Route::post('/{conversation}', [AdminMediaUploadController::class, 'store'])->name('store');
     });
 });
 

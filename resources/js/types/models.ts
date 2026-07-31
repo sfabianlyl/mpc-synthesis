@@ -11,7 +11,10 @@ export interface Conversation {
     id: number;
     title: string;
     description?: string;
-    status: 'active' | 'completed';
+    status: 'active' | 'completed' | 'closed' | 'draft';
+    event_id: number | null;
+    event_title: string | null;
+    media_files: Array<{ name: string; path: string; size: number }>;
     created_at: string;
     updated_at: string;
 }
