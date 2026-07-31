@@ -70,9 +70,40 @@ class AdminMediaUploadController extends Controller
         $folderName = strtolower(str_replace(' ', '', $conversation->title));
         $basePath = public_path($folderName);
 
+        // Validate the base public path is writable
+        $publicPath = public_path();
+        if (!is_writable($publicPath)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'The public directory is not writable.',
+            ], 500);
+        }
+
         // Create the conversation folder if it doesn't exist
         if (! is_dir($basePath)) {
-            mkdir($basePath, 0755, true);
+            // Ensure parent directory (public/) is accessible
+            if (!is_dir(dirname($basePath))) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Invalid directory path for media storage.',
+                ], 500);
+            }
+
+            $created = mkdir($basePath, 0755, true);
+            if (!$created) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to create directory for media storage.',
+                ], 500);
+            }
+
+            // Ensure the newly created directory is writable
+            if (!is_writable($basePath)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'The created directory is not writable.',
+                ], 500);
+            }
         }
 
         $uploadedFiles = [];
