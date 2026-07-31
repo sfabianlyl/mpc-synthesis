@@ -160,7 +160,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/collaborate/{event}', [PastoralController::class, 'collaborate'])->name('collaborate');
         Route::post('/collaborate/{event}/generate-summary', [PastoralController::class, 'generateDecisionSummary'])->name('collaborate.generate-summary');
         Route::patch('/collaborate/{event}/save-master-text', [PastoralController::class, 'saveMasterText'])->name('collaborate.save-master-text');
-        Route::get('/bishop/{event}', [PastoralController::class, 'bishopOverview'])->name('bishop');
+        Route::get('/bishop-overview/{event}', [PastoralController::class, 'bishopOverview'])->name('bishop-overview');
     });
 
     // ─── Admin Chat Routes ────────────────────────────────────────────

@@ -50,17 +50,46 @@ class PastoralController extends Controller
                     ->where('is_submitted', true)
                     ->exists();
 
+                // Get event-level decision submission status
+                $eventLevelSubmitted = null;
+                if ($conversation->event_id) {
+                    $eventLevelSubmitted = NationalDecisionDraft::where('event_id', $conversation->event_id)
+                        ->where('user_id', $user->id)
+                        ->where('is_submitted', true)
+                        ->exists();
+                }
+
+                // Get media files from public/{conversation-title-lowercase}/ folder
+                $mediaFiles = [];
+                if ($conversation->event_id) {
+                    $folder = strtolower(str_replace(' ', '', $conversation->title));
+                    $basePath = public_path($folder);
+                    if (is_dir($basePath)) {
+                        foreach (scandir($basePath) as $file) {
+                            if ($file !== '.' && $file !== '..' && is_file("{$basePath}/{$file}")) {
+                                $mediaFiles[] = [
+                                    'name' => $file,
+                                    'path' => "/{$folder}/{$file}",
+                                    'size' => filesize("{$basePath}/{$file}"),
+                                ];
+                            }
+                        }
+                    }
+                }
+
                 return [
                     'id' => $conversation->id,
                     'title' => $conversation->title,
                     'status' => $conversation->status,
                     'description' => $conversation->description,
+                    'event_id' => $conversation->event_id,
                     'event_title' => $conversation->event?->title,
                     'has_reports' => $hasMasterSynthesisSubmitted,
-                    'user_draft_submitted' => DecisionDraft::where('conversation_id', $conversation->id)
+                    'user_draft_submitted' => $eventLevelSubmitted ?? DecisionDraft::where('conversation_id', $conversation->id)
                         ->where('user_id', $user->id)
                         ->where('is_submitted', true)
                         ->exists(),
+                    'media_files' => $mediaFiles,
                 ];
             });
 
