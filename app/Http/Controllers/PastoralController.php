@@ -15,6 +15,7 @@ use App\Models\NationalDecisionDraft;
 use App\Services\LlmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -59,23 +60,90 @@ class PastoralController extends Controller
                         ->exists();
                 }
 
-                // Get media files from public/{conversation-title-lowercase}/ folder
+                // Get media files from storage/app/public/media/{conversation-title-lowercase}/ folder
                 $mediaFiles = [];
+                
+                // DIAGNOSTIC LOGS
+                Log::info('PastoralDashboard: Checking media for conversation', [
+                    'conversation_id' => $conversation->id,
+                    'conversation_title' => $conversation->title,
+                    'event_id' => $conversation->event_id,
+                    'has_event_id' => (bool) $conversation->event_id,
+                ]);
+                
+                if (!$conversation->event_id) {
+                    Log::warning('PastoralDashboard: Skipping media lookup - no event_id', [
+                        'conversation_id' => $conversation->id,
+                    ]);
+                }
+                
                 if ($conversation->event_id) {
                     $folder = strtolower(str_replace(' ', '', $conversation->title));
-                    $basePath = public_path($folder);
-                    if (is_dir($basePath)) {
-                        foreach (scandir($basePath) as $file) {
-                            if ($file !== '.' && $file !== '..' && is_file("{$basePath}/{$file}")) {
+                    $storagePath = 'media/' . $folder;
+                    
+                    // Check both new storage location and old public location for backward compatibility
+                    $newPath = storage_path('app/public/' . $storagePath);
+                    $oldPath = public_path($folder);
+                    
+                    Log::info('PastoralDashboard: Folder details', [
+                        'folder' => $folder,
+                        'storagePath' => $storagePath,
+                        'newPath' => $newPath,
+                        'oldPath' => $oldPath,
+                        'newPathExists' => is_dir($newPath),
+                        'oldPathExists' => is_dir($oldPath),
+                    ]);
+                    
+                    $files = [];
+                    if (is_dir($newPath)) {
+                        $files = scandir($newPath);
+                        Log::info('PastoralDashboard: Found files in new path', [
+                            'file_count' => count($files),
+                            'files' => $files,
+                        ]);
+                    } elseif (is_dir($oldPath)) {
+                        $files = scandir($oldPath);
+                        Log::info('PastoralDashboard: Found files in old path', [
+                            'file_count' => count($files),
+                            'files' => $files,
+                        ]);
+                    } else {
+                        Log::warning('PastoralDashboard: Neither storage path exists', [
+                            'newPath' => $newPath,
+                            'oldPath' => $oldPath,
+                        ]);
+                        
+                        // Check if parent media directory exists and list its contents
+                        $mediaParentPath = storage_path('app/public/media');
+                        Log::info('PastoralDashboard: Checking media parent directory', [
+                            'mediaParentPath' => $mediaParentPath,
+                            'mediaParentExists' => is_dir($mediaParentPath),
+                            'mediaContents' => is_dir($mediaParentPath) ? scandir($mediaParentPath) : null,
+                        ]);
+                    }
+                    
+                    if ($files) {
+                        foreach ($files as $file) {
+                            if ($file !== '.' && $file !== '..' && is_file(
+                                is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
+                            )) {
                                 $mediaFiles[] = [
                                     'name' => $file,
-                                    'path' => "/{$folder}/{$file}",
-                                    'size' => filesize("{$basePath}/{$file}"),
+                                    'path' => '/storage/' . $storagePath . '/' . $file,
+                                    'size' => filesize(
+                                        is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
+                                    ),
                                 ];
                             }
                         }
                     }
                 }
+                
+                Log::info('PastoralDashboard: Final media_files for conversation', [
+                    'conversation_id' => $conversation->id,
+                    'media_files_count' => count($mediaFiles),
+                    'media_files' => $mediaFiles,
+                ]);
 
                 return [
                     'id' => $conversation->id,

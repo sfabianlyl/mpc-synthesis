@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Conversation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Support\Str;
 
 class AdminMediaUploadController extends Controller
 {
@@ -20,18 +21,35 @@ class AdminMediaUploadController extends Controller
             ->orderBy('created_at', 'desc')
             ->get(['id', 'title', 'status', 'description', 'event_id', 'created_at'])
             ->map(function ($conversation) {
-                // Get media files from public/{conversation-title-lowercase}/ folder
+                // Get media files from storage/app/public/media/{conversation-title-lowercase}/ folder
                 $mediaFiles = [];
                 if ($conversation->event_id) {
                     $folder = strtolower(str_replace(' ', '', $conversation->title));
-                    $basePath = public_path($folder);
-                    if (is_dir($basePath)) {
-                        foreach (scandir($basePath) as $file) {
-                            if ($file !== '.' && $file !== '..' && is_file("{$basePath}/{$file}")) {
+                    $storagePath = 'media/' . $folder;
+                    
+                    // Check both old location (public/{folder}) and new location (storage/media/{folder})
+                    $oldPath = public_path($folder);
+                    $newPath = storage_path('app/public/' . $storagePath);
+                    
+                    $files = [];
+                    if (is_dir($newPath)) {
+                        $files = scandir($newPath);
+                    } elseif (is_dir($oldPath)) {
+                        // Fallback to old location for backward compatibility
+                        $files = scandir($oldPath);
+                    }
+                    
+                    if ($files) {
+                        foreach ($files as $file) {
+                            if ($file !== '.' && $file !== '..' && is_file(
+                                is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
+                            )) {
                                 $mediaFiles[] = [
                                     'name' => $file,
-                                    'path' => "/{$folder}/{$file}",
-                                    'size' => filesize("{$basePath}/{$file}"),
+                                    'path' => '/storage/' . $storagePath . '/' . $file,
+                                    'size' => filesize(
+                                        is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
+                                    ),
                                 ];
                             }
                         }
@@ -68,42 +86,12 @@ class AdminMediaUploadController extends Controller
 
         // Determine the folder name: lowercase, spaces removed
         $folderName = strtolower(str_replace(' ', '', $conversation->title));
-        $basePath = public_path($folderName);
-
-        // Validate the base public path is writable
-        $publicPath = public_path();
-        if (!is_writable($publicPath)) {
-            return response()->json([
-                'success' => false,
-                'error' => 'The public directory is not writable.',
-            ], 500);
-        }
+        $storagePath = 'media/' . $folderName;
+        $basePath = storage_path('app/public/' . $storagePath);
 
         // Create the conversation folder if it doesn't exist
-        if (! is_dir($basePath)) {
-            // Ensure parent directory (public/) is accessible
-            if (!is_dir(dirname($basePath))) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Invalid directory path for media storage.',
-                ], 500);
-            }
-
-            $created = mkdir($basePath, 0755, true);
-            if (!$created) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Failed to create directory for media storage.',
-                ], 500);
-            }
-
-            // Ensure the newly created directory is writable
-            if (!is_writable($basePath)) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'The created directory is not writable.',
-                ], 500);
-            }
+        if (!is_dir($basePath)) {
+            Storage::disk('public')->makeDirectory($storagePath, 0755, true);
         }
 
         $uploadedFiles = [];
@@ -113,15 +101,16 @@ class AdminMediaUploadController extends Controller
             $timestamp = time() . '_' . Str::random(8);
             $extension = $file->getClientOriginalExtension();
             $slugName = Str::slug(pathinfo($originalFilename, PATHINFO_FILENAME));
-            $fileName = $slugName.'_'.$timestamp.'.'.$extension;
+            $fileName = $slugName . '_' . $timestamp . '.' . $extension;
 
-            $file->storeAs($basePath, $fileName, 'public');
+            // Store file using Storage facade
+            Storage::disk('public')->put($storagePath . '/' . $fileName, file_get_contents($file->getRealPath()));
 
             $uploadedFiles[] = [
                 'name' => $fileName,
                 'original_name' => $originalFilename,
                 'size' => $file->getSize(),
-                'path' => "/{$folderName}/{$fileName}",
+                'path' => '/storage/' . $storagePath . '/' . $fileName,
             ];
         }
 
