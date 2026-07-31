@@ -290,14 +290,11 @@ WRONG format (do NOT do this):
 
 Categories:
 
-1. **Convergence (A)**: Points of agreement, shared perspectives, and common ground found across the input.
-   Example: "- agreement on core principles\n- need for clear guidelines\n- structured approaches emphasized"
+1. **Convergence (A)**: independent data points, signs, or lines of evidence coming together to point toward one clear, unified conclusion or emerging conclusion. It serves as a strong validation method where separate inputs align to reduce uncertainty that gives confidence for decision takers to act
 
-2. **Matters for Consideration (B)**: Areas of concern, tension, unresolved questions, or topics needing further discussion.
-   Example: "- resource allocation concerns\n- timeline feasibility questions\n- stakeholder engagement gaps"
+2. **Matters for Consideration (B)**: a dissenting statement, an alternative prediction, or a  record of totally new and unheard of ideas or new and improved ways of doing existing ideas or objections. It describes the opinion and discernment by members of a group who do not agree with the main or majority decision
 
-3. **Proposals (C)**: Concrete suggestions, recommendations, or actionable items proposed by the groups.
-   Example: "- establish working group\n- develop phased implementation\n- schedule follow-up consultations"
+3. **Proposals (C)**: an actionable or something clear enough to be put into practical use. Proposals may be explained through steps that are clear and specific enough to act on right away or may be explained as other required action before being able to address the pertaining matter
 
 IMPORTANT: Do NOT wrap the response in markdown code blocks (no ```json or ```). Do NOT include any explanatory text before or after the JSON. The response must be valid JSON only. Each value string must contain \n escape sequences, not actual newlines.
 
