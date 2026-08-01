@@ -31,12 +31,12 @@ class PastoralAndDiscernmentMembersSeeder extends Seeder
         ];
 
         $discernmentFirstNames = [
-            'Greg' => 0, 
-            'Anna' => 6, 
-            'Kiko' => 2, 
-            'Salomi' => 0, 
-            'Retta' => 0,
-            'ThomasPaul' => 6,
+            'Greg2' => 0, 
+            'Anna2' => 6, 
+            'Kiko2' => 2, 
+            'Salomi2' => 0, 
+            'Retta2' => 0,
+            'ThomasPaul2' => 6,
         ];
 
         // Create 1 pastoral account per diocese
