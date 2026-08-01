@@ -626,7 +626,7 @@ export default function Collaborate({
                                             );
                                         })()}
                                         {/* Show trigger button when master synthesis exists (always retriggerable) */}
-                                        
+                                        {masterSynthesisLocal?.id && (
                                             <div className="mb-4">
                                                 <Button
                                                     onClick={() => handleGenerateSynthesisSummary(category.key)}
@@ -639,7 +639,7 @@ export default function Collaborate({
                                                     {summaryLocal?.id ? 'Regenerate' : 'Generate'} Synthesis Summary for {category.label}
                                                 </Button>
                                             </div>
-                                        
+                                        )}
                                         {/* ─── Master Synthesis Editor ────────── */}
                                         <div className={`pt-4 border-t ${isEditingThisCategory ? 'border-primary/30 bg-primary/5' : ''}`}>
                                             <h4 className="text-sm font-medium mb-3 flex items-center justify-between">
@@ -744,6 +744,7 @@ export default function Collaborate({
                                 </div>
                             ))}
                             {/* Key Points Extraction Output */}
+                            {keyPointsText && (
                                 <div>
                                     <h4 className="text-sm font-medium mb-2 flex items-center gap-2 text-purple-700 dark:text-purple-300">
                                         <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
@@ -761,6 +762,7 @@ export default function Collaborate({
                                         })}
                                     </div>
                                 </div>
+                            )}
                         </CardContent>
                     )}
                     {showAllMasterSynthesis && (!masterSynthesisLocal || !masterSynthesisLocal.id) && (
@@ -772,7 +774,7 @@ export default function Collaborate({
                 </Card>
 
                 {/* ─── Extract Key Points ─────────────────────────── */}
-               
+                {masterSynthesisLocal?.id && (
                     <Card className="border-sidebar-border/50">
                         <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
                             <CardTitle className="text-lg flex items-center gap-2">
@@ -832,6 +834,7 @@ export default function Collaborate({
                             )}
                         </CardContent>
                     </Card>
+                )}
 
                 {/* ─── Action Bar ───────────────────────────── */}
                 <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4 border-t">
