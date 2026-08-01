@@ -365,24 +365,7 @@ export default function Collaborate({
                         <h1 className="text-3xl font-bold tracking-tight">Collaborative Synthesis Review</h1>
                         
                     </div>
-                    <section className="space-y-4">
-                        {/* Instructions for synthesis members */}
-                        <h2 className="font-semibold">Group Action</h2>
-    
-                        <h4>The task is to discern the factors of:</h4>
-                        <ol type="A">
-                            <li>A. Convergence: Independent points coming together to point toward one clear, unified conclusion or emerging conclusion. </li>
-                            <li>B. Matters for consideration: A dissenting statement or totally new and unheard of ideas or improved ways of doing existing ideas or objections.</li>
-                            <li>C. Recommendation: actionable or something clear enough to be put into practical use. Recommendation may also be explained as other required action before being able to address the pertaining matter.</li>
-                        </ol>
-                        
-                        <h4 className="font-semibold">Method</h4>
-                        <ol>
-                            <li>1. Read the submitted paragraphs</li>
-                            <li>2. Then you may use the LLM trigger to assist in the formulation of  FINAL Convergence + Matters for consideration + Proposal</li>
-                            <li>3. Complete in full and proper sentences under Master Content your Convergence + Matters for consideration + Proposal for further discussion and discernment under collaborative review</li>
-                        </ol>
-                    </section>
+                   
 
                     <div className="flex items-center gap-4">
                         {/* Back to Review Button */}
@@ -402,44 +385,25 @@ export default function Collaborate({
                     </div>
                 </div>
 
-                {/* ─── Online Users & Collaboration Indicators ────── */}
-                {onlineMembers.length > 0 && (
-                    <Card className="border-sidebar-border/50">
-                        <CardContent className="pt-6 pb-4">
-                            <div className="flex items-center gap-4 flex-wrap">
-                                <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm font-medium text-muted-foreground">Online:</span>
-                                </div>
-                                <div className="flex -space-x-2">
-                                    {onlineMembers.map((user) => (
-                                        <div
-                                            key={user.id}
-                                            className={`size-8 rounded-full border-2 border-background flex items-center justify-center text-xs font-medium ${
-                                                user.editing_category 
-                                                    ? 'bg-primary text-primary-foreground animate-pulse' 
-                                                    : 'bg-muted text-muted-foreground'
-                                            }`}
-                                            title={`${user.name}${user.editing_category ? ` (editing: ${CATEGORIES.find(c => c.key === user.editing_category)?.label || user.editing_category})` : ''}`}
-                                        >
-                                            {getInitials(user.name)}
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground ml-auto">
-                                    <Clock className="size-3" />
-                                    <span>
-                                        {Object.entries(editingIndicators).map(([cat, count]) => (
-                                            <span key={cat} className="ml-2">
-                                                {count} editing {CATEGORIES.find(c => c.key === cat)?.label || cat}
-                                            </span>
-                                        ))}
-                                    </span>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                 <section className="space-y-4">
+                        {/* Instructions for synthesis members */}
+                        <h2 className="font-semibold">Group Action</h2>
+    
+                        <h4>The task is to discern the factors of:</h4>
+                        <ol type="A">
+                            <li>A. Convergence: Independent points coming together to point toward one clear, unified conclusion or emerging conclusion. </li>
+                            <li>B. Matters for consideration: A dissenting statement or totally new and unheard of ideas or improved ways of doing existing ideas or objections.</li>
+                            <li>C. Recommendation: actionable or something clear enough to be put into practical use. Recommendation may also be explained as other required action before being able to address the pertaining matter.</li>
+                        </ol>
+                        
+                        <h4 className="font-semibold">Method</h4>
+                        <ol>
+                            <li>1. Read the submitted paragraphs</li>
+                            <li>2. Then you may use the LLM trigger to assist in the formulation of  FINAL Convergence + Matters for consideration + Proposal</li>
+                            <li>3. Complete in full and proper sentences under Master Content your Convergence + Matters for consideration + Proposal for further discussion and discernment under collaborative review</li>
+                        </ol>
+                </section>
+
 
                 {/* ─── Status Message ─────────────────────────────── */}
                 {statusMessage && (
