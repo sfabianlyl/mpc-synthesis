@@ -172,6 +172,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/update-db', function(){
             $report =MasterSynthesis::create([
                 'conversation_id' => 4,
+                'synthesis_id'=> 1,
                 // User-written content
                 'status' => 'submitted',
             ]);
