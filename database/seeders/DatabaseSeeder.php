@@ -58,21 +58,42 @@ class DatabaseSeeder extends Seeder
 
             Conversation::create([
                 'event_id' => $event->id,
-                'title' => 'CIS Sarawak',
+                'title' => 'CIS Sarawak 1',
                 'description' => 'Practice session in Sibu',
                 'status' => 'active',
             ]),
 
             Conversation::create([
                 'event_id' => $event->id,
-                'title' => 'CIS Sabah',
+                'title' => 'CIS Sabah 1',
                 'description' => 'Practice session in Kota Kinabalu',
                 'status' => 'active',
             ]),
 
             Conversation::create([
                 'event_id' => $event->id,
-                'title' => 'CIS Semenanjung',
+                'title' => 'CIS Semenanjung 1',
+                'description' => 'Practice session in Kajang',
+                'status' => 'active',
+            ]),
+
+            Conversation::create([
+                'event_id' => $event->id,
+                'title' => 'CIS Sarawak 2',
+                'description' => 'Practice session in Sibu',
+                'status' => 'active',
+            ]),
+
+            Conversation::create([
+                'event_id' => $event->id,
+                'title' => 'CIS Sabah 2',
+                'description' => 'Practice session in Kota Kinabalu',
+                'status' => 'active',
+            ]),
+
+            Conversation::create([
+                'event_id' => $event->id,
+                'title' => 'CIS Semenanjung 2',
                 'description' => 'Practice session in Kajang',
                 'status' => 'active',
             ]),
@@ -178,6 +199,9 @@ class DatabaseSeeder extends Seeder
         $conversations[3]->synthesisMembers()->attach($synthesisMemberIds);
         $conversations[4]->synthesisMembers()->attach($synthesisMemberIds);
         $conversations[5]->synthesisMembers()->attach($synthesisMemberIds);
+        $conversations[6]->synthesisMembers()->attach($synthesisMemberIds);
+        $conversations[7]->synthesisMembers()->attach($synthesisMemberIds);
+        $conversations[8]->synthesisMembers()->attach($synthesisMemberIds);
 
         // ─── 6. Create Responses for CIS 2 (7 group consensus paragraphs) ──
         $cis2 = $conversations[1]; // CIS 2
