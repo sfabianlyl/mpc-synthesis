@@ -647,6 +647,7 @@ class PastoralController extends Controller
         $this->authorizePastoralAccess($request);
 
         $masterDecisionSummary = MasterDecisionSummary::where('event_id', $event->id)->first();
+        $dioceseDecisionDrafts = DioceseDecisionDrafts::all();
 
         return Inertia::render('pastoral/bishop-overview', [
             'event' => $event,
@@ -656,7 +657,10 @@ class PastoralController extends Controller
                 'is_editable' => $masterDecisionSummary->is_editable,
                 'generated_by' => $masterDecisionSummary->generated_by,
                 'generated_at' => $masterDecisionSummary->generated_at?->toIso8601String(),
-            ] : null,
+            ]
+            
+            : null,
+            'dioceseDecisionDrafts' => $dioceseDecisionDrafts
         ]);
     }
 }
