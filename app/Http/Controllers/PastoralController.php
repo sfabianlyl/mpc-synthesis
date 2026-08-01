@@ -647,7 +647,7 @@ class PastoralController extends Controller
         $this->authorizePastoralAccess($request);
 
         $masterDecisionSummary = MasterDecisionSummary::where('event_id', $event->id)->first();
-        $dioceseDecisionDrafts = DioceseDecisionDrafts::all();
+        $dioceseDecisionDrafts = DioceseDecisionDraft::all();
 
         return Inertia::render('pastoral/bishop-overview', [
             'event' => $event,
