@@ -99,7 +99,7 @@ export default function BishopOverview({ event, masterDecisionSummary, dioceseDe
                         <CardTitle className="text-lg">Diocese Decision Drafts</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {dioceseDecisionDrafts.length > 0 ? (
+                        {dioceseDecisionDrafts.length?? 0 > 0 ? (
                             <div className="flex flex-col gap-4">
                                 {dioceseDecisionDrafts.map((draft) => (
                                     <div key={draft.id} className="p-4 bg-muted/30 rounded-md border">
