@@ -87,6 +87,7 @@ export default function Dashboard() {
     const roleLabels: Record<string, { label: string; color: string }> = {
         synthesis: { label: 'Synthesis Team', color: 'text-blue-400' },
         drafter: { label: 'Drafting Team', color: 'text-violet-400' },
+        pastoral: { label: 'PDSW', color: 'text-violet-400' },
         admin: { label: 'Administrator', color: 'text-amber-400' },
     };
 
