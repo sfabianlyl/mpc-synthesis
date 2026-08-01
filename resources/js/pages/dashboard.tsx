@@ -25,6 +25,15 @@ export default function Dashboard() {
                 gradient: 'from-violet-500/20 to-purple-500/20',
             },
         ],
+        pastoral: [
+            {
+                title: 'Pastoral Dashboard',
+                description: 'View conversation syntheses, and begin decision drafts.',
+                icon: <ClipboardList className="size-6" />,
+                href: '/pastoral',
+                gradient: 'from-blue-500/20 to-indigo-500/20',
+            }
+        ],
         admin: [
             {
                 title: 'Synthesis Dashboard',
@@ -39,6 +48,29 @@ export default function Dashboard() {
                 icon: <FileText className="size-6" />,
                 href: '/drafter',
                 gradient: 'from-violet-500/20 to-purple-500/20',
+            },
+            {
+                title: 'Admin Panel',
+                description: 'Manage users, groups, and synthesis assignments.',
+                icon: <Shield className="size-6" />,
+                href: '/admin',
+                gradient: 'from-amber-500/20 to-orange-500/20',
+            },
+        ],
+        discernment: [
+            {
+                title: 'Synthesis Dashboard',
+                description: 'Review assigned groups, trigger AI analysis, and edit synthesis reports.',
+                icon: <ClipboardList className="size-6" />,
+                href: '/synthesis',
+                gradient: 'from-blue-500/20 to-indigo-500/20',
+            },
+            {
+                title: 'Pastoral Dashboard',
+                description: 'View conversation syntheses, and begin decision drafts.',
+                icon: <ClipboardList className="size-6" />,
+                href: '/pastoral',
+                gradient: 'from-blue-500/20 to-indigo-500/20',
             },
             {
                 title: 'Admin Panel',
