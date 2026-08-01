@@ -404,6 +404,44 @@ export default function Collaborate({
                         </ol>
                 </section>
 
+                {/* ─── Online Users & Collaboration Indicators ────── */}
+                {onlineMembers.length > 0 && (
+                    <Card className="border-sidebar-border/50">
+                        <CardContent className="pt-6 pb-4">
+                            <div className="flex items-center gap-4 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                    <Users className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm font-medium text-muted-foreground">Online:</span>
+                                </div>
+                                <div className="flex -space-x-2">
+                                    {onlineMembers.map((user) => (
+                                        <div
+                                            key={user.id}
+                                            className={`size-8 rounded-full border-2 border-background flex items-center justify-center text-xs font-medium ${
+                                                user.editing_category 
+                                                    ? 'bg-primary text-primary-foreground animate-pulse' 
+                                                    : 'bg-muted text-muted-foreground'
+                                            }`}
+                                            title={`${user.name}${user.editing_category ? ` (editing: ${CATEGORIES.find(c => c.key === user.editing_category)?.label || user.editing_category})` : ''}`}
+                                        >
+                                            {getInitials(user.name)}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground ml-auto">
+                                    <Clock className="size-3" />
+                                    <span>
+                                        {Object.entries(editingIndicators).map(([cat, count]) => (
+                                            <span key={cat} className="ml-2">
+                                                {count} editing {CATEGORIES.find(c => c.key === cat)?.label || cat}
+                                            </span>
+                                        ))}
+                                    </span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* ─── Status Message ─────────────────────────────── */}
                 {statusMessage && (
@@ -588,7 +626,7 @@ export default function Collaborate({
                                             );
                                         })()}
                                         {/* Show trigger button when master synthesis exists (always retriggerable) */}
-                                        {masterSynthesisLocal?.id && (
+                                        
                                             <div className="mb-4">
                                                 <Button
                                                     onClick={() => handleGenerateSynthesisSummary(category.key)}
@@ -601,7 +639,7 @@ export default function Collaborate({
                                                     {summaryLocal?.id ? 'Regenerate' : 'Generate'} Synthesis Summary for {category.label}
                                                 </Button>
                                             </div>
-                                        )}
+                                        
                                         {/* ─── Master Synthesis Editor ────────── */}
                                         <div className={`pt-4 border-t ${isEditingThisCategory ? 'border-primary/30 bg-primary/5' : ''}`}>
                                             <h4 className="text-sm font-medium mb-3 flex items-center justify-between">
@@ -706,7 +744,6 @@ export default function Collaborate({
                                 </div>
                             ))}
                             {/* Key Points Extraction Output */}
-                            {keyPointsText && (
                                 <div>
                                     <h4 className="text-sm font-medium mb-2 flex items-center gap-2 text-purple-700 dark:text-purple-300">
                                         <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
@@ -724,7 +761,6 @@ export default function Collaborate({
                                         })}
                                     </div>
                                 </div>
-                            )}
                         </CardContent>
                     )}
                     {showAllMasterSynthesis && (!masterSynthesisLocal || !masterSynthesisLocal.id) && (
@@ -736,7 +772,7 @@ export default function Collaborate({
                 </Card>
 
                 {/* ─── Extract Key Points ─────────────────────────── */}
-                {masterSynthesisLocal?.id && (
+               
                     <Card className="border-sidebar-border/50">
                         <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
                             <CardTitle className="text-lg flex items-center gap-2">
@@ -796,7 +832,6 @@ export default function Collaborate({
                             )}
                         </CardContent>
                     </Card>
-                )}
 
                 {/* ─── Action Bar ───────────────────────────── */}
                 <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4 border-t">
