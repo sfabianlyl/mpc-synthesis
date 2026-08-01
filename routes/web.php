@@ -171,7 +171,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('.details');
         Route::get('/update-db', function(){
             $report =MasterSynthesis::create([
-                'conversation_id' => $conversations[3]->id,
+                'conversation_id' => 4,
                 // User-written content
                 'status' => 'submitted',
             ]);
