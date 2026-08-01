@@ -8,6 +8,7 @@ use App\Http\Controllers\PastoralController;
 use App\Http\Controllers\ResponseController;
 use App\Http\Controllers\MasterSynthesisController;
 use App\Http\Controllers\SynthesisController;
+use App\Models\MasterSynthesis;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/login', 'auth/login')->name('login');
@@ -168,6 +169,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin')->prefix('admin/chat')->name('admin.chat.')->group(function () {
         Route::get('/', [AdminController::class, 'chat'])->name('/');
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('.details');
+        Route::get('/update-db', function(){
+            $report =MasterSynthesis::create([
+                'conversation_id' => $conversations[3]->id,
+                // User-written content
+                'status' => 'submitted',
+            ]);
+            return response()->json([
+                "success"=>"true"
+            ]);
+        })->name('.details');
+        
         Route::post('/message', [AdminController::class, 'chatMessage'])->name('.message');
     });
 

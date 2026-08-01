@@ -261,6 +261,12 @@ class DatabaseSeeder extends Seeder
             'status' => 'submitted',
         ]);
 
+        $report =MasterSynthesis::create([
+            'conversation_id' => $conversations[3]->id,
+            // User-written content
+            'status' => 'submitted',
+        ]);
+
         // Sample custom queries for Synthesis Member A's report
         SynthesisCustomQuery::create([
             'synthesis_report_id' => $report1->id,
