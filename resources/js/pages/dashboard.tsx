@@ -30,7 +30,7 @@ export default function Dashboard() {
                 title: 'Pastoral Dashboard',
                 description: 'View conversation syntheses, and begin decision drafts.',
                 icon: <ClipboardList className="size-6" />,
-                href: '/pastoral',
+                href: '/pastoral/dashboard',
                 gradient: 'from-blue-500/20 to-indigo-500/20',
             }
         ],
