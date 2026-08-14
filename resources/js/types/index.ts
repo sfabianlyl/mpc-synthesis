@@ -1,4 +1,31 @@
 export type * from './auth';
-export type * from './models';
+export type {
+    Conversation,
+    Group,
+    Response,
+    ConversationGroup,
+    ConsensusNote,
+    SynthesisReport,
+    SynthesisSubmission,
+    MasterSynthesisReport,
+    MasterSynthesisPayload,
+    SynthesisCustomQuery,
+    FinalDocument,
+    ConsensusSubmission,
+    UploadedDocumentSource,
+    DocumentSourceChunk,
+    EnrichedDocumentChunk,
+    DocumentRetrievalResponse,
+    Event,
+    DecisionSummary,
+    DecisionDraft,
+    MasterDecision,
+    Diocese,
+    Stats,
+    NationalDecisionDraft,
+    DioceseDecisionDraft,
+    MasterDecisionSummary,
+    MediaFile,
+} from './models';
 export type * from './navigation';
 export type * from './ui';

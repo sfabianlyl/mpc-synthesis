@@ -10,13 +10,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $conversation_id
  * @property int $user_id
- * @property int $group_id
+ * @property int $response_id
  * @property string|null $text
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Conversation $conversation
  * @property-read User $user
- * @property-read Group $group
+ * @property-read Response $response
  */
 class ConsensusNote extends Model
 {
@@ -25,7 +25,7 @@ class ConsensusNote extends Model
     protected $fillable = [
         'conversation_id',
         'user_id',
-        'group_id',
+        'response_id',
         'text',
     ];
 
@@ -53,10 +53,10 @@ class ConsensusNote extends Model
     }
 
     /**
-     * Get the group this note is for.
+     * Get the response this note is for.
      */
-    public function group(): BelongsTo
+    public function response(): BelongsTo
     {
-        return $this->belongsTo(Group::class);
+        return $this->belongsTo(Response::class);
     }
 }

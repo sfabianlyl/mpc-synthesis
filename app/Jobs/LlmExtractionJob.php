@@ -36,28 +36,32 @@ class LlmExtractionJob implements ShouldQueue
      */
     public function handle(LlmService $llm): void
     {
-        // 1. Get all group consensuses for this user's assigned groups
-        $assignedGroupIds = \App\Models\Group::where('synthesis_id', $this->userId)
-            ->whereHas('conversations', fn($q) => $q->where('conversations.id', $this->conversationId))
-            ->pluck('id');
+        // 1. Get all group consensuses for this user's assigned conversation groups
+        $user = \App\Models\User::find($this->userId);
+        $assignedConversationGroupIds = $user ? $user->assignedConversationGroups()
+            ->where('conversation_id', $this->conversationId)
+            ->pluck('conversation_groups.id') : collect();
 
-        if ($assignedGroupIds->isEmpty()) {
-            $assignedGroupIds = Response::where('conversation_id', $this->conversationId)
-                ->whereNotNull('submitted_at')
-                ->pluck('group_id')
+        if ($assignedConversationGroupIds->isEmpty()) {
+            $assignedConversationGroupIds = Response::whereHas('conversationGroup', fn($q) =>
+                $q->where('conversation_id', $this->conversationId)
+            )->whereNotNull('submitted_at')
+                ->pluck('conversation_group_id')
                 ->unique();
         }
 
         // Fetch consensus texts from submitted responses and consensus notes
-        $responseConsensusTexts = Response::whereIn('group_id', $assignedGroupIds)
-            ->where('conversation_id', $this->conversationId)
+        $responseConsensusTexts = Response::whereIn('conversation_group_id', $assignedConversationGroupIds)
             ->whereNotNull('submitted_at')
             ->pluck('consensus_text')
             ->filter()
             ->implode("\n\n---\n\n");
 
+        $responseIds = Response::whereIn('conversation_group_id', $assignedConversationGroupIds)->pluck('id');
+
         $noteConsensusTexts = ConsensusNote::where('conversation_id', $this->conversationId)
             ->where('user_id', $this->userId)
+            ->whereIn('response_id', $responseIds)
             ->whereNotNull('text')
             ->pluck('text')
             ->filter()

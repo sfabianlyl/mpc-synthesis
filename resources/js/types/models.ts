@@ -22,21 +22,38 @@ export interface Conversation {
 export interface Group {
     id: number;
     name: string;
-    synthesis_id?: number;
     responses_count?: number;
-    synthesis?: User;
+    responses?: Response[];
+}
+
+export interface ConversationGroup {
+    id: number;
+    conversation_id: number;
+    group_id: number;
+    group?: Group;
     responses?: Response[];
 }
 
 export interface Response {
     id: number;
-    conversation_id: number;
-    group_id: number;
+    conversation_group_id: number;
+    group_id?: number;
     consensus_text: string;
     submitted_at: string | null;
     created_at: string;
     updated_at: string;
     group?: Group;
+    conversationGroup?: ConversationGroup;
+}
+
+export interface ConsensusNote {
+    id: number;
+    conversation_id: number;
+    user_id: number;
+    response_id: number;
+    text: string | null;
+    created_at?: string;
+    updated_at?: string;
 }
 
 /**

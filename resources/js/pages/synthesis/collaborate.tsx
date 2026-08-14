@@ -327,9 +327,9 @@ export default function Collaborate({
 
             if (data.success) {
                 // Update the summaryLocal state with the new category content
-                const summaryField = category + '_summary';
+                const summaryField = (category + '_summary') as keyof SynthesisSummaryData;
                 setSummaryLocal((prev) => ({
-                    ...(prev || { id: null, generated_at: null }),
+                    ...(prev || { id: 0, convergence_summary: null, consideration_summary: null, proposals_summary: null, other_summary: null, status: 'completed', is_successful: true, provider: null, generated_at: null }),
                     id: prev?.id ?? 0,
                     [summaryField]: data[summaryField] ?? null,
                     generated_at: new Date().toISOString(),

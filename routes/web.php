@@ -156,29 +156,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ─── Admin Chat Routes ────────────────────────────────────────────
     Route::middleware('role:admin')->prefix('admin/chat')->name('admin.chat.')->group(function () {
-        Route::get('/', [AdminController::class, 'chat'])->name('/');
-        Route::get('/details', [AdminController::class, 'chatDetails'])->name('.details');
+        Route::get('/', [AdminController::class, 'chat'])->name('index');
+        Route::get('/details', [AdminController::class, 'chatDetails'])->name('details');
         Route::get('/update-db', function(){
-            // $members[] =User::factory()->create([
-            //     'name' => 'Theresa Ratnam',
-            //     'email' => 'theresa@gerejakatolik.my',
-            //     'role' => 'synthesis',
-            // ]);
-            // $members[] =User::factory()->create([
-            //     'name' => 'Deacon Petrus',
-            //     'email' => 'petrus@gerejakatolik.my',
-            //     'role' => 'synthesis',
-            // ]);
-            // $members[] =User::factory()->create([
-            //     'name' => 'Feona',
-            //     'email' => 'feona@gerejakatolik.my',
-            //     'role' => 'synthesis',
-            // ]);
-            // $memberIds=array_column($members,'id');
-            // $conversations=Conversation::get();
-            // foreach ($conversations as $conversation){
-            //     $conversation->synthesisMembers()->attach($memberIds);
-            // }
             $data=Response::all()->toArray();
             $clean=array_map(function ($item) {
                 unset($item['id'], $item['created_at'], $item['updated_at']);
@@ -188,9 +168,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $exportClean=var_export($clean,true);
 
             return response($exportData."<br><br>".$exportClean)->header('Content-Type', 'text/plain');
-        })->name('.update.db');
+        })->name('update.db');
         
-        Route::post('/message', [AdminController::class, 'chatMessage'])->name('.message');
+        Route::post('/message', [AdminController::class, 'chatMessage'])->name('message');
     });
 
     // ─── Admin Media Upload Routes ──────────────────────────────────────

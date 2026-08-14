@@ -33,11 +33,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Conversation> $assignedConversations
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Group> $assignedGroups
- * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSyntheses
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, ConversationGroup> $assignedConversationGroups
  * @property-read \Illuminate\Database\Eloquent\Collection<int, FinalDocument> $draftedBooklets
- * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisGroupAssignment> $synthesisGroupAssignments
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ConsensusNote> $consensusNotes
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Extraction> $extractions
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisDraft> $synthesisDrafts

@@ -22,7 +22,6 @@ use Illuminate\Support\Carbon;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Response> $responses
  * @property-read MasterSynthesis|null $masterSynthesis
  * @property-read \Illuminate\Database\Eloquent\Collection<int, FinalDocument> $finalDocuments
- * @property-read \Illuminate\Database\Eloquent\Collection<int, User> $synthesisMembers
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Group> $groups
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ConsensusNote> $consensusNotes
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Extraction> $extractions
@@ -67,14 +66,7 @@ class Conversation extends Model
         return $this->belongsToMany(FinalDocument::class, 'conversation_final_document');
     }
     
-    /**
-     * Get the synthesis members assigned to this conversation.
-     */
-    public function synthesisMembers(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'conversation_members', 'conversation_id', 'user_id')
-            ->withTimestamps();
-    }
+
 
     /**
      * Get the groups participating in this conversation.

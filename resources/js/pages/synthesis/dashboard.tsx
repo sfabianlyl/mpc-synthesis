@@ -11,14 +11,18 @@ import type { Conversation, ConsensusSubmission, Group, SynthesisSubmission } fr
 
 interface PageProps {
     conversations: Conversation[];
-    groups: Group[];
+    groups?: Group[];
+    assignedGroups?: any[];
+    responses?: any[];
     selectedConversationId: number | null;
-    consensusSubmissions: Record<number, ConsensusSubmission[]>;
+    consensusSubmissions?: Record<number, ConsensusSubmission[]>;
 }
 
 export default function Dashboard({ 
     conversations, 
     groups, 
+    assignedGroups,
+    responses,
     selectedConversationId, 
     consensusSubmissions 
 }: PageProps) {
@@ -50,6 +54,9 @@ export default function Dashboard({
         const anySub = submission as any;
         return anySub.group_name || anySub.facilitator_name || '';
     };
+
+    const groupList = assignedGroups || groups || [];
+    const submissionsMap = consensusSubmissions || {};
 
     return (
         <>
@@ -153,19 +160,19 @@ export default function Dashboard({
                                 <CardDescription>Track which groups have submitted their group's consensus response.</CardDescription>
                             </div>
                             <Badge variant="outline" className="h-6">
-                                {Object.keys(consensusSubmissions).filter(groupId => Object.values(consensusSubmissions[Number(groupId)]).some(s => s.is_submitted)).length} / {groups.length} Submitted
+                                {Object.keys(submissionsMap).filter(groupId => Object.values(submissionsMap[Number(groupId)] || []).some(s => s.is_submitted)).length} / {groupList.length} Submitted
                             </Badge>
                         </CardHeader>
                         <CardContent className="pt-6">
-                            {Object.keys(consensusSubmissions).length === 0 ? (
+                            {Object.keys(submissionsMap).length === 0 ? (
                                 <div className="text-center py-8 text-muted-foreground text-sm">
                                     <Users className="size-10 mx-auto text-muted-foreground/30 mb-2" />
                                     <p>No consensus submissions received for this session yet.</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {Object.entries(consensusSubmissions).map(([groupId, submissions]) => (
-                                        submissions.map((submission) => {
+                                    {Object.entries(submissionsMap).map(([groupId, submissions]) => (
+                                        (submissions || []).map((submission) => {
                                             const displayName = getDisplayName(submission);
 
                                             return (

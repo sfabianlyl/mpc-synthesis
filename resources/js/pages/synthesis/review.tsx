@@ -9,14 +9,16 @@ import { debounce } from '@/lib/debounce';
 
 interface GroupAssignment {
     id: number;
+    group_id?: number;
     name: string;
     responses: any[];
     consensusSubmission?: {
+        id?: number;
         is_submitted: boolean;
         consensus_text: string;
         submitted_at: string | null;
     } | null;
-    note?: { id: number; text: string | null } | null;
+    note?: { id: number; response_id?: number; text: string | null } | null;
 }
 
 interface Extraction {
@@ -42,7 +44,7 @@ interface SynthesisDraft {
 interface PageProps {
     conversation: any;
     assignedGroups: GroupAssignment[];
-    notes: Record<number, { id: number; text: string | null }>;
+    notes: Record<number, { id: number; response_id?: number; text: string | null }>;
     draft: SynthesisDraft | null;
     extraction: Extraction | null;
     allConsensusSubmitted: boolean;
@@ -84,11 +86,14 @@ export default function Review({
     const [proposalsText, setProposalsText] = useState(draft?.proposals_text ?? '');
     const [othersText, setOthersText] = useState(draft?.other_text ?? '');
 
-    // Local state for notes per group
+    // Local state for notes keyed by response_id
     const [groupNotes, setGroupNotes] = useState<Record<number, string>>(() => {
         const initial: Record<number, string> = {};
         assignedGroups.forEach((group) => {
-            initial[group.id] = group.note?.text ?? '';
+            const respId = group.consensusSubmission?.id || group.responses?.[0]?.id || group.note?.response_id;
+            if (respId) {
+                initial[respId] = group.note?.text ?? '';
+            }
         });
         return initial;
     });
@@ -159,13 +164,12 @@ export default function Review({
         [conversation?.id]
     );
 
-    // Debounced batch save: saves ALL current notes in one request using fetch
-    // so that quickly tabbing between boxes doesn't lose unsaved changes.
+    // Debounced batch save: saves ALL current notes in one request using fetch (keyed by response_id)
     const debouncedSaveNotes = useMemo(
-        () => debounce((notes: Record<number, string>) => {
+        () => debounce((notesMap: Record<number, string>) => {
             if (!conversation?.id) return;
-            const payload = Object.entries(notes).map(([groupId, text]) => ({
-                group_id: Number(groupId),
+            const payload = Object.entries(notesMap).map(([responseId, text]) => ({
+                response_id: Number(responseId),
                 text,
             }));
             fetch(`/synthesis/consensus-notes-batch/${conversation.id}`, {
@@ -191,11 +195,10 @@ export default function Review({
         debouncedSaveDraft(field, value);
     };
 
-    // Handle note changes with autosave — passes entire updated notes map
-    // to the debounced batch saver so all boxes are captured in one request.
-    const handleNoteChange = (groupId: number, text: string) => {
+    // Handle note changes with autosave — passes entire updated notes map by responseId
+    const handleNoteChange = (responseId: number, text: string) => {
         setGroupNotes((prev) => {
-            const updated = { ...prev, [groupId]: text };
+            const updated = { ...prev, [responseId]: text };
             debouncedSaveNotes(updated);
             return updated;
         });
@@ -475,14 +478,19 @@ export default function Review({
                                         {/* Right Side: Notes */}
                                         <div className="space-y-1.5">
                                             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block">Your Notes</label>
-                                            <Textarea
-                                                value={groupNotes[group.id] ?? ''}
-                                                onChange={(e) => handleNoteChange(group.id, e.target.value)}
-                                                disabled={isDraftSubmitted}
-                                                rows={6}
-                                                placeholder="Write your notes or observations here..."
-                                                className="text-sm min-h-[140px]"
-                                            />
+                                            {(() => {
+                                                const responseId = group.consensusSubmission?.id || group.responses?.[0]?.id || group.note?.response_id;
+                                                return (
+                                                    <Textarea
+                                                        value={responseId ? (groupNotes[responseId] ?? '') : ''}
+                                                        onChange={(e) => responseId && handleNoteChange(responseId, e.target.value)}
+                                                        disabled={isDraftSubmitted || !responseId}
+                                                        rows={6}
+                                                        placeholder="Write your notes or observations here..."
+                                                        className="text-sm min-h-[140px]"
+                                                    />
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 </CardContent>
