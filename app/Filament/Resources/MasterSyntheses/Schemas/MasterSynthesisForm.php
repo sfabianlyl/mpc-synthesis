@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\MasterSyntheses\Schemas;
 
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Schema;
@@ -13,11 +12,7 @@ class MasterSynthesisForm
     {
         return $schema
             ->components([
-                Select::make('conversation_id')
-                    ->relationship('conversation', 'title')
-                    ->required(),
-                Select::make('synthesis_id')
-                    ->relationship('synthesis', 'name')
+                TextInput::make('conversation_id')
                     ->required(),
                 Textarea::make('convergence_text')
                     ->columnSpanFull(),

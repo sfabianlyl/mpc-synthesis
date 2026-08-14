@@ -22,7 +22,7 @@ class Response extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['conversation_id', 'group_id', 'consensus_text', 'submitted_at'];
+    protected $fillable = ['conversation_group_id', 'consensus_text', 'submitted_at'];
 
     protected function casts(): array
     {
@@ -31,19 +31,10 @@ class Response extends Model
         ];
     }
 
-    /**
-     * Get the conversation/session this response belongs to.
-     */
-    public function conversation(): BelongsTo
-    {
-        return $this->belongsTo(Conversation::class);
-    }
+    
 
-    /**
-     * Get the group this response belongs to.
-     */
-    public function group(): BelongsTo
+    public function conversationGroup() 
     {
-        return $this->belongsTo(Group::class);
+        return $this->belongsTo(ConversationGroup::class);
     }
 }

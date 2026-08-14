@@ -20,18 +20,14 @@ use Illuminate\Support\Carbon;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Event|null $event
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Response> $responses
- * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSynthesis
+ * @property-read MasterSynthesis|null $masterSynthesis
  * @property-read \Illuminate\Database\Eloquent\Collection<int, FinalDocument> $finalDocuments
  * @property-read \Illuminate\Database\Eloquent\Collection<int, User> $synthesisMembers
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Group> $groups
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ConsensusNote> $consensusNotes
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Extraction> $extractions
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisDraft> $synthesisDrafts
- * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSyntheses
  * @property-read SynthesisSummary $synthesisSummary
- * @property-read \Illuminate\Database\Eloquent\Collection<int, DecisionDraft> $decisionDrafts
- * @property-read \Illuminate\Database\Eloquent\Collection<int, DecisionSummary> $decisionSummaries
- * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterDecision> $masterDecisions
  */
 class Conversation extends Model
 {
@@ -56,11 +52,11 @@ class Conversation extends Model
     }
 
     /**
-     * Get the synthesis reports for this conversation.
+     * Get the master synthesis for this conversation.
      */
-    public function masterSynthesis(): HasMany
+    public function masterSynthesis(): HasOne
     {
-        return $this->hasMany(MasterSynthesis::class);
+        return $this->hasOne(MasterSynthesis::class, 'conversation_id');
     }
 
     /**
@@ -113,14 +109,6 @@ class Conversation extends Model
     }
 
     /**
-     * Get the master syntheses for this conversation.
-     */
-    public function masterSyntheses(): HasMany
-    {
-        return $this->hasMany(MasterSynthesis::class, 'conversation_id');
-    }
-
-    /**
      * Get the synthesis summary for this conversation.
      */
     public function synthesisSummary(): HasOne
@@ -128,27 +116,8 @@ class Conversation extends Model
         return $this->hasOne(SynthesisSummary::class, 'conversation_id');
     }
 
-    /**
-     * Get the decision drafts for this conversation.
-     */
-    public function decisionDrafts(): HasMany
+    public function conversationGroups() 
     {
-        return $this->hasMany(DecisionDraft::class, 'conversation_id');
-    }
-
-    /**
-     * Get the decision summaries for this conversation.
-     */
-    public function decisionSummaries(): HasMany
-    {
-        return $this->hasMany(DecisionSummary::class, 'conversation_id');
-    }
-
-    /**
-     * Get the master decisions for this conversation.
-     */
-    public function masterDecisions(): HasMany
-    {
-        return $this->hasMany(MasterDecision::class, 'conversation_id');
+        return $this->hasMany(ConversationGroup::class);
     }
 }

@@ -8,20 +8,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property int $id
- * @property int $synthesis_report_id
+ * @property int $synthesis_draft_id
  * @property string $prompt
  * @property array|null $response
  * @property string|null $provider
  * @property \Carbon\Carbon|null $created_at
  * @property \Carbon\Carbon|null $updated_at
- * @property-read MasterSynthesis $synthesisReport
+ * @property-read SynthesisDraft $synthesisDraft
  */
 class SynthesisCustomQuery extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'synthesis_report_id',
+        'synthesis_draft_id',
         'prompt',
         'response',
         'provider',
@@ -37,8 +37,8 @@ class SynthesisCustomQuery extends Model
     /**
      * Get the synthesis report this custom query belongs to.
      */
-    public function synthesisReport(): BelongsTo
+    public function synthesisDraft(): BelongsTo
     {
-        return $this->belongsTo(MasterSynthesis::class);
+        return $this->belongsTo(synthesisDraft::class);
     }
 }

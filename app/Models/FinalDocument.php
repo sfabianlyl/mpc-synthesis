@@ -24,7 +24,6 @@ use Illuminate\Support\Carbon;
  * @property-read Event|null $event
  * @property-read User|null $creator
  * @property-read User|null $draftedBy
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Conversation> $conversations
  */
 class FinalDocument extends Model
 {
@@ -81,21 +80,5 @@ class FinalDocument extends Model
     public function conversations(): BelongsToMany
     {
         return $this->belongsToMany(Conversation::class, 'conversation_final_document');
-    }
-
-    /**
-     * Scope: Only AI-generated booklets.
-     */
-    public function scopeAiGenerated($query)
-    {
-        return $query->where('is_ai_generated', true);
-    }
-
-    /**
-     * Scope: Only manually drafted booklets.
-     */
-    public function scopeManuallyDrafted($query)
-    {
-        return $query->where('is_ai_generated', false);
     }
 }

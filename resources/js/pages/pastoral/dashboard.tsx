@@ -193,10 +193,10 @@ export default function Dashboard({ conversations }: PageProps) {
                                         <div className="flex flex-wrap gap-2">
                                             {/* Reports link – only if synthesis is submitted */}
                                             {conversation.has_reports ? (
-                                                <Link href={`/pastoral/reports/${conversation.id}`}>
+                                                <Link href={`/synthesis/export-booklet/${conversation.id}`} target="_blank">
                                                     <Button variant="outline" size="sm" className="gap-2">
                                                         <FileText className="size-4" />
-                                                        View Reports
+                                                        View Booklet
                                                         <ArrowRight className="size-3" />
                                                     </Button>
                                                 </Link>

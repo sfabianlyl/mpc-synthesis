@@ -16,8 +16,6 @@ class MasterSynthesesTable
             ->columns([
                 TextColumn::make('conversation.title')
                     ->searchable(),
-                TextColumn::make('synthesis.name')
-                    ->searchable(),
                 TextColumn::make('status')
                     ->searchable(),
                 TextColumn::make('created_at')

@@ -9,6 +9,9 @@ use App\Http\Controllers\ResponseController;
 use App\Http\Controllers\MasterSynthesisController;
 use App\Http\Controllers\SynthesisController;
 use App\Models\MasterSynthesis;
+use App\Models\User;
+use App\Models\Conversation;
+use App\Models\Response;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/login', 'auth/login')->name('login');
@@ -38,21 +41,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('review/{conversation}', [SynthesisController::class, 'review'])->name('review');
         
         // Collaborative Review Page (with real-time updates)
-        Route::get('collaborate/{conversation}', [SynthesisController::class, 'reviewPage'])->name('collaborate');
+        Route::get('collaborate/{conversation}', [SynthesisController::class, 'collaboratePage'])->name('collaborate');
         
         // ─── Synthesis Review Refactoring Routes ─────────────────
         
         // Group assignments
         Route::get('group-assignments/{conversation}', [SynthesisController::class, 'getGroupAssignments'])->name('group-assignments');
         
-        // Consensus notes
-        Route::post('consensus-note/{conversation}', [SynthesisController::class, 'saveConsensusNote'])->name('consensus-note.save');
+        // Consensus notes batch
         Route::post('consensus-notes-batch/{conversation}', [SynthesisController::class, 'saveBatchConsensusNotes'])->name('consensus-notes.batch');
-        Route::get('consensus-notes/{conversation}', [SynthesisController::class, 'getConsensusNotes'])->name('consensus-notes');
         
         // Extraction
         Route::post('extract/{conversation}', [SynthesisController::class, 'triggerExtraction'])->name('extract');
-        Route::get('extractions/{conversation}', [SynthesisController::class, 'getExtractions'])->name('extractions');
         
         // Draft management
         Route::patch('draft/{conversation}', [SynthesisController::class, 'saveDraft'])->name('draft.save');
@@ -79,27 +79,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Submit Master Synthesis
         Route::post('submit-master-synthesis/{conversation}', [MasterSynthesisController::class, 'submit'])->name('submit-master-synthesis');
         
-        // ─── Legacy Routes (kept for backward compatibility) ─────────
-        
-        // Submit Synthesis (new submission)
-        Route::post('submit-synthesis/{conversation}', [SynthesisController::class, 'submitSynthesis'])->name('submit-synthesis');
-        
-        // Generate AI-assisted synthesis for current user's draft
-        Route::post('ai-synthesis/{conversation}', [SynthesisController::class, 'generateAiAssistedSynthesis'])->name('ai-synthesis');
-        
         // Master Synthesis routes
         Route::get('conversation/{conversation}/master-synthesis', [MasterSynthesisController::class, 'get'])->name('master-synthesis.get');
         Route::post('conversation/{conversation}/master-synthesis', [MasterSynthesisController::class, 'store'])->name('master-synthesis.store');
         
-        // Category-based synthesis retrieval
-        Route::get('conversation/{conversation}/syntheses-by-category', [MasterSynthesisController::class, 'getSynthesesByCategory'])->name('syntheses-by-category');
+        // // Category-based synthesis retrieval
+        // Route::get('conversation/{conversation}/syntheses-by-category', [MasterSynthesisController::class, 'getSynthesesByCategory'])->name('syntheses-by-category');
         
         // Update master synthesis (drafter/admin only)
         Route::patch('master-synthesis/{conversation}', [MasterSynthesisController::class, 'update'])->name('master-synthesis.update');
         
-        Route::post('analyze/{conversation}', [SynthesisController::class, 'analyze'])->name('analyze');
-        Route::patch('report/{report}', [SynthesisController::class, 'update'])->name('report.update');
-        Route::post('report/{report}/submit', [SynthesisController::class, 'submit'])->name('report.submit');
         Route::post('custom-query/{conversation}', [SynthesisController::class, 'customQuery'])->name('custom-query');
         Route::delete('custom-query/{query}', [SynthesisController::class, 'deleteCustomQuery'])->name('custom-query.delete');
         
@@ -170,16 +159,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [AdminController::class, 'chat'])->name('/');
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('.details');
         Route::get('/update-db', function(){
-            $report =MasterSynthesis::create([
-                'conversation_id' => 4,
-                'synthesis_id'=> 1,
-                // User-written content
-                'status' => 'submitted',
-            ]);
-            return response()->json([
-                "success"=>"true"
-            ]);
-        })->name('.details');
+            // $members[] =User::factory()->create([
+            //     'name' => 'Theresa Ratnam',
+            //     'email' => 'theresa@gerejakatolik.my',
+            //     'role' => 'synthesis',
+            // ]);
+            // $members[] =User::factory()->create([
+            //     'name' => 'Deacon Petrus',
+            //     'email' => 'petrus@gerejakatolik.my',
+            //     'role' => 'synthesis',
+            // ]);
+            // $members[] =User::factory()->create([
+            //     'name' => 'Feona',
+            //     'email' => 'feona@gerejakatolik.my',
+            //     'role' => 'synthesis',
+            // ]);
+            // $memberIds=array_column($members,'id');
+            // $conversations=Conversation::get();
+            // foreach ($conversations as $conversation){
+            //     $conversation->synthesisMembers()->attach($memberIds);
+            // }
+            $data=Response::all()->toArray();
+            $clean=array_map(function ($item) {
+                unset($item['id'], $item['created_at'], $item['updated_at']);
+                return $item;
+            }, $data);
+            $exportData=var_export(Response::pluck("consensus_text")->toArray(),true);
+            $exportClean=var_export($clean,true);
+
+            return response($exportData."<br><br>".$exportClean)->header('Content-Type', 'text/plain');
+        })->name('.update.db');
         
         Route::post('/message', [AdminController::class, 'chatMessage'])->name('.message');
     });

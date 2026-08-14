@@ -50,6 +50,15 @@ export default function Collaborate({
     // Expand all master synthesis state
     const [showAllMasterSynthesis, setShowAllMasterSynthesis] = useState(false);
     
+    // Save button feedback state per category
+    const [saveFeedback, setSaveFeedback] = useState<{
+        category: string | null;
+        type: 'success' | 'error' | null;
+    }>({ category: null, type: null });
+
+    // Save all button feedback state
+    const [saveAllFeedback, setSaveAllFeedback] = useState<'success' | 'error' | null>(null);
+
     // Key points extraction state
     const [keyPointsCount, setKeyPointsCount] = useState(5);
     const [keyPointsText, setKeyPointsText] = useState('');
@@ -166,21 +175,20 @@ export default function Collaborate({
     // Build category contributions from all submissions
     const buildCategoryContributions = useCallback((category: string): CategoryContributions => {
         const catSubmissions = getSubmissionsByCategory(category);
-        let manualContent = '';
+        let unifiedContent = '';
 
         catSubmissions.forEach(s => {
             if (s.text && s.text.trim()) {
-                manualContent += (manualContent ? '\n\n--- Manual Input ---\n\n' : '') + s.text;
+                unifiedContent += (unifiedContent ? '\n\n---\n\n' : '') + s.text;
             }
         });
 
         return {
-            manual_content: manualContent,
+            content: unifiedContent,
             submissions: catSubmissions.map(s => ({
                 id: s.id,
                 user: s.user,
-                manual_content: s.text,
-                submission_number: s.submission_number || 1,
+                content: s.text,
                 created_at: '',
                 updated_at: '',
             })),
@@ -191,7 +199,7 @@ export default function Collaborate({
     const handleSubmitSynthesis = () => {
         setIsSubmitting(true);
         router.post(
-            `/synthesis/submit-synthesis/${conversation.id}`,
+            `/synthesis/submit-draft/${conversation.id}`,
             {
                 convergence_text: convergenceInput,
                 consideration_text: mattersInput,
@@ -231,10 +239,16 @@ export default function Collaborate({
                     if (page.props.masterSynthesis) {
                         setMasterSynthesisLocal(page.props.masterSynthesis);
                     }
+                    // Show "Saved" feedback for 2 seconds
+                    setSaveFeedback({ category: categoryKey, type: 'success' });
+                    setTimeout(() => setSaveFeedback(prev => prev.category === categoryKey ? { category: null, type: null } : prev), 2000);
                 },
                 onError: (errors) => {
                     console.error('[ERROR] Save master synthesis failed:', errors);
                     setStatusMessage({ type: 'error', text: 'Failed to save master synthesis. Check console for details.' });
+                    // Show "Error Saving" feedback for 2 seconds
+                    setSaveFeedback({ category: categoryKey, type: 'error' });
+                    setTimeout(() => setSaveFeedback(prev => prev.category === categoryKey ? { category: null, type: null } : prev), 2000);
                 },
             }
         );
@@ -260,10 +274,16 @@ export default function Collaborate({
                     if (page.props.masterSynthesis) {
                         setMasterSynthesisLocal(page.props.masterSynthesis);
                     }
+                    // Show "Saved" feedback for 2 seconds
+                    setSaveAllFeedback('success');
+                    setTimeout(() => setSaveAllFeedback(null), 2000);
                 },
                 onError: (errors) => {
                     console.error('[ERROR] Save all master synthesis failed:', errors);
                     setStatusMessage({ type: 'error', text: 'Failed to save master synthesis. Check console for details.' });
+                    // Show "Error Saving" feedback for 2 seconds
+                    setSaveAllFeedback('error');
+                    setTimeout(() => setSaveAllFeedback(null), 2000);
                 },
             }
         );
@@ -578,11 +598,6 @@ export default function Collaborate({
                                                                     <Badge variant={submission.status === 'submitted' ? 'default' : 'secondary'} className="text-xs">
                                                                         {submission.status === 'submitted' ? 'Submitted' : 'Draft'}
                                                                     </Badge>
-                                                                    {submission.submission_number && submission.submission_number > 1 && (
-                                                                        <Badge variant="outline" className="text-xs">
-                                                                            Submission #{submission.submission_number}
-                                                                        </Badge>
-                                                                    )}
                                                                 </div>
                                                                 {submission.submitted_at && (
                                                                     <span className="text-xs text-muted-foreground">
@@ -649,10 +664,18 @@ export default function Collaborate({
                                                 </span>
                                                 <Button
                                                     size="sm"
-                                                    variant="default"
+                                                    variant={saveFeedback.category === category.key && saveFeedback.type === 'error' ? 'destructive' : 'default'}
                                                     onClick={() => handleSaveMasterCategory(category.key)}
+                                                    disabled={saveFeedback.category === category.key}
+                                                    className={saveFeedback.category === category.key && saveFeedback.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
                                                 >
-                                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Save
+                                                    {saveFeedback.category === category.key && saveFeedback.type === 'success' ? (
+                                                        <><CheckCircle2 className="h-3 w-3 mr-1" /> Saved</>
+                                                    ) : saveFeedback.category === category.key && saveFeedback.type === 'error' ? (
+                                                        <><XCircle className="h-3 w-3 mr-1" /> Error Saving</>
+                                                    ) : (
+                                                        <><CheckCircle2 className="h-3 w-3 mr-1" /> Save</>
+                                                    )}
                                                 </Button>
                                             </h4>
 
@@ -695,9 +718,19 @@ export default function Collaborate({
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="flex justify-end">
-                                <Button onClick={handleSaveAllMasterCategories} className="flex items-center gap-2">
-                                    <CheckCircle2 className="size-4" />
-                                    Save All Categories
+                                <Button
+                                    onClick={handleSaveAllMasterCategories}
+                                    disabled={saveAllFeedback !== null}
+                                    variant={saveAllFeedback === 'error' ? 'destructive' : 'default'}
+                                    className={`flex items-center gap-2 ${saveAllFeedback === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+                                >
+                                    {saveAllFeedback === 'success' ? (
+                                        <><CheckCircle2 className="size-4" /> Saved</>
+                                    ) : saveAllFeedback === 'error' ? (
+                                        <><XCircle className="size-4" /> Error Saving</>
+                                    ) : (
+                                        <><CheckCircle2 className="size-4" /> Save All Categories</>
+                                    )}
                                 </Button>
                             </div>
                         </CardContent>

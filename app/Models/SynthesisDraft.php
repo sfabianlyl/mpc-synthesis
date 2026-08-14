@@ -45,14 +45,6 @@ class SynthesisDraft extends Model
     }
 
     /**
-     * Check if this draft is locked (cannot be edited after submission).
-     */
-    public function isLocked(): bool
-    {
-        return $this->is_submitted;
-    }
-
-    /**
      * Get the conversation this draft belongs to.
      */
     public function conversation(): BelongsTo

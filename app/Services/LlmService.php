@@ -16,6 +16,8 @@ class LlmService
     private bool $localReasoning;
     private string $geminiApiKey;
     private string $geminiModel;
+    private string $categoryDefinitions;
+    private string $outputTone;
 
     public function __construct()
     {
@@ -27,6 +29,14 @@ class LlmService
         $this->localReasoning = (bool) config('services.llm.local_reasoning', false);
         $this->geminiApiKey = config('services.llm.gemini_api_key', '');
         $this->geminiModel = config('services.llm.gemini_model', 'gemini-2.5-flash');
+
+        $this->categoryDefinitions = "1. **Convergence (A)**: independent data points, signs, or lines of evidence coming together to point toward one clear, unified conclusion or emerging conclusion. It serves as a strong validation method where separate inputs align to reduce uncertainty that gives confidence for decision takers to act
+
+2. **Matters for Consideration (B)**: a dissenting statement, an alternative prediction, or a  record of totally new and unheard of ideas or new and improved ways of doing existing ideas or objections. It describes the opinion and discernment by members of a group who do not agree with the main or majority decision
+
+3. **Proposals (C)**: an actionable or something clear enough to be put into practical use. Proposals may be explained through steps that are clear and specific enough to act on right away or may be explained as other required action before being able to address the pertaining matter";
+
+        $this->outputTone = "Stick to original vocabulary used by the contents as much as possible with minimal refinements towards Malaysian English, and pastoral language, where applicable. ";
     }
 
     /**
@@ -263,7 +273,7 @@ class LlmService
      */
     public function buildSynthesisPrompt(): string
     {
-        return <<<'PROMPT'
+        return <<<PROMPT
 You are a synthesis assistant for a consultative process. You will receive one or more consensus paragraphs from group discussions.
 
 Your task is to analyze the text and extract information into exactly three categories. For each category, provide the content as bullet points using dashes (-) with concise phrases (not full sentences).
@@ -288,13 +298,13 @@ WRONG format (do NOT do this):
 - phrase three"
 }
 
-Categories:
+CATEGORIES AND DEFINITIONS:
 
-1. **Convergence (A)**: independent data points, signs, or lines of evidence coming together to point toward one clear, unified conclusion or emerging conclusion. It serves as a strong validation method where separate inputs align to reduce uncertainty that gives confidence for decision takers to act
+$this->categoryDefinitions
 
-2. **Matters for Consideration (B)**: a dissenting statement, an alternative prediction, or a  record of totally new and unheard of ideas or new and improved ways of doing existing ideas or objections. It describes the opinion and discernment by members of a group who do not agree with the main or majority decision
+OUTPUT LANGUAGE AND TONE:
 
-3. **Proposals (C)**: an actionable or something clear enough to be put into practical use. Proposals may be explained through steps that are clear and specific enough to act on right away or may be explained as other required action before being able to address the pertaining matter
+$this->outputTone
 
 IMPORTANT: Do NOT wrap the response in markdown code blocks (no ```json or ```). Do NOT include any explanatory text before or after the JSON. The response must be valid JSON only. Each value string must contain \n escape sequences, not actual newlines.
 
@@ -307,16 +317,24 @@ PROMPT;
      */
     public function buildNotesSynthesisPrompt(): string
     {
-        return <<<'PROMPT'
+        return <<<PROMPT
 You are a synthesis writer for a consultative process. You will receive a set of personal notes written by a synthesis member for different groups.
 
 Your task is to compile and weave all of these notes into four coherent prose paragraphs — one for each of the four synthesis categories below. You are NOT analyzing or categorizing the notes — you are taking all the raw content and writing it up as flowing, readable prose, organized into the appropriate category.
 
-CATEGORY DEFINITIONS:
+CATEGORIES AND DEFINITIONS:
+
+$this->categoryDefinitions
+
+CATEGORY ACTIONS:
 1. "convergence" — Compile all content from the notes that relates to points of agreement, shared views, or common ground. Write it as one coherent paragraph in full sentences.
 2. "consideration" — Compile all content that relates to concerns, tensions, challenges, or unresolved issues. Write it as one coherent paragraph in full sentences.
 3. "proposals" — Compile all content that relates to recommendations, suggestions, or proposed actions. Write it as one coherent paragraph in full sentences.
 4. "others" — Compile any remaining content that does not clearly fit the above three categories. Write it as one coherent paragraph in full sentences.
+
+OUTPUT LANGUAGE AND TONE:
+
+$this->outputTone
 
 EXAMPLE:
 {
@@ -335,7 +353,7 @@ PROMPT;
      */
     public function buildCustomQueryPrompt(): string
     {
-        return <<<'PROMPT'
+        return <<<PROMPT
 You are a synthesis assistant for a consultative process. You will receive one or more consensus paragraphs from group discussions as context, followed by a specific question or prompt from the user.
 
 Your task is to answer the user's question based on the provided context. Structure your response as bullet points.
@@ -349,6 +367,10 @@ Return your response as a JSON object with a single key "points" containing an a
   ]
 }
 
+OUTPUT LANGUAGE AND TONE:
+
+$this->outputTone
+
 IMPORTANT: Do NOT wrap the response in markdown code blocks. Return valid JSON only.
 Be concise but thorough. Base your analysis on the provided group responses.
 PROMPT;
@@ -359,7 +381,7 @@ PROMPT;
      */
     public function buildGlobalSynthesisPrompt(): string
     {
-        return <<<'PROMPT'
+        return <<<PROMPT
 You are a senior synthesis analyst. You will receive multiple synthesis reports, each containing three categories: Convergence, Matters for Consideration, and Proposals.
 
 Your task is to perform a macro-level analysis and identify:
@@ -376,6 +398,10 @@ Return your analysis as a JSON object:
   "critical_considerations": "...",
   "priority_proposals": "..."
 }
+
+OUTPUT LANGUAGE AND TONE:
+
+$this->outputTone
 
 Be analytical and thorough. This analysis will inform a final synthesis document.
 PROMPT;
@@ -424,7 +450,7 @@ PROMPT;
      */
     public function buildBookletGenerationPrompt(string $synthesisContent, string $retrievedDocuments): string
     {
-        return <<<'PROMPT'
+        return <<<PROMPT
 You are generating a final synthesis booklet for a consultative process. You have already completed the synthesis analysis and now need to enhance the document by citing and quoting from authoritative source documents.
 
 === SYNTHESIS CONTENT ===
@@ -455,7 +481,7 @@ PROMPT;
             $systemPrompt = $this->buildBookletGenerationPrompt($synthesisContent, $documentContext);
         } else {
             // Use standard synthesis prompt without document sources
-            $systemPrompt = <<<'PROMPT'
+            $systemPrompt = <<<PROMPT
 You are generating a final synthesis booklet for a consultative process. Analyze the provided synthesis content and produce a well-structured final document.
 
 === INSTRUCTIONS ===
@@ -495,6 +521,10 @@ Example format:
 1. Point one about convergence
 2. Point two about considerations
 3. Point three about proposals
+
+OUTPUT LANGUAGE AND TONE:
+
+$this->outputTone
 
 Return only the numbered key points, one per line. No dashes, no extra text.
 PROMPT;

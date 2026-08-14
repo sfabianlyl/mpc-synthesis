@@ -40,15 +40,12 @@ class PastoralController extends Controller
 
         $user = $request->user();
 
-        $conversations = Conversation::with(['event'])
+        $conversations = Conversation::with(['event','masterSynthesis'])
             ->orderBy('created_at', 'desc')
             ->get(['id', 'title', 'status', 'description', 'event_id', 'created_at'])
             ->map(function ($conversation) use ($user) {
                 // Check report availability (MasterSynthesis submitted)
-                $hasMasterSynthesisSubmitted = $conversation->masterSyntheses()
-                    ->where('is_master_synthesis', true)
-                    ->where('is_submitted', true)
-                    ->exists();
+                $masterSynthesis = $conversation->masterSynthesis;
 
                 // Get event-level decision submission status
                 $eventLevelSubmitted = null;
@@ -99,7 +96,7 @@ class PastoralController extends Controller
                     'description' => $conversation->description,
                     'event_id' => $conversation->event_id,
                     'event_title' => $conversation->event?->title,
-                    'has_reports' => $hasMasterSynthesisSubmitted,
+                    'master_synthesis' => $masterSynthesis,
                     'user_draft_submitted' => $eventLevelSubmitted ?? DecisionDraft::where('conversation_id', $conversation->id)
                         ->where('user_id', $user->id)
                         ->where('is_submitted', true)
@@ -120,12 +117,8 @@ class PastoralController extends Controller
     {
         $this->authorizePastoralAccess($request);
 
-        $masterSynthesis = $conversation->masterSyntheses()
-            ->where('is_master_synthesis', true)
-            ->where('is_submitted', true)
-            ->first();
-
-        $hasReports = $masterSynthesis !== null;
+        $masterSynthesis = $conversation->masterSynthesis;
+        $hasReports = $masterSynthesis && $masterSynthesis->is_submitted;
 
         return Inertia::render('pastoral/reports', [
             'conversation' => $conversation,

@@ -35,7 +35,6 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Conversation> $assignedConversations
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Group> $assignedGroups
- * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSynthesis
  * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSyntheses
  * @property-read \Illuminate\Database\Eloquent\Collection<int, FinalDocument> $draftedBooklets
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisGroupAssignment> $synthesisGroupAssignments
@@ -126,26 +125,18 @@ class User extends Authenticatable
     /**
      * Get the groups assigned to this synthesis team member.
      */
-    public function assignedGroups(): HasMany
+    public function assignedConversationGroups() 
     {
-        return $this->hasMany(Group::class, 'synthesis_id');
+        return $this->belongsToMany(ConversationGroup::class, 'conversation_group_user');
     }
 
-    /**
-     * Get the synthesis reports created by this synthesis team member.
-     */
-    public function masterSynthesis(): HasMany
+    // Get all responses the user is allowed to view
+    public function accessibleResponses()
     {
-        return $this->hasMany(MasterSynthesis::class, 'synthesis_id');
-    }
-    
-    /**
-     * Get the master syntheses created by this user.
-     */
-    public function masterSyntheses(): HasMany
-    {
-        return $this->hasMany(MasterSynthesis::class, 'synthesis_id')
-            ->where('is_master_synthesis', true);
+        return Response::whereIn(
+            'conversation_group_id', 
+            $this->assignedConversationGroups()->select('conversation_groups.id')
+        );
     }
 
     /**
@@ -156,16 +147,7 @@ class User extends Authenticatable
         return $this->hasMany(FinalDocument::class, 'drafted_by');
     }
 
-    /**
-     * Get the conversations this user is assigned to as a synthesis member.
-     */
-    public function assignedConversations(): BelongsToMany
-    {
-        return $this->belongsToMany(Conversation::class, 'conversation_members', 'user_id', 'conversation_id')
-            ->withTimestamps();
-    }
-
-
+    
     /**
      * Get the consensus notes written by this user.
      */
@@ -190,17 +172,5 @@ class User extends Authenticatable
         return $this->hasMany(SynthesisDraft::class, 'user_id');
     }
 
-    /**
-     * Get all accessible responses for this user.
-     * Admins get all responses; synthesis members get responses from assigned conversations.
-     */
-    public function getAccessibleResponses(): \Illuminate\Database\Eloquent\Collection
-    {
-        if ($this->isAdmin()) {
-            return \App\Models\Response::all();
-        }
-        
-        $conversationIds = $this->assignedConversations()->pluck('conversations.id');
-        return \App\Models\Response::whereIn('conversation_id', $conversationIds)->get();
-    }
+    
 }

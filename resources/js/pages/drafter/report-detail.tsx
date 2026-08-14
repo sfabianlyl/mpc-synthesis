@@ -32,8 +32,6 @@ interface SynthesisReport {
     conversation_id: number;
     user_id: number;
     synthesis_id: number;
-    submission_number?: number;
-    
     // Content fields
     convergence_text?: string | null;
     consideration_text?: string | null;
@@ -140,13 +138,13 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
         if (currentMaster) {
             return CATEGORIES.map(cat => ({
                 ...cat,
-                manual_content: (currentMaster as any)[`${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
+                content: (currentMaster as any)[`${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
             }));
         }
         
         return CATEGORIES.map(cat => ({
             ...cat,
-            manual_content: (report as any)[`${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
+            content: (report as any)[`${cat.key === 'consideration' ? 'consideration' : cat.key}_text`] as string | null,
         }));
     };
 
@@ -210,12 +208,6 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
                                 <span className="text-muted-foreground block">Synthesis Member:</span>
                                 <span className="ml-2">{report.synthesis?.name || 'Unknown'}</span>
                             </div>
-                            {report.submission_number && (
-                                <div>
-                                    <span className="text-muted-foreground block">Submission #:</span>
-                                    <Badge variant="outline" className="mt-1 text-xs">#{report.submission_number}</Badge>
-                                </div>
-                            )}
                             <div>
                                 <span className="text-muted-foreground block">Last Updated:</span>
                                 <span className="ml-2">{new Date(report.updated_at).toLocaleString()}</span>
@@ -243,20 +235,20 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
                                         <h4 className={`text-sm font-medium ${cat.color}`}>
                                             {cat.label}
                                         </h4>
-                                        {(cat as any).manual_content && (cat as any).manual_content.trim() && (
+                                        {(cat as any).content && (cat as any).content.trim() && (
                                             <Badge variant="outline" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                                                <Pencil className="h-3 w-3 mr-1" /> Manual Content
+                                                <Pencil className="h-3 w-3 mr-1" /> Content
                                             </Badge>
                                         )}
                                     </div>
                                     <p className="text-xs text-muted-foreground mb-2">{cat.description}</p>
                                     
-                                    {/* Manual Content */}
-                                    {(cat as any).manual_content && (cat as any).manual_content.trim() && (
+                                    {/* Content */}
+                                    {(cat as any).content && (cat as any).content.trim() && (
                                         <div>
                                             <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Master Content:</p>
                                             <div className="bg-white/50 dark:bg-black/10 rounded-md p-2 max-h-32 overflow-y-auto">
-                                                {renderContent((cat as any).manual_content)}
+                                                {renderContent((cat as any).content)}
                                             </div>
                                         </div>
                                     )}
@@ -279,14 +271,14 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
                             <CardContent className="pt-4">
                                 <Separator className="my-4" />
 
-                                {/* Manual Content */}
+                                {/* Content */}
                                 <div>
                                     <div className="flex items-center gap-2 mb-2">
                                         <Pencil className="h-4 w-4 text-green-600" />
-                                        <span className="text-sm font-medium text-green-700 dark:text-green-300">Manual Content:</span>
+                                        <span className="text-sm font-medium text-green-700 dark:text-green-300">Content:</span>
                                     </div>
                                     <div className="min-h-[60px]">
-                                        {renderContent((cat as any).manual_content)}
+                                        {renderContent((cat as any).content)}
                                     </div>
                                 </div>
                             </CardContent>
@@ -358,7 +350,7 @@ export default function ReportDetail({ report, masterSynthesis, relatedReports =
                                                 <div>
                                                     <p className="text-sm font-medium">{relatedReport.synthesis?.name || 'Unknown'}</p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        Submission #{relatedReport.submission_number || 1} · {new Date(relatedReport.updated_at).toLocaleDateString()}
+                                                        {new Date(relatedReport.updated_at).toLocaleDateString()}
                                                     </p>
                                                 </div>
                                             </div>

@@ -65,7 +65,6 @@ interface SynthesisReport {
     conversation_id: number;
     user_id: number;
     synthesis_id: number;
-    submission_number?: number;
     is_master_synthesis?: boolean;
     status: string;
     created_at: string;

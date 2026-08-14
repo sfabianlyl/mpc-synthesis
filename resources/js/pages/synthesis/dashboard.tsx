@@ -141,7 +141,7 @@ export default function Dashboard({
                 )}
                
 
-                {/* ─── Consensus Submission Status Card ───────────── */}
+                {/* ─── Consensus Submission Status Cards ───────────── */}
                 {selectedConversationId && (
                     <Card className="border-sidebar-border/50">
                         <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 flex flex-row items-center justify-between pb-4">
@@ -163,59 +163,29 @@ export default function Dashboard({
                                     <p>No consensus submissions received for this session yet.</p>
                                 </div>
                             ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Group Name</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Submitted At</TableHead>
-                                            <TableHead>Consensus Text Preview</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {Object.entries(consensusSubmissions).map(([groupId, submissions]) => (
-                                            submissions.map((submission) => {
-                                                const anySub = submission as any;
-                                                const displayName = getDisplayName(submission);
-                                                const initials = displayName
-                                                    ? displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2)
-                                                    : '';
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {Object.entries(consensusSubmissions).map(([groupId, submissions]) => (
+                                        submissions.map((submission) => {
+                                            const displayName = getDisplayName(submission);
 
-                                                return (
-                                                    <TableRow key={submission.id}>
-                                                        <TableCell>
-                                                            {displayName ? (
-                                                                <span className="flex items-center gap-2">
-                                                                    <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                                                                        {initials}
-                                                                    </div>
-                                                                    G{groupId}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-muted-foreground italic">Unassigned</span>
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge variant={submission.is_submitted ? 'default' : 'secondary'} className={submission.is_submitted ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/10' : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/10'}>
-                                                                {submission.is_submitted ? (
-                                                                    <><CheckCircle2 className="size-3.5 mr-1" /> Submitted</>
-                                                                ) : (
-                                                                    <><XCircle className="size-3.5 mr-1" /> Pending</>
-                                                                )}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell className="text-muted-foreground text-sm">
-                                                            {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : '—'}
-                                                        </TableCell>
-                                                        <TableCell className="max-w-[300px] truncate text-muted-foreground text-xs font-normal">
-                                                            {submission.consensus_text || '—'}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                            return (
+                                                <Card key={submission.id} className={`border-sidebar-border/50 hover:shadow-md transition-shadow ${submission.is_submitted ? 'bg-emerald-500/5' : 'bg-muted/20'}`}>
+                                                    <CardHeader className="pb-3">
+                                                        <CardTitle className="text-base flex items-center gap-2">
+                                                            {submission.is_submitted && <CheckCircle2 className="size-5 text-emerald-500" />}
+                                                            {displayName || `Group ${groupId}`}
+                                                        </CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="pt-0">
+                                                        <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                                            {submission.consensus_text || 'No consensus text provided.'}
+                                                        </p>
+                                                    </CardContent>
+                                                </Card>
+                                            );
+                                        })
+                                    ))}
+                                </div>
                             )}
                         </CardContent>
                     </Card>

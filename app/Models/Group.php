@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
@@ -19,8 +18,6 @@ use Illuminate\Support\Carbon;
  * @property-read Event|null $event
  * @property-read User|null $synthesis
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Response> $responses
- * @property-read \Illuminate\Database\Eloquent\Collection<int, MasterSynthesis> $masterSynthesis
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Conversation> $conversations
  */
 class Group extends Model
 {
@@ -42,14 +39,6 @@ class Group extends Model
     }
 
     /**
-     * Get the conversations this group participates in.
-     */
-    public function conversations(): BelongsToMany
-    {
-        return $this->belongsToMany(Conversation::class, 'conversation_group');
-    }
-
-    /**
      * Get the responses submitted for this group.
      */
     public function responses(): HasMany
@@ -57,11 +46,8 @@ class Group extends Model
         return $this->hasMany(Response::class);
     }
 
-    /**
-     * Get the synthesis reports for this group.
-     */
-    public function masterSynthesis(): HasMany
+    public function conversationGroups() 
     {
-        return $this->hasMany(MasterSynthesis::class);
+        return $this->hasMany(ConversationGroup::class);
     }
 }

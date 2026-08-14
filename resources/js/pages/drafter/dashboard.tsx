@@ -23,8 +23,6 @@ interface SynthesisReport {
     conversation_id: number;
     user_id: number;
     synthesis_id: number;
-    submission_number?: number;
-    
     // Content fields
     convergence_text?: string | null;
     consideration_text?: string | null;
@@ -285,7 +283,6 @@ export default function Dashboard({ reports, masterSyntheses, documents, events,
                                         <TableHead>Synthesis Member</TableHead>
                                         <TableHead>Type</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead>Submission #</TableHead>
                                         <TableHead>Date</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -316,11 +313,6 @@ export default function Dashboard({ reports, masterSyntheses, documents, events,
                                                 }`}>
                                                     {report.status}
                                                 </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="text-xs">
-                                                    #{report.submission_number || 1}
-                                                </Badge>
                                             </TableCell>
                                             <TableCell>{new Date(report.updated_at).toLocaleDateString()}</TableCell>
                                             <TableCell className="text-right">

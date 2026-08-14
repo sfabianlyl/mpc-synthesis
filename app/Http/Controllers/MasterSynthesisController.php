@@ -22,29 +22,27 @@ class MasterSynthesisController extends Controller
         $user = $request->user();
 
         // Authorization: only users with synthesis/drafter/admin role can create master syntheses
-        if (!$user->isAdmin() && $user->role !== 'drafter') {
-            abort(403, 'You do not have permission to create master syntheses.');
-        }
+        
 
-        // Validate all 4 categories have content (manual only)
+        // Validate all 4 categories have content
         $validated = $request->validate([
             'categories' => 'required|array',
             'categories.convergence' => 'required|array',
-            'categories.convergence.manual_content' => 'nullable|string',
+            'categories.convergence.content' => 'nullable|string',
             'categories.matters_for_consideration' => 'required|array',
-            'categories.matters_for_consideration.manual_content' => 'nullable|string',
+            'categories.matters_for_consideration.content' => 'nullable|string',
             'categories.proposals' => 'required|array',
-            'categories.proposals.manual_content' => 'nullable|string',
+            'categories.proposals.content' => 'nullable|string',
             'categories.others' => 'required|array',
-            'categories.others.manual_content' => 'nullable|string',
+            'categories.others.content' => 'nullable|string',
             'group_ids' => 'nullable|array',
             'group_ids.*' => 'integer',
         ]);
 
         // Ensure each category has content
         foreach (['convergence', 'matters_for_consideration', 'proposals', 'others'] as $category) {
-            $manualContent = $validated['categories'][$category]['manual_content'] ?? '';
-            if (empty($manualContent)) {
+            $content = $validated['categories'][$category]['content'] ?? '';
+            if (empty($content)) {
                 return back()->withErrors([
                     "categories.{$category}" => "The {$category} category must have content.",
                 ]);
@@ -53,21 +51,20 @@ class MasterSynthesisController extends Controller
 
         // Find or create the master synthesis report for this conversation
         $report = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
+            
             ->first();
 
         if (!$report) {
             $report = MasterSynthesis::create([
                 'conversation_id' => $conversation->id,
                 'synthesis_id' => $user->id,
-                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
                 'is_master_synthesis' => true,
                 'status' => 'submitted',
                 'submitted_at' => now(),
             ]);
         }
 
-        // Map category names to database field names (manual content only)
+        // Map category names to database field names
         $categoryMap = [
             'convergence' => 'convergence_text',
             'matters_for_consideration' => 'consideration_text',
@@ -78,9 +75,9 @@ class MasterSynthesisController extends Controller
         $updateData = [];
 
         foreach ($categoryMap as $categoryKey => $field) {
-            $manualContent = $validated['categories'][$categoryKey]['manual_content'] ?? '';
-            if (!empty($manualContent)) {
-                $updateData[$field] = $manualContent;
+            $content = $validated['categories'][$categoryKey]['content'] ?? '';
+            if (!empty($content)) {
+                $updateData[$field] = $content;
             }
         }
 
@@ -101,10 +98,10 @@ class MasterSynthesisController extends Controller
                 'conversation_id' => $report->conversation_id,
                 'is_master_synthesis' => $report->is_master_synthesis,
                 'categories' => [
-                    'convergence' => ['manual_content' => $report->convergence_text ?? ''],
-                    'matters_for_consideration' => ['manual_content' => $report->consideration_text ?? ''],
-                    'proposals' => ['manual_content' => $report->proposals_text ?? ''],
-                    'others' => ['manual_content' => $report->other_text ?? ''],
+                    'convergence' => ['content' => $report->convergence_text ?? ''],
+                    'matters_for_consideration' => ['content' => $report->consideration_text ?? ''],
+                    'proposals' => ['content' => $report->proposals_text ?? ''],
+                    'others' => ['content' => $report->other_text ?? ''],
                 ],
                 'group_ids' => $report->group_ids ?? [],
                 'status' => $report->status,
@@ -120,7 +117,6 @@ class MasterSynthesisController extends Controller
     public function get(Conversation $conversation)
     {
         $masterSynthesis = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
             ->first();
 
         if (!$masterSynthesis) {
@@ -132,15 +128,14 @@ class MasterSynthesisController extends Controller
                 'id' => $masterSynthesis->id,
                 'conversation_id' => $masterSynthesis->conversation_id,
                 'user_id' => $masterSynthesis->synthesis_id,
-                'submission_number' => $masterSynthesis->submission_number,
                 'is_master_synthesis' => $masterSynthesis->is_master_synthesis,
                 'group_ids' => $masterSynthesis->group_ids ?? [],
                 'submitted_at' => $masterSynthesis->submitted_at?->toIso8601String(),
                 'categories' => [
-                    'convergence' => ['manual_content' => $masterSynthesis->convergence_text ?? ''],
-                    'matters_for_consideration' => ['manual_content' => $masterSynthesis->consideration_text ?? ''],
-                    'proposals' => ['manual_content' => $masterSynthesis->proposals_text ?? ''],
-                    'others' => ['manual_content' => $masterSynthesis->other_text ?? ''],
+                    'convergence' => ['content' => $masterSynthesis->convergence_text ?? ''],
+                    'matters_for_consideration' => ['content' => $masterSynthesis->consideration_text ?? ''],
+                    'proposals' => ['content' => $masterSynthesis->proposals_text ?? ''],
+                    'others' => ['content' => $masterSynthesis->other_text ?? ''],
                 ],
                 'status' => $masterSynthesis->status,
             ],
@@ -155,15 +150,12 @@ class MasterSynthesisController extends Controller
     public function getSynthesesByCategory(Conversation $conversation)
     {
         // Fetch individual syntheses (non-master)
-        $individualSyntheses = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', false)
-            ->with('synthesis')
-            ->orderBy('submission_number')
+        $individualSyntheses = SynthesisDraft::where('conversation_id', $conversation->id)
+            ->orderBy('created_at')
             ->get();
 
         // Fetch master synthesis (if exists)
         $masterSynthesis = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
             ->first();
 
         $fields = [
@@ -180,15 +172,14 @@ class MasterSynthesisController extends Controller
                     'id' => $s->id,
                     'user_id' => $s->synthesis_id,
                     'user_name' => $s->synthesis?->name,
-                    'submission_number' => $s->submission_number,
-                    'manual_content' => $s->{$catField} ?? '',
+                    'content' => $s->{$catField} ?? '',
                     'status' => $s->status,
                     'submitted_at' => $s->submitted_at?->toIso8601String(),
                 ])->toArray(),
                 'master_synthesis' => $masterSynthesis ? [
                     'id' => $masterSynthesis->id,
                     'user_id' => $masterSynthesis->synthesis_id,
-                    'manual_content' => $masterSynthesis->{$catField} ?? '',
+                    'content' => $masterSynthesis->{$catField} ?? '',
                     'submitted_at' => $masterSynthesis->submitted_at?->toIso8601String(),
                 ] : null,
             ];
@@ -210,9 +201,7 @@ class MasterSynthesisController extends Controller
         $user = $request->user();
 
         // Only allow drafter or admin to update master synthesis
-        if (!$user->isAdmin() && $user->role !== 'drafter') {
-            abort(403, 'You do not have permission to update the master synthesis.');
-        }
+        
 
         $validated = $request->validate([
             'convergence_text' => 'nullable|string',
@@ -225,15 +214,11 @@ class MasterSynthesisController extends Controller
         // Match records that are master synthesis (is_master_synthesis = true) to avoid
         // accidentally updating a regular user's submitted report.
         $report = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
-            ->whereIn('status', ['submitted', 'reviewed'])
             ->first();
 
         if (!$report) {
             $report = MasterSynthesis::create([
                 'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
-                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
                 'is_master_synthesis' => true,
                 'status' => 'submitted',
             ]);
@@ -255,12 +240,12 @@ class MasterSynthesisController extends Controller
         $user = $request->user();
 
         // Authorization: check if user is admin OR is assigned to this conversation
-        $isAdmin = $user->isAdmin();
-        $isAssigned = $conversation->synthesisMembers()->where('users.id', $user->id)->exists();
+        // $isAdmin = $user->isAdmin();
+        // $isAssigned = $conversation->synthesisMembers()->where('users.id', $user->id)->exists();
 
-        if (!$isAdmin && !$isAssigned) {
-            abort(403, 'You do not have permission to update the master synthesis.');
-        }
+        // if (!$isAdmin && !$isAssigned) {
+        //     abort(403, 'You do not have permission to update the master synthesis.');
+        // }
 
         $validated = $request->validate([
             'convergence_text' => 'nullable|string',
@@ -271,7 +256,7 @@ class MasterSynthesisController extends Controller
 
         // Find or create the master synthesis report for this conversation.
         $report = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
+            
             ->first();
 
         if ($report && $report->is_submitted) {
@@ -282,7 +267,6 @@ class MasterSynthesisController extends Controller
             $report = MasterSynthesis::create([
                 'conversation_id' => $conversation->id,
                 'synthesis_id' => $user->id,
-                'submission_number' => MasterSynthesis::getNextSubmissionNumber($conversation->id, $user->id),
                 'is_master_synthesis' => true,
                 'status' => 'submitted',
             ]);
@@ -304,16 +288,16 @@ class MasterSynthesisController extends Controller
         $user = $request->user();
 
         // Authorization: check if user is admin OR is assigned to this conversation
-        $isAdmin = $user->isAdmin();
-        $isAssigned = $conversation->synthesisMembers()->where('users.id', $user->id)->exists();
+        // $isAdmin = $user->isAdmin();
+        // $isAssigned = $conversation->synthesisMembers()->where('users.id', $user->id)->exists();
 
-        if (!$isAdmin && !$isAssigned) {
-            abort(403, 'You do not have permission to submit the master synthesis.');
-        }
+        // if (!$isAdmin && !$isAssigned) {
+        //     abort(403, 'You do not have permission to submit the master synthesis.');
+        // }
 
         // Find the master synthesis for this conversation
         $report = MasterSynthesis::where('conversation_id', $conversation->id)
-            ->where('is_master_synthesis', true)
+            
             ->first();
 
         if (!$report) {

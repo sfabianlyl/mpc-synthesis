@@ -74,12 +74,4 @@ class DocumentSourceChunk extends Model
 
         return $magA > 0 && $magB > 0 ? $dotProduct / ($magA * $magB) : 0.0;
     }
-
-    /**
-     * Scope to filter chunks that have embeddings.
-     */
-    public function scopeWithEmbedding($query)
-    {
-        return $query->whereNotNull('embedding');
-    }
 }

@@ -15,12 +15,11 @@ export interface SynthesisMember {
  * Grouped synthesis contributions for a single category from all members.
  */
 export interface CategoryContributions {
-    manual_content: string;    // Manually crafted content (editable)
+    content: string;    // Unified content (editable)
     submissions: Array<{
         id: number;
         user: { id: number; name: string };
-        manual_content: string | null;
-        submission_number: number;
+        content: string | null;
         created_at: string;
         updated_at: string;
     }>;

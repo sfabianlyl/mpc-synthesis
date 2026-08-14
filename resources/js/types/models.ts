@@ -41,31 +41,18 @@ export interface Response {
 
 /**
  * SynthesisReport represents an individual synthesis submission from a synthesis member.
- * Each category can have both AI-generated content (ai_* fields) and manual content (regular fields).
  */
 export interface SynthesisReport {
     id: number;
     conversation_id: number;
     user_id: number;
     synthesis_id: number;
-    submission_number?: number;
-    
-    // Manual content fields (can be edited by synthesis member)
     convergence_text?: string;
     consideration_text?: string;
     proposals_text?: string;
     other_text?: string;
     
-    // AI-generated content fields (read-only, populated by LLM)
-    ai_convergence_text?: string | null;
-    ai_consideration_text?: string | null;
-    ai_proposals_text?: string | null;
-    ai_other_text?: string | null;
-    
-    // Flags and metadata
-    is_llm_assisted?: boolean;
     is_master_synthesis?: boolean;
-    llm_generated: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
     submitted_at?: string | null;
     created_at: string;
@@ -81,17 +68,11 @@ export interface SynthesisReport {
  */
 export interface SynthesisSubmission {
     id: number;
-    submission_number: number;
     user: { id: number; name: string; email: string };
     convergence_text: string | null;
     consideration_text: string | null;
     proposals_text: string | null;
     other_text: string | null;
-    ai_convergence_text: string | null;
-    ai_consideration_text: string | null;
-    ai_proposals_text: string | null;
-    ai_other_text: string | null;
-    is_llm_assisted: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
     submitted_at: string | null;
     custom_queries: Array<{
@@ -111,22 +92,14 @@ export interface MasterSynthesisReport {
     id: number | null;
     conversation_id: number;
     user_id: number | null;
-    submission_number?: number;
     is_master_synthesis: boolean;
-    is_llm_assisted: boolean;
     group_ids: number[];
     
-    // Categories with both AI and manual content
     convergence_text?: string | null;
     consideration_text?: string | null;
     proposals_text?: string | null;
     other_text?: string | null;
-    ai_convergence_text?: string | null;
-    ai_consideration_text?: string | null;
-    ai_proposals_text?: string | null;
-    ai_other_text?: string | null;
     
-    llm_generated: boolean;
     status: 'draft' | 'reviewed' | 'submitted';
     submitted_at: string | null;
     created_at: string;
@@ -139,10 +112,10 @@ export interface MasterSynthesisReport {
 export interface MasterSynthesisPayload {
     conversation_id: number;
     categories: {
-        convergence: { ai_content: string; manual_content: string };
-        matters_for_consideration: { ai_content: string; manual_content: string };
-        proposals: { ai_content: string; manual_content: string };
-        others: { ai_content: string; manual_content: string };
+        convergence: { content: string };
+        matters_for_consideration: { content: string };
+        proposals: { content: string };
+        others: { content: string };
     };
 }
 
