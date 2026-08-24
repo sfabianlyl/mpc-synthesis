@@ -1,120 +1,202 @@
-import { Head, router, usePage } from '@inertiajs/react';
-import { CheckCircle2, XCircle, Loader2, FileText, Shield, Sparkles } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import {
+    CheckCircle2,
+    XCircle,
+    Loader2,
+    FileText,
+    Shield,
+    Sparkles,
+    Users,
+    ChevronRight,
+    ArrowRight,
+    Save,
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 
-interface EventData {
+interface ConversationData {
     id: number;
     title: string;
-    start_date: string;
-    end_date: string | null;
+    description: string | null;
+    status: string;
+    event_id: number | null;
+    event?: {
+        id: number;
+        title: string;
+        start_date: string;
+        end_date: string | null;
+    } | null;
 }
 
 interface DraftData {
     id: number | null;
-    draft_text: string | null;
+    national_text: string | null;
+    diocesan_text: string | null;
     is_submitted: boolean;
     submitted_at: string | null;
 }
 
-interface DecisionPageProps {
-    event: EventData;
-    nationalDraft: DraftData | null;
-    dioceseDraft: DraftData | null;
-    userSubmitted: boolean;
+interface MemberProgress {
+    id: number;
+    name: string;
+    diocese: string | null;
+    is_submitted: boolean;
 }
 
-export default function Decision({ event, nationalDraft, dioceseDraft, userSubmitted }: DecisionPageProps) {
+interface DecisionPageProps {
+    conversation: ConversationData;
+    eventConversations: Array<{ id: number; title: string; event_id: number | null }>;
+    draft: DraftData | null;
+    submissionProgress: {
+        total: number;
+        submitted_count: number;
+        members: MemberProgress[];
+    };
+}
+
+export default function Decision({
+    conversation,
+    eventConversations = [],
+    draft,
+    submissionProgress,
+}: DecisionPageProps) {
     const { flash } = usePage().props as any;
-    const [nationalText, setNationalText] = useState(nationalDraft?.draft_text ?? '');
-    const [dioceseText, setDioceseText] = useState(dioceseDraft?.draft_text ?? '');
+    const [nationalText, setNationalText] = useState(draft?.national_text ?? '');
+    const [diocesanText, setDiocesanText] = useState(draft?.diocesan_text ?? '');
+    const [isSaving, setIsSaving] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-    // Load flash messages
+    // Sync state when draft prop changes
+    useEffect(() => {
+        setNationalText(draft?.national_text ?? '');
+        setDiocesanText(draft?.diocesan_text ?? '');
+    }, [draft]);
+
+    // Handle flash messages
     useEffect(() => {
         if (flash?.success) {
             setStatusMessage({ type: 'success', text: flash.success });
             const timer = setTimeout(() => setStatusMessage(null), 5000);
             return () => clearTimeout(timer);
         }
-
-        if (flash?.errors?.national || flash?.errors?.diocese) {
-            const key = flash.errors.national ? 'national' : 'diocese';
-            setStatusMessage({ type: 'error', text: flash.errors[key] });
+        if (flash?.errors && Object.keys(flash.errors).length > 0) {
+            const firstError = Object.values(flash.errors)[0] as string;
+            setStatusMessage({ type: 'error', text: firstError || 'An error occurred.' });
             const timer = setTimeout(() => setStatusMessage(null), 5000);
             return () => clearTimeout(timer);
         }
     }, [flash]);
 
-    // Pre-fill from existing drafts on mount
-    useEffect(() => {
-        setNationalText(nationalDraft?.draft_text ?? '');
-        setDioceseText(dioceseDraft?.draft_text ?? '');
-    }, [nationalDraft, dioceseDraft]);
+    const isSubmitted = Boolean(draft?.is_submitted);
 
-    const handleSubmit = () => {
-        setIsSubmitting(true);
+    const handleSaveDraft = (submitFinal: boolean = false) => {
+        if (submitFinal) {
+            setIsSubmitting(true);
+        } else {
+            setIsSaving(true);
+        }
         setStatusMessage(null);
 
         router.post(
-            `/pastoral/decision/${event.id}`,
+            `/pastoral/decision/${conversation.id}`,
             {
-                national_draft_text: nationalText || null,
-                diocese_draft_text: dioceseText || null,
-                submit: true,
+                national_text: nationalText || null,
+                diocesan_text: diocesanText || null,
+                is_submitted: submitFinal,
             },
             {
                 preserveScroll: true,
                 onSuccess: () => {
+                    setIsSaving(false);
                     setIsSubmitting(false);
-                    setStatusMessage({ type: 'success', text: 'Decision drafts submitted successfully.' });
                 },
                 onError: (errors) => {
+                    setIsSaving(false);
                     setIsSubmitting(false);
-                    if (errors.national_draft_text || errors.diocese_draft_text) {
-                        setStatusMessage({ type: 'error', text: 'Validation failed. Please check your inputs.' });
-                    } else {
-                        setStatusMessage({ type: 'error', text: 'Failed to submit drafts. Please try again.' });
-                    }
+                    const errorMsg = Object.values(errors)[0] as string || 'Failed to save draft.';
+                    setStatusMessage({ type: 'error', text: errorMsg });
                 },
             }
         );
     };
 
     const nationalCharCount = nationalText.length;
-    const dioceseCharCount = dioceseText.length;
+    const diocesanCharCount = diocesanText.length;
 
     return (
         <>
-            <Head title={`Begin Decision Making - ${event.title}`} />
+            <Head title={`Decision Draft - ${conversation.title}`} />
             <div className="p-8 flex flex-col gap-6 max-w-5xl mx-auto">
+                {/* ─── Top Session Stepper / Switcher ───────────── */}
+                {eventConversations.length > 1 && (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b">
+                        <span className="text-xs font-semibold uppercase text-muted-foreground mr-2 shrink-0">
+                            Sessions:
+                        </span>
+                        {eventConversations.map((conv) => {
+                            const isCurrent = conv.id === conversation.id;
+                            return (
+                                <Link key={conv.id} href={`/pastoral/decision/${conv.id}`}>
+                                    <Button
+                                        variant={isCurrent ? 'default' : 'outline'}
+                                        size="sm"
+                                        className={`gap-1.5 text-xs ${
+                                            isCurrent ? 'bg-indigo-600 hover:bg-indigo-700' : ''
+                                        }`}
+                                    >
+                                        <FileText className="size-3.5" />
+                                        {conv.title}
+                                    </Button>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                )}
+
                 {/* ─── Header Section ─────────────────────────────── */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Begin Decision Making</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Event: {event.title}
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-3xl font-bold tracking-tight">Pastoral Decision Draft</h1>
+                            <Badge variant="outline" className="text-xs">
+                                Step 1 of 3: Individual Draft
+                            </Badge>
+                        </div>
+                        <p className="text-muted-foreground mt-1 text-base">
+                            Session: <span className="font-semibold text-foreground">{conversation.title}</span>
+                            {conversation.event?.title && ` · Event: ${conversation.event.title}`}
                         </p>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                            {new Date(event.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                            {' - '}
-                            {event.end_date
-                                ? new Date(event.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                                : 'Ongoing'}
-                        </p>
+                        {conversation.description && (
+                            <p className="text-sm text-muted-foreground mt-0.5 max-w-2xl">
+                                {conversation.description}
+                            </p>
+                        )}
                     </div>
 
-                    {/* Submitted Badge */}
-                    {userSubmitted && (
-                        <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1 self-start">
-                            <CheckCircle2 className="h-4 w-4" />
-                            Submitted
-                        </Badge>
-                    )}
+                    {/* Progress Badge */}
+                    <div className="flex flex-col sm:items-end gap-1.5 shrink-0">
+                        {isSubmitted ? (
+                            <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Your Draft is Submitted
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20">
+                                Draft in Progress
+                            </Badge>
+                        )}
+
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Users className="size-3.5" />
+                            <span>
+                                Team Progress: {submissionProgress?.submitted_count ?? 0} / {submissionProgress?.total ?? 0} submitted
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* ─── Status Message ─────────────────────────────── */}
@@ -136,30 +218,24 @@ export default function Decision({ event, nationalDraft, dioceseDraft, userSubmi
                 )}
 
                 {/* ─── National Level Decision Draft ──────────────── */}
-                <Card className={userSubmitted ? 'opacity-60' : ''}>
+                <Card className={isSubmitted ? 'border-emerald-500/30' : ''}>
                     <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
                         <CardTitle className="text-lg flex items-center gap-2">
-                            <Shield className="size-5 text-primary" />
-                            National Level Decision Draft
+                            <Shield className="size-5 text-indigo-600" />
+                            National Level Reflection & Proposals
                         </CardTitle>
                         <CardDescription>
-                            Provide your decision draft at the national level. This will be consolidated with other members' inputs.
+                            Provide your strategic discernment and proposals for the national church for this session ({conversation.title}).
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-3">
-                        {nationalDraft?.is_submitted && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                                Submitted at {new Date(nationalDraft.submitted_at!).toLocaleString()}
-                            </div>
-                        )}
                         <textarea
                             value={nationalText}
                             onChange={(e) => setNationalText(e.target.value)}
-                            placeholder="Enter your national level decision draft..."
-                            rows={10}
-                            disabled={userSubmitted}
-                            className="w-full min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            placeholder="Enter your national-level pastoral proposals and key directions..."
+                            rows={8}
+                            disabled={isSubmitted}
+                            className="w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-75"
                         />
                         <div className="flex justify-end">
                             <span className="text-xs text-muted-foreground">
@@ -170,65 +246,81 @@ export default function Decision({ event, nationalDraft, dioceseDraft, userSubmi
                 </Card>
 
                 {/* ─── Diocese Level Decision Draft ───────────────── */}
-                <Card className={userSubmitted ? 'opacity-60' : ''}>
+                <Card className={isSubmitted ? 'border-emerald-500/30' : ''}>
                     <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
                         <CardTitle className="text-lg flex items-center gap-2">
-                            <Shield className="size-5 text-secondary" />
-                            Diocese Level Decision Draft
+                            <Shield className="size-5 text-violet-600" />
+                            Diocesan Level Implementation & Context
                         </CardTitle>
                         <CardDescription>
-                            Provide your decision draft at the diocese level. This will be consolidated with other members' inputs.
+                            Provide specific pastoral needs, challenges, and implementation perspectives for your diocese.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-3">
-                        {dioceseDraft?.is_submitted && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                                Submitted at {new Date(dioceseDraft.submitted_at!).toLocaleString()}
-                            </div>
-                        )}
                         <textarea
-                            value={dioceseText}
-                            onChange={(e) => setDioceseText(e.target.value)}
-                            placeholder="Enter your diocese level decision draft..."
-                            rows={10}
-                            disabled={userSubmitted}
-                            className="w-full min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            value={diocesanText}
+                            onChange={(e) => setDiocesanText(e.target.value)}
+                            placeholder="Enter your diocesan-level proposals and pastoral considerations..."
+                            rows={8}
+                            disabled={isSubmitted}
+                            className="w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-75"
                         />
                         <div className="flex justify-end">
                             <span className="text-xs text-muted-foreground">
-                                {dioceseCharCount} character{dioceseCharCount !== 1 ? 's' : ''}
+                                {diocesanCharCount} character{diocesanCharCount !== 1 ? 's' : ''}
                             </span>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* ─── Action Bar ───────────────────────────── */}
-                <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4 border-t">
-                    <div className="flex items-center gap-3">
-                        <a href="/pastoral/dashboard">
-                            <Button variant="outline" className="flex items-center gap-2">
+                {/* ─── Submission Timestamp ───────────────────────── */}
+                {draft?.submitted_at && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <CheckCircle2 className="size-3.5 text-emerald-600" />
+                        Submitted on {new Date(draft.submitted_at).toLocaleString()}
+                    </div>
+                )}
+
+                {/* ─── Action Bar ─────────────────────────────────── */}
+                <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4 border-t items-center">
+                    <div className="flex items-center gap-2">
+                        <Link href="/pastoral/dashboard">
+                            <Button variant="outline" size="sm" className="gap-2">
                                 <FileText className="size-4" /> Back to Dashboard
                             </Button>
-                        </a>
+                        </Link>
                     </div>
-                    {!userSubmitted && (
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={isSubmitting || (!nationalText.trim() && !dioceseText.trim())}
-                            className="flex items-center gap-2"
-                        >
-                            {isSubmitting && <Loader2 className="size-4 animate-spin" />}
-                            {!isSubmitting && <Sparkles className="size-4" />}
-                            {isSubmitting ? 'Submitting...' : 'Submit Both Drafts'}
-                        </Button>
-                    )}
-                    {userSubmitted && (
-                        <Badge variant="outline" className="flex items-center gap-1 text-emerald-600 border-emerald-200 dark:border-emerald-800">
-                            <CheckCircle2 className="h-4 w-4" />
-                            Your drafts have been submitted
-                        </Badge>
-                    )}
+
+                    <div className="flex items-center gap-2">
+                        {!isSubmitted ? (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => handleSaveDraft(false)}
+                                    disabled={isSaving || isSubmitting}
+                                    className="gap-2"
+                                >
+                                    {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                                    Save Draft
+                                </Button>
+                                <Button
+                                    onClick={() => handleSaveDraft(true)}
+                                    disabled={isSaving || isSubmitting || (!nationalText.trim() && !diocesanText.trim())}
+                                    className="gap-2 bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                    {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                                    Submit Draft
+                                </Button>
+                            </>
+                        ) : (
+                            <Link href={`/pastoral/collaborate/${conversation.id}`}>
+                                <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                                    Proceed to Collaboration
+                                    <ArrowRight className="size-4" />
+                                </Button>
+                            </Link>
+                        )}
+                    </div>
                 </div>
             </div>
         </>
@@ -237,16 +329,15 @@ export default function Decision({ event, nationalDraft, dioceseDraft, userSubmi
 
 Decision.layout = (page: React.ReactNode) => {
     const props = page as any;
-
-    if (!props?.props?.event) {
-        return <>{page}</>;
-    }
+    const conversation = props?.props?.conversation;
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Pastoral Dashboard', href: '/pastoral/dashboard' },
-            { title: 'Begin Decision Making', href: `/pastoral/decision/${props.props.event.id}` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Pastoral Dashboard', href: '/pastoral/dashboard' },
+                { title: `Decision Draft: ${conversation?.title || 'Session'}`, href: `/pastoral/decision/${conversation?.id || ''}` },
+            ]}
+        >
             {page}
         </AppLayout>
     );

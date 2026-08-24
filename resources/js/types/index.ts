@@ -19,6 +19,7 @@ export type {
     Event,
     DecisionSummary,
     DecisionDraft,
+    DecisionPart,
     MasterDecision,
     Diocese,
     Stats,

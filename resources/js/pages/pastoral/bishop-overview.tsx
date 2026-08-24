@@ -1,60 +1,55 @@
 import { Head } from '@inertiajs/react';
-import { Printer } from 'lucide-react';
+import { Printer, Shield, BookOpen, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 
 interface Event {
     id: number;
     title: string;
-    start_date: string;
-    end_date: string | null;
+    start_date?: string;
+    end_date?: string | null;
 }
 
-interface MasterDecisionSummary {
+interface MasterDecision {
     id: number | null;
     master_text: string | null;
-    is_editable: boolean;
+    is_submitted: boolean;
+    submitted_at: string | null;
+    submitted_by: string | null;
     generated_by: string | null;
     generated_at: string | null;
 }
 
-interface DioceseDecisionDraft {
+interface ConversationPartItem {
     id: number;
-    event_id: number;
-    user_id: number;
-    diocese_id: number | null;
-    draft_text: string | null;
-    is_submitted: boolean;
-    submitted_at: string | null;
-    user?: {
-        name: string;
-        email: string;
-    };
-    diocese?: {
-        name: string;
-    };
+    title: string;
+    decision_part: {
+        id: number;
+        consolidated_text: string | null;
+        is_submitted: boolean;
+        submitted_at: string | null;
+        submitted_by: string | null;
+    } | null;
 }
 
 interface BishopPageProps {
     event: Event;
-    masterDecisionSummary: MasterDecisionSummary | null;
-    dioceseDecisionDrafts: DioceseDecisionDraft[];
+    masterDecision: MasterDecision | null;
+    conversationsWithParts: ConversationPartItem[];
 }
 
-const formatDate = (dateStr: string | null): string => {
+const formatDate = (dateStr?: string | null): string => {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
     });
 };
 
-export default function BishopOverview({ event, masterDecisionSummary, dioceseDecisionDrafts }: BishopPageProps) {
+export default function BishopOverview({ event, masterDecision, conversationsWithParts = [] }: BishopPageProps) {
     const handlePrint = () => {
         window.print();
     };
@@ -65,82 +60,96 @@ export default function BishopOverview({ event, masterDecisionSummary, dioceseDe
             <div className="p-8 flex flex-col gap-6 max-w-4xl mx-auto print:p-0">
                 {/* Header Section */}
                 <div className="flex flex-col gap-2 print:gap-1">
-                    <h1 className="text-3xl font-bold tracking-tight">Bishop's Overview</h1>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold tracking-tight">Bishop's Executive Briefing</h1>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                                Pastoral Decisions Summary & Session Breakdowns
+                            </p>
+                        </div>
+                        <Button variant="outline" size="sm" className="gap-2 print:hidden" onClick={handlePrint}>
+                            <Printer className="size-4" />
+                            Print Briefing
+                        </Button>
+                    </div>
                     <Separator />
-                    <div className="flex flex-col gap-1 mt-2">
+                    <div className="flex flex-col gap-0.5 mt-2">
                         <p className="text-xl font-semibold">{event.title}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                             {formatDate(event.start_date)} — {event.end_date ? formatDate(event.end_date) : 'Ongoing'}
                         </p>
                     </div>
                 </div>
 
-                {/* Master Decision Display */}
+                {/* Master Decision Section */}
                 <Card className="border-2 print:border-none print:shadow-none">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-lg">Master Decision</CardTitle>
+                    <CardHeader className="pb-3 bg-muted/20 print:bg-transparent">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Shield className="size-5 text-indigo-600 print:text-black" />
+                            Official Master Pastoral Decision
+                        </CardTitle>
+                        {masterDecision?.submitted_by && (
+                            <CardDescription className="text-xs">
+                                Finalized by {masterDecision.submitted_by}
+                                {masterDecision.submitted_at && ` on ${new Date(masterDecision.submitted_at).toLocaleDateString()}`}
+                            </CardDescription>
+                        )}
                     </CardHeader>
-                    <CardContent>
-                        {masterDecisionSummary?.master_text ? (
-                            <div className="whitespace-pre-wrap text-base leading-relaxed text-foreground min-h-[200px] p-4 bg-muted/30 rounded-md">
-                                {masterDecisionSummary.master_text}
+                    <CardContent className="pt-4">
+                        {masterDecision?.master_text ? (
+                            <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground min-h-[160px] p-4 bg-muted/30 print:bg-transparent rounded-md font-mono">
+                                {masterDecision.master_text}
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center min-h-[200px] text-muted-foreground">
-                                <p className="text-base italic">No master decision has been generated yet.</p>
+                            <div className="flex flex-col items-center justify-center min-h-[120px] text-muted-foreground">
+                                <p className="text-sm italic">No master pastoral decision has been finalized yet.</p>
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
-                {/* Diocese Decision Drafts */}
-                <Card className="print:border-none print:shadow-none">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-lg">Diocese Decision Drafts</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {dioceseDecisionDrafts.length?? 0 > 0 ? (
-                            <div className="flex flex-col gap-4">
-                                {dioceseDecisionDrafts.map((draft) => (
-                                    <div key={draft.id} className="p-4 bg-muted/30 rounded-md border">
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex flex-col gap-0.5">
-                                                    {draft.diocese && (
-                                                        <p className="text-sm text-muted-foreground">
-                                                            Diocese: {draft.diocese.name}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                
-                                            </div>
-                                            <Separator />
-                                            {draft.draft_text ? (
-                                                <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                                                    {draft.draft_text}
-                                                </div>
-                                            ) : (
-                                                <p className="text-sm italic text-muted-foreground">No draft text provided.</p>
+                {/* Session Decision Parts */}
+                <div className="space-y-4">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <BookOpen className="size-5 text-indigo-600 print:text-black" />
+                        Session Decision Parts
+                    </h2>
+
+                    {conversationsWithParts.length > 0 ? (
+                        <div className="flex flex-col gap-4">
+                            {conversationsWithParts.map((item) => (
+                                <Card key={item.id} className="print:border-none print:shadow-none border">
+                                    <CardHeader className="pb-2 bg-muted/15 print:bg-transparent">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-sm font-semibold">{item.title}</CardTitle>
+                                            {item.decision_part?.is_submitted && (
+                                                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                                                    <CheckCircle2 className="size-3" /> Finalized
+                                                </span>
                                             )}
-                                            
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center min-h-[100px] text-muted-foreground">
-                                <p className="text-base italic">No diocese decision drafts have been submitted yet.</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Print Button */}
-                <div className="flex justify-end print:hidden">
-                    <Button variant="outline" size="sm" className="gap-2" onClick={handlePrint}>
-                        <Printer className="size-4" />
-                        Print / Export
-                    </Button>
+                                    </CardHeader>
+                                    <CardContent className="pt-3">
+                                        {item.decision_part?.consolidated_text ? (
+                                            <div className="whitespace-pre-wrap text-xs leading-relaxed text-foreground p-3 bg-muted/20 print:bg-transparent rounded-md font-mono">
+                                                {item.decision_part.consolidated_text}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs italic text-muted-foreground">
+                                                No decision part finalized for this session.
+                                            </p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : (
+                        <Card className="border-dashed bg-muted/20">
+                            <CardContent className="py-8 text-center text-muted-foreground text-xs">
+                                No discernment sessions found for this event.
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
         </>
@@ -155,7 +164,7 @@ BishopOverview.layout = (page: React.ReactNode) => {
         <AppLayout
             breadcrumbs={[
                 { title: 'Pastoral Dashboard', href: '/pastoral/dashboard' },
-                { title: "Bishop's Overview", href: `/pastoral/bishop/${event?.id}` },
+                { title: `Bishop's Overview: ${event?.title || 'Event'}`, href: `/pastoral/bishop-overview/${event?.id || ''}` },
             ]}
         >
             {page}

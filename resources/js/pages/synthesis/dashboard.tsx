@@ -7,24 +7,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import type { Conversation, ConsensusSubmission, Group, SynthesisSubmission } from '@/types/models';
+import type { Conversation, ConsensusSubmission, Group, SynthesisSubmission, Response } from '@/types/models';
 
 interface PageProps {
     conversations: Conversation[];
-    groups?: Group[];
     assignedGroups?: any[];
-    responses?: any[];
+    responses?: Response[];
     selectedConversationId: number | null;
-    consensusSubmissions?: Record<number, ConsensusSubmission[]>;
 }
 
 export default function Dashboard({ 
     conversations, 
-    groups, 
     assignedGroups,
     responses,
     selectedConversationId, 
-    consensusSubmissions 
 }: PageProps) {
     const { flash } = usePage().props as any;
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -50,13 +46,27 @@ export default function Dashboard({
     };
 
     // Helper to get display name with fallback
-    const getDisplayName = (submission: ConsensusSubmission): string => {
-        const anySub = submission as any;
-        return anySub.group_name || anySub.facilitator_name || '';
+    const getDisplayName = (response: Response): string => {
+        const anyResp = response as any;
+        return anyResp.conversationGroup?.group?.name || anyResp.group_name || '';
     };
 
-    const groupList = assignedGroups || groups || [];
-    const submissionsMap = consensusSubmissions || {};
+    const groupList = assignedGroups || [];
+
+    // Build submissions map from responses
+    const submissionsMap: Record<number, Response[]> = {};
+    if (responses && responses.length > 0) {
+        responses.forEach((response) => {
+            const anyResp = response as any;
+            const cgId = anyResp.conversation_group_id || anyResp.conversationGroup?.id;
+            if (cgId) {
+                if (!submissionsMap[cgId]) {
+                    submissionsMap[cgId] = [];
+                }
+                submissionsMap[cgId].push(response);
+            }
+        });
+    }
 
     return (
         <>
@@ -146,7 +156,7 @@ export default function Dashboard({
                         <span className="text-sm font-medium">{statusMessage.text}</span>
                     </div>
                 )}
-               
+                
 
                 {/* ─── Consensus Submission Status Cards ───────────── */}
                 {selectedConversationId && (
@@ -160,7 +170,7 @@ export default function Dashboard({
                                 <CardDescription>Track which groups have submitted their group's consensus response.</CardDescription>
                             </div>
                             <Badge variant="outline" className="h-6">
-                                {Object.keys(submissionsMap).filter(groupId => Object.values(submissionsMap[Number(groupId)] || []).some(s => s.is_submitted)).length} / {groupList.length} Submitted
+                                {Object.values(submissionsMap).flat().filter(r => (r as any).submitted_at).length} / {groupList.length} Submitted
                             </Badge>
                         </CardHeader>
                         <CardContent className="pt-6">
@@ -171,21 +181,22 @@ export default function Dashboard({
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {Object.entries(submissionsMap).map(([groupId, submissions]) => (
-                                        (submissions || []).map((submission) => {
-                                            const displayName = getDisplayName(submission);
+                                    {Object.entries(submissionsMap).map(([cgId, responseList]) => (
+                                        responseList.map((response) => {
+                                            const displayName = getDisplayName(response);
+                                            const anyResp = response as any;
 
                                             return (
-                                                <Card key={submission.id} className={`border-sidebar-border/50 hover:shadow-md transition-shadow ${submission.is_submitted ? 'bg-emerald-500/5' : 'bg-muted/20'}`}>
+                                                <Card key={response.id} className={`border-sidebar-border/50 hover:shadow-md transition-shadow ${anyResp.submitted_at ? 'bg-emerald-500/5' : 'bg-muted/20'}`}>
                                                     <CardHeader className="pb-3">
                                                         <CardTitle className="text-base flex items-center gap-2">
-                                                            {submission.is_submitted && <CheckCircle2 className="size-5 text-emerald-500" />}
-                                                            {displayName || `Group ${groupId}`}
+                                                            {anyResp.submitted_at && <CheckCircle2 className="size-5 text-emerald-500" />}
+                                                            {displayName || `Group ${cgId}`}
                                                         </CardTitle>
                                                     </CardHeader>
                                                     <CardContent className="pt-0">
                                                         <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                                                            {submission.consensus_text || 'No consensus text provided.'}
+                                                            {anyResp.consensus_text || 'No consensus text provided.'}
                                                         </p>
                                                     </CardContent>
                                                 </Card>

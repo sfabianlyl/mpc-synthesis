@@ -3,7 +3,7 @@ import {
     ArrowRight,
     BookOpen,
     CheckCircle2,
-    ClipboardList,
+    Clock,
     FileDown,
     FileText,
     LayoutGrid,
@@ -11,26 +11,41 @@ import {
     ScrollText,
     Shield,
     Users,
+    Layers,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 
-interface Conversation {
+interface ConversationItem {
     id: number;
     title: string;
     status: string;
     description: string | null;
+    event_id: number | null;
     event_title: string | null;
     has_reports: boolean;
     user_draft_submitted: boolean;
-    event_id: number | null;
+    submitted_drafts_count: number;
+    total_pastoral_count: number;
+    all_drafts_submitted: boolean;
+    decision_part_exists: boolean;
+    decision_part_submitted: boolean;
     media_files: Array<{ name: string; path: string; size: number }>;
 }
 
+interface EventItem {
+    id: number;
+    title: string;
+    conversations_count: number;
+    all_decision_parts_submitted: boolean;
+    master_decision_submitted: boolean;
+}
+
 interface PageProps {
-    conversations: Conversation[];
+    conversations: ConversationItem[];
+    events: EventItem[];
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -39,9 +54,13 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 border-amber-200 dark:border-amber-800' },
 };
 
-export default function Dashboard({ conversations }: PageProps) {
+export default function Dashboard({ conversations = [], events = [] }: PageProps) {
     const { auth } = usePage().props as any;
     const user = auth?.user;
+
+    const userDraftsCount = conversations.filter((c) => c.user_draft_submitted).length;
+    const finalizedPartsCount = conversations.filter((c) => c.decision_part_submitted).length;
+    const readyToMasterEvents = events.filter((e) => e.all_decision_parts_submitted).length;
 
     return (
         <>
@@ -51,100 +70,137 @@ export default function Dashboard({ conversations }: PageProps) {
                 <div className="flex flex-col gap-1">
                     <h1 className="text-3xl font-bold tracking-tight">Pastoral Dashboard</h1>
                     <p className="text-muted-foreground">
-                        Welcome, {user?.name}. Review conversations, submit decision drafts, and view final pastoral decisions.
+                        Welcome, {user?.name}. Follow the 3-step synodal workflow: submit individual drafts, collaborate on session decision parts, and consolidate the event master decision.
                     </p>
                 </div>
 
-                {/* Quick-action cards */}
+                {/* Quick access to Master Decision */}
+                {events.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                        {events.map((event) => (
+                            <Link key={event.id} href={`/pastoral/master-decision/${event.id}`}>
+                                <Button variant="outline" className="gap-1.5 text-sm border-indigo-200 hover:bg-indigo-50 dark:border-indigo-800 dark:hover:bg-indigo-950/20">
+                                    <Shield className="size-4 text-indigo-600" />
+                                    Master Decision — {event.title}
+                                    <ArrowRight className="size-4" />
+                                </Button>
+                            </Link>
+                        ))}
+                    </div>
+                )}
+
+                {/* Quick-action metric cards */}
                 <div className="grid gap-4 sm:grid-cols-3">
                     <Card>
                         <CardContent className="pt-6 flex items-center gap-3">
                             <div className="p-2 bg-indigo-50 dark:bg-indigo-950/20 rounded-lg">
-                                <ScrollText className="h-5 w-5 text-indigo-600" />
+                                <FileText className="h-5 w-5 text-indigo-600" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium">Conversations</p>
-                                <p className="text-xs text-muted-foreground">{conversations.length} total</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6 flex items-center gap-3">
-                            <div className="p-2 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg">
-                                <FileText className="h-5 w-5 text-emerald-600" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium">Reports Ready</p>
+                                <p className="text-sm font-medium">Your Individual Drafts</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {conversations.filter((c) => c.has_reports).length} available
+                                    {userDraftsCount} of {conversations.length} sessions submitted
                                 </p>
                             </div>
                         </CardContent>
                     </Card>
+
                     <Card>
                         <CardContent className="pt-6 flex items-center gap-3">
                             <div className="p-2 bg-violet-50 dark:bg-violet-950/20 rounded-lg">
-                                <CheckCircle2 className="h-5 w-5 text-violet-600" />
+                                <Users className="h-5 w-5 text-violet-600" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium">Decisions Submitted</p>
+                                <p className="text-sm font-medium">Shared Decision Parts</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {conversations.filter((c) => c.user_draft_submitted).length} of {conversations.length}
+                                    {finalizedPartsCount} of {conversations.length} sessions finalized
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="pt-6 flex items-center gap-3">
+                            <div className="p-2 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg">
+                                <Shield className="h-5 w-5 text-emerald-600" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium">Event Master Decisions</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {events.filter((e) => e.master_decision_submitted).length} of {events.length} events finalized
                                 </p>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Event-level Decision Action Buttons */}
-                {(() => {
-                    const eventIds = [...new Set(conversations.filter(c => c.event_id).map(c => c.event_id))];
-                    if (eventIds.length === 0) return null;
-                    
-                    // Use the first event_id if only one, otherwise show a note
-                    const eventId = eventIds[0];
-                    const hasMultipleEvents = eventIds.length > 1;
-                    
-                    return (
-                        <div className="flex flex-col gap-3">
-                            <h2 className="text-lg font-semibold">Event-level Decision Making</h2>
-                            {hasMultipleEvents && (
-                                <p className="text-sm text-muted-foreground">
-                                    Showing buttons for the first event. Conversations span {eventIds.length} events.
-                                </p>
-                            )}
-                            <div className="flex flex-wrap gap-2">
-                                <Link href={`/pastoral/decision/${eventId}`}>
-                                    <Button variant="default" size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-                                        <FileText className="size-4" />
-                                        Begin Decision Making
-                                        <ArrowRight className="size-3" />
-                                    </Button>
-                                </Link>
-                                
-                                <Link href={`/pastoral/collaborate/${eventId}`}>
-                                    <Button variant="outline" size="sm" className="gap-2">
-                                        <Users className="size-4" />
-                                        Collaborative Decision
-                                        <ArrowRight className="size-3" />
-                                    </Button>
-                                </Link>
-                                
-                                <Link href={`/pastoral/bishop-overview/${eventId}`}>
-                                    <Button variant="outline" size="sm" className="gap-2">
-                                        <Shield className="size-4" />
-                                        Bishop's Overview
-                                        <ArrowRight className="size-3" />
-                                    </Button>
-                                </Link>
-                            </div>
-                        </div>
-                    );
-                })()}
+                {/* Event Master Decision Action Banner */}
+                {events.length > 0 && (
+                    <div className="space-y-3">
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                            <Shield className="size-5 text-indigo-600" />
+                            Event Master Consolidation
+                        </h2>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {events.map((event) => (
+                                <Card key={event.id} className="border-sidebar-border/60">
+                                    <CardHeader className="pb-3">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-base">{event.title}</CardTitle>
+                                            {event.master_decision_submitted ? (
+                                                <Badge variant="default" className="bg-emerald-600 text-xs">
+                                                    Master Finalized
+                                                </Badge>
+                                            ) : event.all_decision_parts_submitted ? (
+                                                <Badge variant="outline" className="text-indigo-600 border-indigo-300 bg-indigo-50 dark:bg-indigo-950/20 text-xs">
+                                                    Ready to Finalize
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs flex items-center gap-1">
+                                                    <Lock className="size-3" /> Waiting for Sessions
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <CardDescription className="text-xs">
+                                            {event.conversations_count} discernment sessions in this event
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="pt-0 flex flex-wrap gap-2">
+                                        <Link href={`/pastoral/master-decision/${event.id}`}>
+                                            <Button
+                                                size="sm"
+                                                variant={event.all_decision_parts_submitted ? 'default' : 'outline'}
+                                                className={`gap-1.5 text-xs ${
+                                                    event.all_decision_parts_submitted && !event.master_decision_submitted
+                                                        ? 'bg-indigo-600 hover:bg-indigo-700'
+                                                        : ''
+                                                }`}
+                                            >
+                                                <Layers className="size-3.5" />
+                                                Master Decision Review
+                                                <ArrowRight className="size-3" />
+                                            </Button>
+                                        </Link>
 
-                {/* Conversations List */}
+                                        <Link href={`/pastoral/bishop-overview/${event.id}`}>
+                                            <Button size="sm" variant="outline" className="gap-1.5 text-xs">
+                                                <Shield className="size-3.5" />
+                                                Bishop's Overview
+                                            </Button>
+                                        </Link>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Discernment Sessions / Conversations List */}
                 <div className="flex flex-col gap-4">
-                    <h2 className="text-lg font-semibold">Conversations</h2>
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <ScrollText className="size-5 text-indigo-600" />
+                        Discernment Sessions (Step 1 & 2)
+                    </h2>
 
                     {conversations.length === 0 ? (
                         <Card>
@@ -154,80 +210,121 @@ export default function Dashboard({ conversations }: PageProps) {
                             </CardContent>
                         </Card>
                     ) : (
-                        conversations.map((conversation) => {
-                            const statusStyle = statusConfig[conversation.status] ?? statusConfig['draft'];
+                        conversations.map((conv) => {
+                            const statusStyle = statusConfig[conv.status] ?? statusConfig['draft'];
                             return (
-                                <Card key={conversation.id} className="border-sidebar-border/50">
+                                <Card key={conv.id} className="border-sidebar-border/60">
                                     <CardHeader className="pb-3">
                                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                                             <div className="flex flex-col gap-1">
                                                 <CardTitle className="text-base flex items-center gap-2">
                                                     <BookOpen className="size-4 text-indigo-500 shrink-0" />
-                                                    {conversation.title}
+                                                    {conv.title}
                                                 </CardTitle>
-                                                {conversation.event_title && (
+                                                {conv.event_title && (
                                                     <CardDescription className="text-xs">
-                                                        Event: {conversation.event_title}
+                                                        Event: {conv.event_title}
                                                     </CardDescription>
                                                 )}
-                                                {conversation.description && (
+                                                {conv.description && (
                                                     <p className="text-sm text-muted-foreground line-clamp-2">
-                                                        {conversation.description}
+                                                        {conv.description}
                                                     </p>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <Badge variant="outline" className={`text-xs px-2 py-0.5 ${statusStyle.className}`}>
-                                                    {statusStyle.label}
-                                                </Badge>
-                                                {conversation.user_draft_submitted && (
-                                                    <Badge variant="outline" className="text-xs px-2 py-0.5 bg-violet-50 dark:bg-violet-950/20 text-violet-700 border-violet-200 dark:border-violet-800 flex items-center gap-1">
-                                                        <Lock className="size-3" />
-                                                        Decision Submitted
+
+                                            {/* Status Badges */}
+                                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                                {conv.user_draft_submitted ? (
+                                                    <Badge variant="outline" className="text-xs px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 border-emerald-300 flex items-center gap-1">
+                                                        <CheckCircle2 className="size-3" />
+                                                        Your Draft Submitted
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-xs px-2 py-0.5 bg-amber-50 dark:bg-amber-950/20 text-amber-700 border-amber-300 flex items-center gap-1">
+                                                        <Clock className="size-3" />
+                                                        Draft Pending
+                                                    </Badge>
+                                                )}
+
+                                                {conv.decision_part_submitted ? (
+                                                    <Badge variant="default" className="text-xs px-2 py-0.5 bg-indigo-600 flex items-center gap-1">
+                                                        <CheckCircle2 className="size-3" />
+                                                        Decision Part Finalized
+                                                    </Badge>
+                                                ) : conv.all_drafts_submitted ? (
+                                                    <Badge variant="outline" className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 border-purple-300">
+                                                        Ready to Collaborate
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="secondary" className="text-xs px-2 py-0.5 text-muted-foreground">
+                                                        {conv.submitted_drafts_count}/{conv.total_pastoral_count} Drafts
                                                     </Badge>
                                                 )}
                                             </div>
                                         </div>
                                     </CardHeader>
-                                    <CardContent className="border-t border-sidebar-border/30 pt-4">
+                                    <CardContent className="border-t border-sidebar-border/30 pt-3 flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex flex-wrap gap-2">
-                                            {/* Reports link – only if synthesis is submitted */}
-                                            {conversation.has_reports ? (
-                                                <Link href={`/synthesis/export-booklet/${conversation.id}`} target="_blank">
-                                                    <Button variant="outline" size="sm" className="gap-2">
-                                                        <FileText className="size-4" />
+                                            {/* Step 1: Decision Draft button */}
+                                            <Link href={`/pastoral/decision/${conv.id}`}>
+                                                <Button
+                                                    size="sm"
+                                                    variant={conv.user_draft_submitted ? 'outline' : 'default'}
+                                                    className={`gap-1.5 text-xs ${
+                                                        !conv.user_draft_submitted ? 'bg-indigo-600 hover:bg-indigo-700' : ''
+                                                    }`}
+                                                >
+                                                    <FileText className="size-3.5" />
+                                                    {conv.user_draft_submitted ? 'Edit Your Draft' : 'Submit Decision Draft'}
+                                                </Button>
+                                            </Link>
+
+                                            {/* Step 2: Collaborative Decision button */}
+                                            <Link href={`/pastoral/collaborate/${conv.id}`}>
+                                                <Button
+                                                    size="sm"
+                                                    variant={conv.all_drafts_submitted ? 'default' : 'outline'}
+                                                    className={`gap-1.5 text-xs ${
+                                                        conv.all_drafts_submitted && !conv.decision_part_submitted
+                                                            ? 'bg-purple-600 hover:bg-purple-700'
+                                                            : ''
+                                                    }`}
+                                                >
+                                                    <Users className="size-3.5" />
+                                                    Collaborate on Decision Part
+                                                </Button>
+                                            </Link>
+
+                                            {/* Booklet export link */}
+                                            {conv.has_reports && (
+                                                <Link href={`/synthesis/export-booklet/${conv.id}`} target="_blank">
+                                                    <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
+                                                        <FileText className="size-3.5" />
                                                         View Booklet
-                                                        <ArrowRight className="size-3" />
                                                     </Button>
                                                 </Link>
-                                            ) : (
-                                                <Button variant="outline" size="sm" className="gap-2 opacity-50 cursor-not-allowed" disabled>
-                                                    <FileText className="size-4" />
-                                                    Reports Not Ready
-                                                </Button>
                                             )}
                                         </div>
 
-                                        {/* Media Files - Open in New Tab */}
-                                        {conversation.media_files && conversation.media_files.length > 0 ? (
-                                            <div className="border-t border-sidebar-border/30 pt-3 mt-2">
-                                                <p className="text-xs font-medium text-muted-foreground mb-2">Downloads:</p>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {conversation.media_files.map((file) => (
-                                                        <a
-                                                            key={file.name}
-                                                            href={file.path}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-flex items-center gap-1 px-2 h-7 rounded-md border border-transparent hover:bg-muted/50 transition-colors cursor-pointer"
-                                                        >
-                                                            <FileDown className="size-3 text-muted-foreground" />
-                                                            <span className="text-xs">{file.name}</span>
-                                                        </a>
-                                                    ))}
-                                                </div>
+                                        {/* Media Files */}
+                                        {conv.media_files && conv.media_files.length > 0 && (
+                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                <span>Downloads:</span>
+                                                {conv.media_files.map((file) => (
+                                                    <a
+                                                        key={file.name}
+                                                        href={file.path}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border hover:bg-muted text-[11px]"
+                                                    >
+                                                        <FileDown className="size-3" />
+                                                        {file.name}
+                                                    </a>
+                                                ))}
                                             </div>
-                                        ) : null}
+                                        )}
                                     </CardContent>
                                 </Card>
                             );

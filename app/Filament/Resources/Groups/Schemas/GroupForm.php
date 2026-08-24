@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Groups\Schemas;
 
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 
@@ -11,8 +12,14 @@ class GroupForm
     {
         return $schema
             ->components([
+                Select::make('event_id')
+                    ->relationship('event', 'title')
+                    ->searchable()
+                    ->preload()
+                    ->nullable(),
                 TextInput::make('name')
-                    ->required(),
+                    ->required()
+                    ->maxLength(255),
             ]);
     }
 }

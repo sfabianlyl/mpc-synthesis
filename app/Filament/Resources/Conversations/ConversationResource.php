@@ -18,7 +18,7 @@ class ConversationResource extends Resource
 {
     protected static ?string $model = Conversation::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static BackedEnum|string|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function form(Schema $schema): Schema
     {
@@ -33,7 +33,11 @@ class ConversationResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            \App\Filament\Resources\Conversations\RelationManagers\Responses::class,
+            \App\Filament\Resources\Conversations\RelationManagers\ConsensusNotes::class,
+            \App\Filament\Resources\Conversations\RelationManagers\Extractions::class,
+            \App\Filament\Resources\Conversations\RelationManagers\SynthesisGroupAssignments::class,
+            \App\Filament\Resources\Conversations\RelationManagers\SynthesisSummaries::class,
         ];
     }
 

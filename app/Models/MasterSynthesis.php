@@ -74,4 +74,12 @@ class MasterSynthesis extends Model
     {
         return $this->hasMany(SynthesisCustomQuery::class, 'synthesis_report_id');
     }
+
+    /**
+     * Get the key points for this master synthesis.
+     */
+    public function synthesisKeyPoints(): HasMany
+    {
+        return $this->hasMany(SynthesisKeyPoint::class, 'master_synthesis_id');
+    }
 }

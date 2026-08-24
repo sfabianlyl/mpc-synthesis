@@ -17,7 +17,7 @@ class UploadedDocumentSourceResource extends Resource
 {
     protected static ?string $model = UploadedDocumentSource::class;
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
+    protected static BackedEnum|string|null $navigationIcon = 'heroicon-o-document-text';
 
     public static function form(Schema $schema): Schema
     {
@@ -32,7 +32,7 @@ class UploadedDocumentSourceResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            \App\Filament\Resources\UploadedDocumentSource\RelationManagers\DocumentSourceChunks::class,
         ];
     }
 

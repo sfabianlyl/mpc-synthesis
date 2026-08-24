@@ -89,6 +89,13 @@ class UploadedDocumentSourceForm
                     ->numeric()
                     ->visible(fn (?Model $record) => $record !== null && $record->chunk_count > 0)
                     ->label('Chunk Count'),
+
+                Select::make('uploaded_by')
+                    ->relationship('uploader', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->nullable()
+                    ->visible(fn (?Model $record) => $record !== null),
             ]);
     }
 }

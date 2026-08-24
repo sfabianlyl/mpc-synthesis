@@ -11,7 +11,12 @@ interface GroupAssignment {
     id: number;
     group_id?: number;
     name: string;
-    responses: any[];
+    responses: Array<{
+        id: number;
+        consensus_text: string | null;
+        submitted_at: string | null;
+        is_submitted: boolean;
+    }>;
     consensusSubmission?: {
         id?: number;
         is_submitted: boolean;
@@ -48,7 +53,6 @@ interface PageProps {
     draft: SynthesisDraft | null;
     extraction: Extraction | null;
     allConsensusSubmitted: boolean;
-    consensusSubmissions: Record<number, any[]>;
     success?: string;
     canTrigger?: boolean;
 }
@@ -60,7 +64,6 @@ export default function Review({
     draft,
     extraction,
     allConsensusSubmitted,
-    consensusSubmissions,
     success: initialSuccess,
     canTrigger: initialCanTrigger,
 }: PageProps) {
@@ -195,7 +198,7 @@ export default function Review({
         debouncedSaveDraft(field, value);
     };
 
-    // Handle note changes with autosave — passes entire updated notes map by responseId
+    // Handle note changes with autosave — passes entire updated notes map by response_id
     const handleNoteChange = (responseId: number, text: string) => {
         setGroupNotes((prev) => {
             const updated = { ...prev, [responseId]: text };
@@ -438,86 +441,63 @@ export default function Review({
                 <section className="space-y-4">
                     
                     <div className="space-y-4">
-                        {assignedGroups.map((group) => (
-                            <Card key={group.id}>
-                                <CardHeader className="pb-3 border-b">
-                                    <div className="flex justify-between items-center">
-                                        <CardTitle className="text-base font-semibold">Group {group.name}</CardTitle>
-                                        <Badge
-                                            variant={group.consensusSubmission?.is_submitted ? 'default' : 'secondary'}
-                                            className="text-xs"
-                                        >
-                                            {group.consensusSubmission?.is_submitted ? (
-                                                <span className="flex items-center gap-1">
-                                                    <CheckCircle2 className="h-3.5 w-3.5" /> Submitted
-                                                </span>
-                                            ) : (
-                                                <span className="flex items-center gap-1">
-                                                    <XCircle className="h-3.5 w-3.5" /> Pending
-                                                </span>
-                                            )}
-                                        </Badge>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="pt-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Left Side: Consensus Text */}
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block">Group Consensus</label>
-                                            {group.consensusSubmission?.is_submitted ? (
-                                                <p className="text-sm whitespace-pre-wrap bg-muted/50 border rounded-md p-4 min-h-[140px] max-h-[300px] overflow-y-auto leading-relaxed">
-                                                    {group.consensusSubmission.consensus_text}
-                                                </p>
-                                            ) : (
-                                                <div className="bg-muted/30 border border-dashed rounded-md p-4 min-h-[140px] flex items-center justify-center">
-                                                    <p className="text-muted-foreground text-sm italic">Pending group submission...</p>
-                                                </div>
-                                            )}
+                        {assignedGroups.map((group) => {
+                            // Get the first submitted response from the group's responses as fallback
+                            const submittedResponse = group.responses.find(r => r.is_submitted || r.consensus_text);
+                            
+                            return (
+                                <Card key={group.id}>
+                                    <CardHeader className="pb-3 border-b">
+                                        <div className="flex justify-between items-center">
+                                            <CardTitle className="text-base font-semibold">{group.name}</CardTitle>
+                                            
                                         </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Left Side: Consensus Text — use responses data */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block">Group Consensus</label>
+                                                {group.consensusSubmission?.is_submitted ? (
+                                                    <p className="text-sm whitespace-pre-wrap bg-muted/50 border rounded-md p-4 min-h-[140px] max-h-[300px] overflow-y-auto leading-relaxed">
+                                                        {group.consensusSubmission.consensus_text}
+                                                    </p>
+                                                ) : submittedResponse ? (
+                                                    <p className="text-sm whitespace-pre-wrap bg-muted/50 border rounded-md p-4 min-h-[140px] max-h-[300px] overflow-y-auto leading-relaxed">
+                                                        {submittedResponse.consensus_text || 'No consensus text available'}
+                                                    </p>
+                                                ) : (
+                                                    <div className="bg-muted/30 border border-dashed rounded-md p-4 min-h-[140px] flex items-center justify-center">
+                                                        <p className="text-muted-foreground text-sm italic">Pending group submission...</p>
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                        {/* Right Side: Notes */}
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block">Your Notes</label>
-                                            {(() => {
-                                                const responseId = group.consensusSubmission?.id || group.responses?.[0]?.id || group.note?.response_id;
-                                                return (
-                                                    <Textarea
-                                                        value={responseId ? (groupNotes[responseId] ?? '') : ''}
-                                                        onChange={(e) => responseId && handleNoteChange(responseId, e.target.value)}
-                                                        disabled={isDraftSubmitted || !responseId}
-                                                        rows={6}
-                                                        placeholder="Write your notes or observations here..."
-                                                        className="text-sm min-h-[140px]"
-                                                    />
-                                                );
-                                            })()}
+                                            {/* Right Side: Notes */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block">Your Notes</label>
+                                                {(() => {
+                                                    const responseId = group.consensusSubmission?.id || group.responses?.[0]?.id || group.note?.response_id;
+                                                    return (
+                                                        <Textarea
+                                                            value={responseId ? (groupNotes[responseId] ?? '') : ''}
+                                                            onChange={(e) => responseId && handleNoteChange(responseId, e.target.value)}
+                                                            disabled={isDraftSubmitted || !responseId}
+                                                            rows={6}
+                                                            placeholder="Write your notes or observations here..."
+                                                            className="text-sm min-h-[140px]"
+                                                        />
+                                                    );
+                                                })()}
+                                            </div>
                                         </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
                     </div>
 
-                    {/* Submission Status Summary */}
-                    <Card>
-                        <CardContent className="pt-6">
-                            {(() => {
-                                const totalGroups = assignedGroups.length;
-                                const submittedGroups = assignedGroups.filter(
-                                    (g) => g.consensusSubmission?.is_submitted
-                                ).length;
-
-                                return (
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">Consensus Submissions</span>
-                                        <Badge variant="outline" className="text-base font-semibold">
-                                            {submittedGroups} / {totalGroups} Submitted
-                                        </Badge>
-                                    </div>
-                                );
-                            })()}
-                        </CardContent>
-                    </Card>
+                   
                 </section>
 
                 {/* ─── Right Column: Synthesis Panel ──────────────────────── */}

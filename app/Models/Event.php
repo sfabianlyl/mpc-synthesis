@@ -69,4 +69,20 @@ class Event extends Model
     {
         return $this->hasOne(MasterDecisionSummary::class);
     }
+
+    /**
+     * Get the master decision for this event.
+     */
+    public function masterDecision(): HasOne
+    {
+        return $this->hasOne(MasterDecision::class);
+    }
+
+    /**
+     * Get all decision parts for the conversations of this event.
+     */
+    public function decisionParts()
+    {
+        return $this->hasManyThrough(DecisionPart::class, Conversation::class);
+    }
 }

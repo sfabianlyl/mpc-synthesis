@@ -15,12 +15,17 @@ class GroupsTable
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->searchable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('event.title')
+                    ->label('Event')
+                    ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
+                TextColumn::make('responses_count')
+                    ->label('Responses')
+                    ->counts('responses')
+                    ->toggleable(),
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

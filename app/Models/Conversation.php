@@ -112,4 +112,21 @@ class Conversation extends Model
     {
         return $this->hasMany(ConversationGroup::class);
     }
+
+    /**
+     * Get the individual pastoral decision drafts for this conversation.
+     */
+    public function decisionDrafts(): HasMany
+    {
+        return $this->hasMany(DecisionDraft::class);
+    }
+
+    /**
+     * Get the shared decision part for this conversation.
+     */
+    public function decisionPart(): HasOne
+    {
+        return $this->hasOne(DecisionPart::class);
+    }
 }
+

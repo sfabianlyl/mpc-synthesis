@@ -139,18 +139,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['auth', 'role:pastoral,discernment'])->prefix('pastoral')->name('pastoral.')->group(function () {
         Route::get('/dashboard', [PastoralController::class, 'index'])->name('dashboard');
         Route::get('/reports/{conversation}', [PastoralController::class, 'reports'])->name('reports');
-        Route::get('/decision-draft/{conversation}', [PastoralController::class, 'decisionDraft'])->name('decision-draft');
-        Route::post('/decision-draft/{conversation}', [PastoralController::class, 'storeDecisionDraft'])->name('decision-draft.store');
-        Route::get('/decisions/{conversation}', [PastoralController::class, 'decisions'])->name('decisions');
-        Route::post('/decision-summary/{conversation}/{level}', [PastoralController::class, 'decisionSummary'])->name('decision-summary');
-        Route::patch('/master-decision/{conversation}/{level}', [PastoralController::class, 'updateMasterDecision'])->name('master-decision.update');
 
-        // Event-level decision making routes
-        Route::get('/decision/{event}', [PastoralController::class, 'decision'])->name('decision');
-        Route::post('/decision/{event}', [PastoralController::class, 'storeDecisionDrafts'])->name('decision.store');
-        Route::get('/collaborate/{event}', [PastoralController::class, 'collaborate'])->name('collaborate');
-        Route::post('/collaborate/{event}/generate-summary', [PastoralController::class, 'generateDecisionSummary'])->name('collaborate.generate-summary');
-        Route::patch('/collaborate/{event}/save-master-text', [PastoralController::class, 'saveMasterText'])->name('collaborate.save-master-text');
+        // Step 1: Per-Conversation Decision Draft (Member Scope)
+        Route::get('/decision/{conversation}', [PastoralController::class, 'conversationDecision'])->name('decision');
+        Route::post('/decision/{conversation}', [PastoralController::class, 'storeConversationDraft'])->name('decision.store');
+
+        // Step 2: Per-Conversation Collaborative DecisionPart (Shared Scope)
+        Route::get('/collaborate/{conversation}', [PastoralController::class, 'collaborateConversation'])->name('collaborate');
+        Route::post('/collaborate/{conversation}/generate-summary', [PastoralController::class, 'generateDecisionPartSummary'])->name('collaborate.generate-summary');
+        Route::patch('/collaborate/{conversation}/save-part', [PastoralController::class, 'saveDecisionPart'])->name('collaborate.save-part');
+        Route::post('/collaborate/{conversation}/finalize-part', [PastoralController::class, 'finalizeDecisionPart'])->name('collaborate.finalize-part');
+
+        // Step 3: Event-Level Master Decision Review & Finalization
+        Route::get('/master-decision/{event}', [PastoralController::class, 'masterDecision'])->name('master-decision');
+        Route::post('/master-decision/{event}/generate-summary', [PastoralController::class, 'generateMasterDecisionSummary'])->name('master-decision.generate-summary');
+        Route::patch('/master-decision/{event}/save', [PastoralController::class, 'saveMasterDecision'])->name('master-decision.save');
+        Route::post('/master-decision/{event}/finalize', [PastoralController::class, 'finalizeMasterDecision'])->name('master-decision.finalize');
+
+        // Step 4: Bishop's Overview
         Route::get('/bishop-overview/{event}', [PastoralController::class, 'bishopOverview'])->name('bishop-overview');
     });
 
@@ -159,15 +165,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [AdminController::class, 'chat'])->name('index');
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('details');
         Route::get('/update-db', function(){
-            $data=Response::all()->toArray();
-            $clean=array_map(function ($item) {
-                unset($item['id'], $item['created_at'], $item['updated_at']);
-                return $item;
-            }, $data);
-            $exportData=var_export(Response::pluck("consensus_text")->toArray(),true);
-            $exportClean=var_export($clean,true);
-
-            return response($exportData."<br><br>".$exportClean)->header('Content-Type', 'text/plain');
+            
+            return response()->json([
+                "success"=>true
+            ], 200);
         })->name('update.db');
         
         Route::post('/message', [AdminController::class, 'chatMessage'])->name('message');

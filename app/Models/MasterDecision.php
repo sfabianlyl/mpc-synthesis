@@ -9,28 +9,30 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property int $conversation_id
- * @property int|null $diocese_id
- * @property string $level
- * @property string|null $decision_text
+ * @property int $event_id
+ * @property int|null $submitted_by_user_id
+ * @property string|null $master_text
  * @property bool $is_submitted
  * @property Carbon|null $submitted_at
+ * @property string|null $generated_by
+ * @property Carbon|null $generated_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read Conversation $conversation
- * @property-read Diocese|null $diocese
+ * @property-read Event $event
+ * @property-read User|null $submittedBy
  */
 class MasterDecision extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'conversation_id',
-        'diocese_id',
-        'level',
-        'decision_text',
+        'event_id',
+        'submitted_by_user_id',
+        'master_text',
         'is_submitted',
         'submitted_at',
+        'generated_by',
+        'generated_at',
     ];
 
     protected function casts(): array
@@ -38,22 +40,23 @@ class MasterDecision extends Model
         return [
             'is_submitted' => 'boolean',
             'submitted_at' => 'datetime',
+            'generated_at' => 'datetime',
         ];
     }
 
     /**
-     * Get the conversation this master decision belongs to.
+     * Get the event this master decision belongs to.
      */
-    public function conversation(): BelongsTo
+    public function event(): BelongsTo
     {
-        return $this->belongsTo(Conversation::class);
+        return $this->belongsTo(Event::class);
     }
 
     /**
-     * Get the diocese associated with this master decision.
+     * Get the user who finalized this master decision.
      */
-    public function diocese(): BelongsTo
+    public function submittedBy(): BelongsTo
     {
-        return $this->belongsTo(Diocese::class);
+        return $this->belongsTo(User::class, 'submitted_by_user_id');
     }
 }

@@ -87,13 +87,13 @@ class DatabaseSeeder extends Seeder
                     'role' => 'synthesis',
                 ]),
                 User::factory()->create([
-                    'name' => 'Deacon Petrus Lesle',
-                    'email' => 'petrus@gerejakatolik.my',
+                    'name' => 'Deacon Leslie Petrus',
+                    'email' => 'leslie@gerejakatolik.my',
                     'role' => 'synthesis',
                 ]),
                 User::factory()->create([
-                    'name' => 'Nelson Ruki',
-                    'email' => 'nelson@gerejakatolik.my',
+                    'name' => 'Margaret Cor',
+                    'email' => 'margaret@gerejakatolik.my',
                     'role' => 'synthesis',
                 ]),
             ],
@@ -177,8 +177,8 @@ class DatabaseSeeder extends Seeder
                     'role' => 'synthesis',
                 ]),
                 User::factory()->create([
-                    'name' => 'Philip Tiong',
-                    'email' => 'philip@gerejakatolik.my',
+                    'name' => 'Martina Yong',
+                    'email' => 'martina@gerejakatolik.my',
                     'role' => 'synthesis',
                 ]),
             ],

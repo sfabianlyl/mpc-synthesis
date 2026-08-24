@@ -18,7 +18,7 @@ class MasterSynthesisResource extends Resource
 {
     protected static ?string $model = MasterSynthesis::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static BackedEnum|string|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function form(Schema $schema): Schema
     {
@@ -33,7 +33,7 @@ class MasterSynthesisResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            \App\Filament\Resources\MasterSyntheses\RelationManagers\SynthesisKeyPoints::class,
         ];
     }
 

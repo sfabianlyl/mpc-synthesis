@@ -288,15 +288,17 @@ export interface DecisionSummary {
 }
 
 /**
- * DecisionDraft represents an individual's decision draft submission.
+ * DecisionDraft represents an individual's decision draft submission per conversation.
  */
 export interface DecisionDraft {
     id: number;
+    conversation_id: number;
     user_id: number;
     diocese_id: number | null;
-    national_summary: string | null;
-    diocesan_summary: string | null;
-    is_finalized: boolean;
+    national_text: string | null;
+    diocesan_text: string | null;
+    is_submitted: boolean;
+    submitted_at: string | null;
     created_at: string;
     updated_at: string;
     user?: {
@@ -312,20 +314,50 @@ export interface DecisionDraft {
 }
 
 /**
- * MasterDecision represents the national-level master decision.
+ * DecisionPart represents the shared decision part for a conversation.
+ */
+export interface DecisionPart {
+    id: number;
+    conversation_id: number;
+    submitted_by_user_id: number | null;
+    national_text: string | null;
+    diocesan_text: string | null;
+    consolidated_text: string | null;
+    is_submitted: boolean;
+    submitted_at: string | null;
+    generated_by: string | null;
+    generated_at: string | null;
+    created_at: string;
+    updated_at: string;
+    conversation?: Conversation;
+    submitted_by?: {
+        id: number;
+        name: string;
+        email: string;
+    } | string;
+}
+
+/**
+ * MasterDecision represents the event-level master decision.
  */
 export interface MasterDecision {
     id: number;
-    national_decision: string;
-    diocesan_decisions: Array<{
-        diocese_id: number;
-        diocese_name: string;
-        decision: string;
-    }> | null;
-    is_finalized: boolean;
+    event_id: number;
+    submitted_by_user_id: number | null;
+    master_text: string | null;
+    is_submitted: boolean;
+    submitted_at: string | null;
+    generated_by: string | null;
+    generated_at: string | null;
     created_at: string;
     updated_at: string;
+    submitted_by?: {
+        id: number;
+        name: string;
+        email: string;
+    } | string;
 }
+
 
 /**
  * Diocese represents a diocese entity.

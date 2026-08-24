@@ -169,5 +169,11 @@ class User extends Authenticatable
         return $this->hasMany(SynthesisDraft::class, 'user_id');
     }
 
-    
+    /**
+     * Get the decision drafts created by this user.
+     */
+    public function decisionDrafts(): HasMany
+    {
+        return $this->hasMany(DecisionDraft::class, 'user_id');
+    }
 }
