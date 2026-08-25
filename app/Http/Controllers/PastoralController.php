@@ -268,8 +268,17 @@ class PastoralController extends Controller
             : collect([$conversation]);
 
         return Inertia::render('pastoral/decision', [
-            'conversation' => $conversation->load('event'),
+            'conversation' => $conversation->load(['event', 'masterSynthesis']),
             'eventConversations' => $eventConversations,
+            'masterSynthesis' => $conversation->masterSynthesis ? [
+                'id' => $conversation->masterSynthesis->id,
+                'convergence_text' => $conversation->masterSynthesis->convergence_text,
+                'consideration_text' => $conversation->masterSynthesis->consideration_text,
+                'proposals_text' => $conversation->masterSynthesis->proposals_text,
+                'other_text' => $conversation->masterSynthesis->other_text,
+                'is_submitted' => $conversation->masterSynthesis->is_submitted,
+                'submitted_at' => $conversation->masterSynthesis->submitted_at?->toIso8601String(),
+            ] : null,
             'dioceseDraft' => [
                 'id' => $dioceseDraft->id,
                 'draft_text' => $dioceseDraft->draft_text,

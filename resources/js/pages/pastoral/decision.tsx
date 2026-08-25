@@ -10,6 +10,7 @@ import {
     ChevronRight,
     ArrowRight,
     Save,
+    FolderOpen,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +49,15 @@ interface MemberProgress {
 interface DecisionPageProps {
     conversation: ConversationData;
     eventConversations: Array<{ id: number; title: string; event_id: number | null }>;
+    masterSynthesis?: {
+        id: number;
+        convergence_text: string | null;
+        consideration_text: string | null;
+        proposals_text: string | null;
+        other_text: string | null;
+        is_submitted: boolean;
+        submitted_at: string | null;
+    } | null;
     dioceseDraft?: IndividualDraftItem | null;
     nationalDraft?: IndividualDraftItem | null;
     draft?: {
@@ -66,6 +76,7 @@ interface DecisionPageProps {
 export default function Decision({
     conversation,
     eventConversations = [],
+    masterSynthesis,
     dioceseDraft,
     nationalDraft,
     draft,
@@ -228,70 +239,184 @@ export default function Decision({
                         <span className="text-sm font-medium">{statusMessage.text}</span>
                     </div>
                 )}
+                {/* ─── Main Split Content ─────────────────────────── */}
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start">
 
-                {/* ─── National Level Decision Draft ──────────────── */}
-                <Card className={isSubmitted ? 'border-emerald-500/30' : ''}>
-                    <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Shield className="size-5 text-indigo-600" />
-                            National Level Reflection & Proposals
-                        </CardTitle>
-                        <CardDescription>
-                            Provide your strategic discernment and proposals for the national church for this session ({conversation.title}).
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-6 space-y-3">
-                        <textarea
-                            value={nationalText}
-                            onChange={(e) => setNationalText(e.target.value)}
-                            placeholder="Enter your national-level pastoral proposals and key directions..."
-                            rows={8}
-                            disabled={isSubmitted}
-                            className="w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-75"
-                        />
-                        <div className="flex justify-end">
-                            <span className="text-xs text-muted-foreground">
-                                {nationalCharCount} character{nationalCharCount !== 1 ? 's' : ''}
-                            </span>
-                        </div>
-                    </CardContent>
-                </Card>
+                    {/* ─── Left Column: Master Synthesis ────────────── */}
+                    <div className="space-y-4">
+                        <h2 className="text-xl font-semibold flex items-center gap-2 text-foreground">
+                            <FolderOpen className="size-5 text-indigo-600" />
+                            Master Synthesis
+                            {masterSynthesis?.is_submitted && (
+                                <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-700 ml-2 text-xs">
+                                    <CheckCircle2 className="size-3.5" />
+                                    Locked
+                                </Badge>
+                            )}
+                        </h2>
 
-                {/* ─── Diocese Level Decision Draft ───────────────── */}
-                <Card className={isSubmitted ? 'border-emerald-500/30' : ''}>
-                    <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Shield className="size-5 text-violet-600" />
-                            Diocesan Level Implementation & Context
-                        </CardTitle>
-                        <CardDescription>
-                            Provide specific pastoral needs, challenges, and implementation perspectives for your diocese.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-6 space-y-3">
-                        <textarea
-                            value={diocesanText}
-                            onChange={(e) => setDiocesanText(e.target.value)}
-                            placeholder="Enter your diocesan-level proposals and pastoral considerations..."
-                            rows={8}
-                            disabled={isSubmitted}
-                            className="w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-75"
-                        />
-                        <div className="flex justify-end">
-                            <span className="text-xs text-muted-foreground">
-                                {diocesanCharCount} character{diocesanCharCount !== 1 ? 's' : ''}
-                            </span>
-                        </div>
-                    </CardContent>
-                </Card>
+                        {masterSynthesis ? (
+                            <>
+                                {/* Convergence */}
+                                {masterSynthesis.convergence_text && (
+                                    <Card>
+                                        <CardHeader className="bg-muted/10 border-b py-3 px-4">
+                                            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
+                                                Convergence
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="pt-4 pb-3 px-4">
+                                            <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                                                {masterSynthesis.convergence_text}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                )}
 
-                {/* ─── Submission Timestamp ───────────────────────── */}
-                {submittedAt && (
-                    <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                        <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        Submitted on {new Date(submittedAt).toLocaleString()}
+                                {/* Matter for Consideration */}
+                                {masterSynthesis.consideration_text && (
+                                    <Card>
+                                        <CardHeader className="bg-muted/10 border-b py-3 px-4">
+                                            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+                                                Matter for Consideration
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="pt-4 pb-3 px-4">
+                                            <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                                                {masterSynthesis.consideration_text}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+
+
+                                {/* Proposals */}
+                                {masterSynthesis.proposals_text && (
+                                    <Card>
+                                        <CardHeader className="bg-muted/10 border-b py-3 px-4">
+                                            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                                                Proposals
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="pt-4 pb-3 px-4">
+                                            <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                                                {masterSynthesis.proposals_text}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Others */}
+                                {masterSynthesis.other_text && (
+                                    <Card>
+                                        <CardHeader className="bg-muted/10 border-b py-3 px-4">
+                                            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                <span className="inline-block w-2 h-2 rounded-full bg-slate-500" />
+                                                Others
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="pt-4 pb-3 px-4">
+                                            <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                                                {masterSynthesis.other_text}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {!masterSynthesis.convergence_text && !masterSynthesis.consideration_text && !masterSynthesis.proposals_text && !masterSynthesis.other_text && (
+                                    <div className="flex flex-col items-center justify-center p-12 rounded-lg border border-dashed bg-muted/20">
+                                        <Shield className="size-8 text-muted-foreground mb-3" />
+                                        <p className="text-sm text-muted-foreground text-center">
+                                            No Master Synthesis available for this session yet.
+                                        </p>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center p-12 rounded-lg border border-dashed bg-muted/20">
+                                <Shield className="size-8 text-muted-foreground mb-3" />
+                                <p className="text-sm text-muted-foreground text-center">
+                                    No Master Synthesis available for this session.
+                                </p>
+                            </div>
+                        )}
                     </div>
-                )}
+
+                    {/* ─── Right Column: Decision Draft ─────────────── */}
+                    <div className="space-y-4">
+                        <h2 className="text-xl font-semibold flex items-center gap-2 text-foreground pb-1 border-b">
+                            <Shield className="size-5 text-indigo-600" />
+                            Individual Decision Draft
+                        </h2>
+
+                        {/* ─── National Level Implementation ─────────── */}
+                        <Card className={isSubmitted ? 'border-emerald-500/30' : ''}>
+                            <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Shield className="size-5 text-indigo-600" />
+                                    National Level Implementation
+                                </CardTitle>
+                                <CardDescription>
+                                    Provide your strategic discernment and proposals for the national church for this session ({conversation.title}).
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-6 space-y-3">
+                                <textarea
+                                    value={nationalText}
+                                    onChange={(e) => setNationalText(e.target.value)}
+                                    placeholder="Enter your national-level pastoral proposals and key directions..."
+                                    rows={8}
+                                    disabled={isSubmitted}
+                                    className="w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-75"
+                                />
+                                <div className="flex justify-end">
+                                    <span className="text-xs text-muted-foreground">
+                                        {nationalCharCount} character{nationalCharCount !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        {/* ─── Diocesan Level Implementation ─────────── */}
+                        <Card className={isSubmitted ? 'border-emerald-500/30' : ''}>
+                            <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Shield className="size-5 text-indigo-600" />
+                                    Diocesan Level Implementation
+                                </CardTitle>
+                                <CardDescription>
+                                    Provide your diocesan-level pastoral proposals and considerations for this session ({conversation.title}).
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-6 space-y-3">
+                                <textarea
+                                    value={diocesanText}
+                                    onChange={(e) => setDiocesanText(e.target.value)}
+                                    placeholder="Enter your diocesan-level proposals and pastoral considerations..."
+                                    rows={8}
+                                    disabled={isSubmitted}
+                                    className="w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-75"
+                                />
+                                <div className="flex justify-end">
+                                    <span className="text-xs text-muted-foreground">
+                                        {diocesanCharCount} character{diocesanCharCount !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* ─── Submission Timestamp ───────────────────── */}
+                        {submittedAt && (
+                            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                <CheckCircle2 className="size-3.5 text-emerald-600" />
+                                Submitted on {new Date(submittedAt).toLocaleString()}
+                            </div>
+                        )}
+                    </div>
+                </div>
 
                 {/* ─── Action Bar ─────────────────────────────────── */}
                 <div className="flex flex-col sm:flex-row gap-3 justify-between pt-4 border-t items-center">
