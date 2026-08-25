@@ -167,7 +167,7 @@ class PastoralController extends Controller
                     'description' => $conversation->description,
                     'event_id' => $conversation->event_id,
                     'event_title' => $conversation->event?->title,
-                    'has_reports' => (bool) $masterSynthesis?->is_submitted,
+                    'has_master_synthesis' => $masterSynthesis !== null,
 
                     // Stage 1: Individual Draft (conversation-level scope)
                     'user_draft_submitted' => (bool) $userDraftSubmitted,
@@ -346,7 +346,7 @@ class PastoralController extends Controller
     {
         $this->authorizePastoralAccess($request);
 
-        $isUnlocked = $this->areAllDraftsSubmittedForConversation($conversation);
+        // Submission progress (informational only — always accessible)
         $totalMembers = $this->getTotalPastoralMembersCount();
 
         // Count submitted drafts for this conversation
@@ -404,7 +404,6 @@ class PastoralController extends Controller
         return Inertia::render('pastoral/collaborate', [
             'conversation' => $conversation->load('event'),
             'eventConversations' => $eventConversations,
-            'isUnlocked' => $isUnlocked,
             'progress' => [
                 'submitted_count' => $submittedDraftsCount,
                 'total_required' => $totalMembers,
@@ -432,14 +431,6 @@ class PastoralController extends Controller
     public function generateDecisionPartSummary(Request $request, Conversation $conversation, LlmService $llmService): JsonResponse
     {
         $this->authorizePastoralAccess($request);
-
-        $isUnlocked = $this->areAllDraftsSubmittedForConversation($conversation);
-        if (!$isUnlocked) {
-            return response()->json([
-                'success' => false,
-                'error' => 'All pastoral members must submit their drafts for this conversation before generating a summary.',
-            ], 403);
-        }
 
         // Gather submitted drafts for this conversation
         $dioceseDrafts = DioceseDecisionDraft::where('conversation_id', $conversation->id)
@@ -610,7 +601,7 @@ class PastoralController extends Controller
     {
         $this->authorizePastoralAccess($request);
 
-        $isUnlocked = $this->areAllDecisionPartsSubmittedForEvent($event);
+        // Submission progress (informational only — always accessible)
 
         // Fetch all conversations with their diocese and national decision parts
         $conversationsWithParts = $event->conversations()
@@ -643,7 +634,6 @@ class PastoralController extends Controller
 
         return Inertia::render('pastoral/master-decision', [
             'event' => $event,
-            'isUnlocked' => $isUnlocked,
             'conversationsWithParts' => $conversationsWithParts,
             'masterDecision' => $masterDecision ? [
                 'id' => $masterDecision->id,
@@ -666,13 +656,6 @@ class PastoralController extends Controller
     public function generateMasterDecisionSummary(Request $request, Event $event, LlmService $llmService): JsonResponse
     {
         $this->authorizePastoralAccess($request);
-
-        if (!$this->areAllDecisionPartsSubmittedForEvent($event)) {
-            return response()->json([
-                'success' => false,
-                'error' => 'All conversations must have finalized Decision Parts before generating the Master Decision.',
-            ], 403);
-        }
 
         // Use diocese decision parts for the master synthesis
         $dioceseDecisionParts = DioceseDecisionPart::whereIn('conversation_id', $event->conversations()->pluck('id'))

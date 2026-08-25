@@ -63,14 +63,12 @@ interface MasterDecisionPageProps {
         start_date?: string;
         end_date?: string | null;
     };
-    isUnlocked: boolean;
     conversationsWithParts: ConversationPartItem[];
     masterDecision: MasterDecisionData | null;
 }
 
 export default function MasterDecisionPage({
     event,
-    isUnlocked,
     conversationsWithParts = [],
     masterDecision,
 }: MasterDecisionPageProps) {
@@ -217,15 +215,11 @@ export default function MasterDecisionPage({
                                 <CheckCircle2 className="h-4 w-4" />
                                 Master Decision Finalized
                             </Badge>
-                        ) : isUnlocked ? (
-                            <Badge variant="outline" className="text-indigo-600 border-indigo-300 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20">
-                                Ready to Finalize
-                            </Badge>
                         ) : (
-                            <Badge variant="outline" className="text-amber-600 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 flex items-center gap-1">
-                                <Lock className="size-3" />
-                                Waiting for Session Parts
-                            </Badge>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Layers className="size-3" />
+                                Sessions: {conversationsWithParts.filter(c => c.diocese_decision_part?.is_submitted && c.national_decision_part?.is_submitted).length}/{conversationsWithParts.length} parts finalized
+                            </div>
                         )}
                     </div>
                 </div>
@@ -248,61 +242,7 @@ export default function MasterDecisionPage({
                     </div>
                 )}
 
-                {/* ─── Gated Locked State ─────────────────────────── */}
-                {!isUnlocked ? (
-                    <Card className="border-dashed bg-muted/20">
-                        <CardContent className="py-12 flex flex-col items-center justify-center text-center gap-5 max-w-xl mx-auto">
-                            <div className="p-3 bg-amber-100 dark:bg-amber-950/40 rounded-full text-amber-600">
-                                <Lock className="size-8" />
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="text-lg font-semibold">Master Decision Locked</h3>
-                                <p className="text-sm text-muted-foreground">
-                                    All session Decision Parts (National and Diocese) within this event must be finalized before the Master Pastoral Decision can be produced.
-                                </p>
-                            </div>
-
-                            {/* Session Status Checklist */}
-                            <div className="w-full text-left space-y-2 pt-2 border-t">
-                                <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-                                    Session Decision Parts Status:
-                                </p>
-                                {conversationsWithParts.map((c) => {
-                                    const isPartsSubmitted = Boolean(
-                                        (c.diocese_decision_part?.is_submitted && c.national_decision_part?.is_submitted) ||
-                                        c.decision_part?.is_submitted
-                                    );
-                                    return (
-                                        <div
-                                            key={c.id}
-                                            className="flex items-center justify-between p-2.5 rounded-md border bg-background text-sm"
-                                        >
-                                            <span className="font-medium">{c.title}</span>
-                                            {isPartsSubmitted ? (
-                                                <Badge variant="default" className="bg-emerald-600 text-xs flex items-center gap-1">
-                                                    <CheckCircle2 className="size-3" /> Finalized
-                                                </Badge>
-                                            ) : (
-                                                <Link href={`/pastoral/collaborate/${c.id}`}>
-                                                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
-                                                        Collaborate <ArrowRight className="size-3" />
-                                                    </Button>
-                                                </Link>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <Link href="/pastoral/dashboard">
-                                <Button variant="outline" size="sm">
-                                    Back to Dashboard
-                                </Button>
-                            </Link>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    /* ─── Unlocked Master Decision View ─────────── */
+                {/* ─── Full Editor View (Always Accessible) ─────────── */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         {/* ─── Left Column: Session Decision Parts Review ─ */}
                         <div className="lg:col-span-5 flex flex-col gap-4">
@@ -470,7 +410,6 @@ export default function MasterDecisionPage({
                             </Card>
                         </div>
                     </div>
-                )}
             </div>
         </>
     );

@@ -12,6 +12,7 @@ use App\Models\MasterSynthesis;
 use App\Models\User;
 use App\Models\Conversation;
 use App\Models\Response;
+use App\Models\Diocese;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/login', 'auth/login')->name('login');
@@ -95,6 +96,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Key Points Extraction
         Route::post('extract-key-points/{conversation}', [SynthesisController::class, 'extractKeyPoints'])->name('extract-key-points');
         Route::get('key-points/{conversation}', [SynthesisController::class, 'getKeyPoints'])->name('key-points');
+        Route::patch('key-points/{conversation}', [SynthesisController::class, 'updateKeyPoints'])->name('key-points.update');
         
         // Export Booklet
         Route::get('export-booklet/{conversation}', [SynthesisController::class, 'exportBooklet'])->name('export-booklet');
@@ -158,6 +160,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Step 4: Bishop's Overview
         Route::get('/bishop-overview/{event}', [PastoralController::class, 'bishopOverview'])->name('bishop-overview');
+
+        // Booklet export (accessible by pastoral and discernment)
+        Route::get('/export-booklet/{conversation}', [\App\Http\Controllers\SynthesisController::class, 'exportBooklet'])->name('export-booklet');
     });
 
     // ─── Admin Chat Routes ────────────────────────────────────────────
@@ -166,8 +171,81 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('details');
         Route::get('/update-db', function(){
 
-            $responses=Response::pluck("consensus_text")->toArray();
-            dd($responses);
+            $dioceses = Diocese::all();
+            // First names for generating user accounts
+            $pastoralFirstNames = [
+                'KL', // kl
+                'Penang', //penang
+                'MJD', //mjd
+                'Kuching', //kuching
+                'Sibu', //sibu
+                'Miri', //miri
+                'KK', // kk
+                'Sandakan', //sandakan
+                'Keningau' //keningau
+            ];
+
+            
+            // Create 1 pastoral account per diocese
+            foreach ($dioceses as $i=>$diocese) {
+                $firstName = $pastoralFirstNames[$i] ?? 'Pastoral';
+                $email1 = strtolower($firstName."01@gerejakatolik.my");
+                $email2 = strtolower($firstName."02@gerejakatolik.my");
+
+                User::firstOrCreate(
+                    ['email' => $email1],
+                    [
+                        'name' => $firstName."01",
+                        'role' => 'pastoral',
+                        'diocese_id' => $diocese->id,
+                        'password' => bcrypt('password'),
+                        'email_verified_at' => now(),
+                    ]
+                );
+
+                User::firstOrCreate(
+                    ['email' => $email2],
+                    [
+                        'name' => $firstName."02",
+                        'role' => 'pastoral',
+                        'diocese_id' => $diocese->id,
+                        'password' => bcrypt('password'),
+                        'email_verified_at' => now(),
+                    ]
+                );
+            }
+
+            //bishops
+            User::firstOrCreate(
+                    ['email' => "bernard@gerejakatolik.my"],
+                    [
+                        'name' => "Bishop Bernard Paul",
+                        'role' => 'pastoral',
+                        'diocese_id' => 3,
+                        'password' => bcrypt('password'),
+                        'email_verified_at' => now(),
+                    ]
+                );
+            User::firstOrCreate(
+                    ['email' => "julius@gerejakatolik.my"],
+                    [
+                        'name' => "Bishop Julius Gitom",
+                        'role' => 'pastoral',
+                        'diocese_id' => 8,
+                        'password' => bcrypt('password'),
+                        'email_verified_at' => now(),
+                    ]
+                );
+            User::firstOrCreate(
+                    ['email' => "richard@gerejakatolik.my"],
+                    [
+                        'name' => "Bishop Richard Ng",
+                        'role' => 'pastoral',
+                        'diocese_id' => 6,
+                        'password' => bcrypt('password'),
+                        'email_verified_at' => now(),
+                    ]
+                );
             
             return response()->json([
                 "success"=>true

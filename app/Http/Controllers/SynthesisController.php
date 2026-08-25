@@ -95,6 +95,11 @@ class SynthesisController extends Controller
             return;
         }
 
+        // Allow pastoral and discernment users to access (used by export-booklet route)
+        if ($user->isPastoral() || $user->isDiscernment()) {
+            return;
+        }
+
         $isAssigned = $user->assignedConversationGroups()
             ->where('conversation_id', $conversation->id)
             ->exists();
@@ -1155,6 +1160,63 @@ PROMPT;
                 'provider' => $keyPoints->provider,
                 'created_at' => $keyPoints->created_at?->toIso8601String(),
             ] : null,
+        ]);
+    }
+
+    /**
+     * Update the key points text for a conversation.
+     */
+    public function updateKeyPoints(Request $request, Conversation $conversation)
+    {
+        $user = $request->user();
+
+        // Authorization
+        $this->authorizeConversationAccess($user, $conversation);
+
+        $validated = $request->validate([
+            'key_points_text' => 'required|string',
+            'master_synthesis_id' => 'nullable|integer',
+        ]);
+
+        // Find the most recent completed key points for this conversation (prefer matching master_synthesis_id)
+        $synthesisKeyPoint = SynthesisKeyPoint::where('conversation_id', $conversation->id)
+            ->where('status', 'completed')
+            ->when($validated['master_synthesis_id'], fn($q) => $q->where('master_synthesis_id', $validated['master_synthesis_id']))
+            ->latest('updated_at')
+            ->first();
+
+        // If no existing record with matching master_synthesis_id, find any completed one
+        if (!$synthesisKeyPoint) {
+            $synthesisKeyPoint = SynthesisKeyPoint::where('conversation_id', $conversation->id)
+                ->where('status', 'completed')
+                ->latest('updated_at')
+                ->first();
+        }
+
+        // If still no record, create one (should be rare)
+        if (!$synthesisKeyPoint) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No key points record found. Please extract key points first.',
+            ], 422);
+        }
+
+        $synthesisKeyPoint->update([
+            'key_points_text' => $validated['key_points_text'],
+            'key_points' => array_filter(
+                array_map('trim', explode("\n", $validated['key_points_text'])),
+                fn($line) => !empty($line)
+            ),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Key points updated successfully.',
+            'key_points' => [
+                'id' => $synthesisKeyPoint->id,
+                'key_points_text' => $synthesisKeyPoint->key_points_text,
+                'key_points' => $synthesisKeyPoint->key_points ?? [],
+            ],
         ]);
     }
 

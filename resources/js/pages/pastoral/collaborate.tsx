@@ -53,7 +53,6 @@ interface CollaboratePageProps {
         } | null;
     };
     eventConversations: Array<{ id: number; title: string; event_id: number | null }>;
-    isUnlocked: boolean;
     progress: {
         submitted_count: number;
         total_required: number;
@@ -67,7 +66,6 @@ interface CollaboratePageProps {
 export default function Collaborate({
     conversation,
     eventConversations = [],
-    isUnlocked,
     progress,
     nationalDrafts = [],
     dioceseDrafts = [],
@@ -273,15 +271,11 @@ export default function Collaborate({
                                 <CheckCircle2 className="h-4 w-4" />
                                 Decision Parts Finalized
                             </Badge>
-                        ) : isUnlocked ? (
-                            <Badge variant="outline" className="text-indigo-600 border-indigo-300 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20">
-                                Collaboration Open
-                            </Badge>
                         ) : (
-                            <Badge variant="outline" className="text-amber-600 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 flex items-center gap-1">
-                                <Lock className="size-3" />
-                                Locked (Drafts Pending)
-                            </Badge>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Globe className="size-3" />
+                                Progress: {progress.submitted_count}/{progress.total_required} members submitted
+                            </div>
                         )}
                     </div>
                 </div>
@@ -304,46 +298,7 @@ export default function Collaborate({
                     </div>
                 )}
 
-                {/* ─── Gated Locked State ─────────────────────────── */}
-                {!isUnlocked ? (
-                    <Card className="border-dashed bg-muted/20">
-                        <CardContent className="py-16 flex flex-col items-center justify-center text-center gap-4 max-w-xl mx-auto">
-                            <div className="p-3 bg-amber-100 dark:bg-amber-950/40 rounded-full text-amber-600">
-                                <Lock className="size-8" />
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="text-lg font-semibold">Collaboration Locked for this Session</h3>
-                                <p className="text-sm text-muted-foreground">
-                                    All pastoral members must submit their individual decision drafts for <strong>{conversation.title}</strong> before the group can produce the shared Decision Parts.
-                                </p>
-                            </div>
-                            <div className="w-full bg-muted rounded-full h-3 overflow-hidden border">
-                                <div
-                                    className="bg-indigo-600 h-full transition-all duration-500 rounded-full"
-                                    style={{
-                                        width: `${progress.total_required > 0 ? (progress.submitted_count / progress.total_required) * 100 : 0}%`,
-                                    }}
-                                />
-                            </div>
-                            <p className="text-xs text-muted-foreground font-medium">
-                                {progress.submitted_count} of {progress.total_required} pastoral members submitted for this session
-                            </p>
-                            <div className="flex gap-2 pt-2">
-                                <Link href={`/pastoral/decision/${conversation.id}`}>
-                                    <Button variant="default" size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-                                        <FileText className="size-4" /> Go to Your Draft
-                                    </Button>
-                                </Link>
-                                <Link href="/pastoral/dashboard">
-                                    <Button variant="outline" size="sm">
-                                        Back to Dashboard
-                                    </Button>
-                                </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    /* ─── Unlocked Collaboration View ───────────── */
+                {/* ─── Full Editor View (Always Accessible) ─────────── */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         {/* ─── Left Column: Submitted Member Drafts ─── */}
                         <div className="lg:col-span-6 flex flex-col gap-4">
@@ -604,10 +559,10 @@ export default function Collaborate({
                                         </Link>
                                     </div>
                                 )
-                            )}
+                            )
+                            }
                         </div>
                     </div>
-                )}
             </div>
         </>
     );

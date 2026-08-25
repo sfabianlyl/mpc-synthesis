@@ -64,6 +64,9 @@ export default function Collaborate({
     const [keyPointsText, setKeyPointsText] = useState('');
     const [isExtractingKeyPoints, setIsExtractingKeyPoints] = useState(false);
     const [hasLoadedKeyPoints, setHasLoadedKeyPoints] = useState(false);
+
+    // Key points save feedback state
+    const [keyPointsSaveFeedback, setKeyPointsSaveFeedback] = useState<'success' | 'error' | null>(null);
     
     // Active editing category indicator (for real-time collaboration)
 
@@ -355,6 +358,40 @@ export default function Collaborate({
             })
             .catch(() => {
                 setIsExtractingKeyPoints(false);
+            });
+    };
+
+    // Save key points handler — persists edited key points to the backend
+    const handleSaveKeyPoints = () => {
+        if (!keyPointsText.trim()) {
+            return;
+        }
+
+        setKeyPointsSaveFeedback('success');
+        setTimeout(() => setKeyPointsSaveFeedback(null), 2000);
+
+        fetch(`/synthesis/key-points/${conversation.id}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                key_points_text: keyPointsText,
+                master_synthesis_id: masterSynthesisLocal?.id,
+            }),
+        })
+            .then((res) => res.json())
+            .then((data) => {
+                if (!data.success) {
+                    setKeyPointsSaveFeedback('error');
+                    setTimeout(() => setKeyPointsSaveFeedback(null), 2000);
+                }
+            })
+            .catch(() => {
+                setKeyPointsSaveFeedback('error');
+                setTimeout(() => setKeyPointsSaveFeedback(null), 2000);
             });
     };
 
@@ -831,7 +868,7 @@ export default function Collaborate({
 
                             {/* Key Points Textarea */}
                             {(keyPointsText || isExtractingKeyPoints || hasLoadedKeyPoints) && (
-                                <div>
+                                <div className="space-y-2">
                                     <label className="text-sm font-medium mb-1 block flex items-center gap-2">
                                         <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                         Extracted Key Points (Editable)
@@ -843,9 +880,25 @@ export default function Collaborate({
                                         placeholder={isExtractingKeyPoints ? 'Extracting key points...' : 'Key points will appear here...'}
                                         className="w-full min-h-[60px] rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     />
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Edit the extracted key points as needed. Each point should be on its own line starting with a number (e.g., "1. ").
-                                    </p>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-xs text-muted-foreground">
+                                            Edit the extracted key points as needed. Each point should be on its own line starting with a number (e.g., "1. ").
+                                        </p>
+                                        <Button
+                                            onClick={handleSaveKeyPoints}
+                                            disabled={keyPointsSaveFeedback !== null || !keyPointsText.trim()}
+                                            variant={keyPointsSaveFeedback === 'error' ? 'destructive' : 'default'}
+                                            className={`flex items-center gap-2 text-sm ${keyPointsSaveFeedback === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                                        >
+                                            {keyPointsSaveFeedback === 'success' ? (
+                                                <><CheckCircle2 className="size-4" /> Saved</>
+                                            ) : keyPointsSaveFeedback === 'error' ? (
+                                                <><XCircle className="size-4" /> Error Saving</>
+                                            ) : (
+                                                <><CheckCircle2 className="size-4" /> Save Key Points</>
+                                            )}
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>
