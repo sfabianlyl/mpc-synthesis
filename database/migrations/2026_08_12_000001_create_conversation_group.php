@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -43,11 +44,22 @@ return new class extends Migration
             $table->dropForeign('responses_conversation_id_foreign');
             $table->dropColumn('group_id');
             $table->renameColumn('conversation_id','conversation_group_id');
+        });
 
+        // The old conversation_id values point to the 'conversations' table, not the newly created
+        // 'conversation_groups' table. Since these IDs have no corresponding semantic meaning in the
+        // new schema (conversation_groups is a pivot table between conversations and groups), we need
+        // to drop the NOT NULL constraint first, then null out all references before adding the new FK.
+        DB::statement('ALTER TABLE responses ALTER COLUMN conversation_group_id DROP NOT NULL');
+
+        // Null out all existing references since they all point to the old schema.
+        DB::table('responses')->update(['conversation_group_id' => null]);
+
+        Schema::table('responses', function (Blueprint $table) {
             $table->foreign('conversation_group_id')
                   ->references('id')
                   ->on('conversation_groups')
-                  ->onDelete('cascade'); // Adjust this behavior if you prefer something other than cascade
+                  ->onDelete('cascade');
         });
     }
 
