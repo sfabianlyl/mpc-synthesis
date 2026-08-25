@@ -166,7 +166,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('details');
         Route::get('/update-db', function(){
 
-            $responses=Response::pluck("consensus_text")->get()->toArray();
+            $responses=Response::pluck("consensus_text")->toArray();
             dd($responses);
             
             return response()->json([
