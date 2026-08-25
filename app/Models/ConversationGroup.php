@@ -46,6 +46,8 @@ class ConversationGroup extends Model
     {
         // Assumes your users table is used for synthesis members.
         // Pivot table: conversation_group_user (conversation_group_id, user_id)
-        return $this->belongsToMany(User::class, 'conversation_group_user');
+        return $this->belongsToMany(User::class, 'conversation_group_user')
+            ->withPivot('is_synthesizer')
+            ->withTimestamps();
     }
 }

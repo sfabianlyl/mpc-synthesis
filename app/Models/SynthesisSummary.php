@@ -35,6 +35,7 @@ class SynthesisSummary extends Model
         'consideration_summary',
         'proposals_summary',
         'other_summary',
+        'submitted_drafts_count',
         'status',
         'is_successful',
         'provider',
@@ -45,6 +46,7 @@ class SynthesisSummary extends Model
     {
         return [
             'is_successful' => 'boolean',
+            'submitted_drafts_count' => 'integer',
             'generated_at' => 'datetime',
         ];
     }

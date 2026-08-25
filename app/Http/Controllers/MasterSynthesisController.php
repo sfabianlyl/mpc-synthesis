@@ -57,7 +57,6 @@ class MasterSynthesisController extends Controller
         if (!$report) {
             $report = MasterSynthesis::create([
                 'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
                 'is_master_synthesis' => true,
                 'status' => 'submitted',
                 'submitted_at' => now(),
@@ -266,7 +265,6 @@ class MasterSynthesisController extends Controller
         if (!$report) {
             $report = MasterSynthesis::create([
                 'conversation_id' => $conversation->id,
-                'synthesis_id' => $user->id,
                 'is_master_synthesis' => true,
                 'status' => 'submitted',
             ]);

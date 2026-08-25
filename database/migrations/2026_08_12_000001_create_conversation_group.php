@@ -40,19 +40,18 @@ return new class extends Migration
             $table->unique(['user_id', 'conversation_group_id']); 
         });
 
-        Schema::table('responses', function (Blueprint $table) {
-            $table->dropForeign('responses_conversation_id_foreign');
-            $table->dropColumn('group_id');
-            $table->renameColumn('conversation_id','conversation_group_id');
-        });
+        DB::statement('ALTER TABLE responses DROP CONSTRAINT IF EXISTS responses_conversation_id_foreign');
 
-        // The old conversation_id values point to the 'conversations' table, not the newly created
-        // 'conversation_groups' table. Since these IDs have no corresponding semantic meaning in the
-        // new schema (conversation_groups is a pivot table between conversations and groups), we need
-        // to drop the NOT NULL constraint first, then null out all references before adding the new FK.
+        if (Schema::hasColumn('responses', 'conversation_id')) {
+            Schema::table('responses', function (Blueprint $table) {
+                if (Schema::hasColumn('responses', 'group_id')) {
+                    $table->dropColumn('group_id');
+                }
+                $table->renameColumn('conversation_id', 'conversation_group_id');
+            });
+        }
+
         DB::statement('ALTER TABLE responses ALTER COLUMN conversation_group_id DROP NOT NULL');
-
-        // Null out all existing references since they all point to the old schema.
         DB::table('responses')->update(['conversation_group_id' => null]);
 
         Schema::table('responses', function (Blueprint $table) {

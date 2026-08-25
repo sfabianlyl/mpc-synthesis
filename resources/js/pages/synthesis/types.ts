@@ -31,6 +31,7 @@ export interface SynthesisSummaryData {
     consideration_summary: string | null;
     proposals_summary: string | null;
     other_summary: string | null;
+    submitted_drafts_count?: number | null;
     status: string;
     is_successful: boolean;
     provider: string | null;
@@ -53,6 +54,7 @@ export interface CollaboratePageProps {
     responses: any[];
     consensusSubmissions: Record<number, any[]>;
     currentUser: { id: number; name: string; email: string; role: string };
+    isSynthesizer?: boolean;
     onlineUsers?: SynthesisMember[];
     retrievedChunks?: any[];
     success?: string;

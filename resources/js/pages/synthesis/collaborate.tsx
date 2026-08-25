@@ -150,6 +150,12 @@ export default function Collaborate({
         (s) => s.user.id === currentUser.id && s.status === 'submitted'
     );
 
+    // Track submitted drafts count and whether summary regeneration button should be shown
+    const submittedDraftsCount = submissionsLocal.filter(s => s.status === 'submitted').length;
+    const hasGeneratedSummary = Boolean(summaryLocal && summaryLocal.generated_at && summaryLocal.is_successful);
+    const summarySubmittedDraftsCount = summaryLocal?.submitted_drafts_count ?? 0;
+    const shouldShowSummaryButton = !hasGeneratedSummary || (submittedDraftsCount !== summarySubmittedDraftsCount);
+
     // Get online synthesis members
     const onlineMembers = onlineUsers.filter(u => u.is_online !== false);
     
@@ -218,12 +224,8 @@ export default function Collaborate({
         );
     };
 
-    // Save master synthesis for a specific category — use authorized route so any assigned member can edit
+    // Save master synthesis for a specific category — any synthesis member can edit and save
     const handleSaveMasterCategory = (categoryKey: string) => {
-        if (!masterSynthesisLocal?.id && currentUser.role !== 'admin' && currentUser.role !== 'drafter') {
-            return;
-        }
-
         // Track active editing category
         setActiveEditingCategory(categoryKey);
         setTimeout(() => setActiveEditingCategory(null), 3000);
@@ -254,12 +256,8 @@ export default function Collaborate({
         );
     };
 
-    // Save all master synthesis categories at once — use authorized route so any assigned member can edit
+    // Save all master synthesis categories at once — any synthesis member can edit and save
     const handleSaveAllMasterCategories = () => {
-        if (!masterSynthesisLocal?.id && currentUser.role !== 'admin' && currentUser.role !== 'drafter') {
-            return;
-        }
-
         router.post(
             `/synthesis/master-synthesis-authorized/${conversation.id}`,
             {
@@ -302,12 +300,8 @@ export default function Collaborate({
 
     // Extract key points handler
 
-    // Generate SynthesisSummary handler — synchronous call with immediate result display
-    const handleGenerateSynthesisSummary = async (category: string) => {
-        if (!masterSynthesisLocal?.id) {
-            return;
-        }
-
+    // Generate SynthesisSummary handler — generates summaries for ALL categories synchronously
+    const handleGenerateSynthesisSummary = async () => {
         setIsGeneratingSummary(true);
         setStatusMessage(null);
         try {
@@ -318,23 +312,12 @@ export default function Collaborate({
                     'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({
-                    master_synthesis_id: masterSynthesisLocal.id,
-                    category: category,
-                }),
             });
             const data = await res.json();
 
-            if (data.success) {
-                // Update the summaryLocal state with the new category content
-                const summaryField = (category + '_summary') as keyof SynthesisSummaryData;
-                setSummaryLocal((prev) => ({
-                    ...(prev || { id: 0, convergence_summary: null, consideration_summary: null, proposals_summary: null, other_summary: null, status: 'completed', is_successful: true, provider: null, generated_at: null }),
-                    id: prev?.id ?? 0,
-                    [summaryField]: data[summaryField] ?? null,
-                    generated_at: new Date().toISOString(),
-                }));
-                setStatusMessage({ type: 'success', text: `Synthesis summary for ${category} generated successfully.` });
+            if (data.success && data.summary) {
+                setSummaryLocal(data.summary);
+                setStatusMessage({ type: 'success', text: 'Synthesis summaries generated successfully for all categories.' });
             } else {
                 setStatusMessage({ type: 'error', text: data.message || 'Failed to generate summary.' });
             }
@@ -640,18 +623,18 @@ export default function Collaborate({
                                                 </div>
                                             );
                                         })()}
-                                        {/* Show trigger button when master synthesis exists (always retriggerable) */}
-                                        {masterSynthesisLocal?.id && (
+                                        {/* Show trigger button when no summary exists or when submitted drafts count has changed */}
+                                        {shouldShowSummaryButton && (
                                             <div className="mb-4">
                                                 <Button
-                                                    onClick={() => handleGenerateSynthesisSummary(category.key)}
-                                                    disabled={isGeneratingSummary}
-                                                    variant={summaryLocal?.id ? 'outline' : 'default'}
-                                                    className={`flex items-center gap-2 ${summaryLocal?.id ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                                    onClick={handleGenerateSynthesisSummary}
+                                                    disabled={isGeneratingSummary || submittedDraftsCount === 0}
+                                                    variant={hasGeneratedSummary ? 'outline' : 'default'}
+                                                    className={`flex items-center gap-2 ${hasGeneratedSummary ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                                                 >
                                                     {isGeneratingSummary && <Loader2 className="size-4 animate-spin" />}
                                                     <Sparkles className="size-4" />
-                                                    {summaryLocal?.id ? 'Regenerate' : 'Generate'} Synthesis Summary for {category.label}
+                                                    {hasGeneratedSummary ? 'Regenerate' : 'Generate'} Synthesis Summary for {category.label}
                                                 </Button>
                                             </div>
                                         )}
@@ -706,7 +689,7 @@ export default function Collaborate({
                 </Card>
 
                 {/* ─── Save All Master Synthesis (for admin/drafter) ───── */}
-                {canEditMaster && masterSynthesisLocal?.id && (
+                {canEditMaster && (
                     <Card className="border-sidebar-border/50">
                         <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
                             <CardTitle className="text-lg flex items-center justify-between">

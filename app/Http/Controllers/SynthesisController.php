@@ -55,12 +55,35 @@ class SynthesisController extends Controller
         })->get();
         $assignedGroups=$user->assignedConversationGroups()->where("conversation_id",$selectedConversationId)->get();
 
+        $selectedConversation = $conversations->firstWhere('id', $selectedConversationId)
+            ?? Conversation::find($selectedConversationId);
+
+        $isSynthesizer = $selectedConversation
+            ? $this->isSynthesizerForConversation($user, $selectedConversation)
+            : false;
+
         return Inertia::render('synthesis/dashboard', [
             'conversations' => $conversations,
             'responses' => $responses,
             'selectedConversationId' => $selectedConversationId,
             'assignedGroups' => $assignedGroups,
+            'isSynthesizer' => $isSynthesizer,
         ]);
+    }
+
+    /**
+     * Check if user is a synthesizer for at least one ConversationGroup in the given Conversation.
+     */
+    private function isSynthesizerForConversation(User $user, Conversation $conversation): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return $user->assignedConversationGroups()
+            ->where('conversation_id', $conversation->id)
+            ->wherePivot('is_synthesizer', true)
+            ->exists();
     }
 
     /**
@@ -206,6 +229,7 @@ class SynthesisController extends Controller
             'allConsensusSubmitted' => $allSubmitted,
             'consensusSubmissions' => $consensusSubmissions,
             'canTrigger' => !$hasSuccessfulExtraction,
+            'isSynthesizer' => $this->isSynthesizerForConversation($user, $conversation),
         ]);
     }
 
@@ -256,8 +280,10 @@ class SynthesisController extends Controller
     {
         $user = $request->user();
 
-        // Authorization
-        $this->authorizeConversationAccess($user, $conversation);
+        // Authorization: only synthesis members assigned as synthesizer for this conversation (or admin) can access
+        if (!$this->isSynthesizerForConversation($user, $conversation)) {
+            abort(403, 'You are not assigned as a synthesizer for this conversation.');
+        }
 
         // Fetch ALL conversation groups for this conversation
         $conversationGroups = ConversationGroup::where('conversation_id', $conversation->id)
@@ -341,6 +367,7 @@ class SynthesisController extends Controller
             'consideration_summary' => $synthesisSummary->consideration_summary,
             'proposals_summary' => $synthesisSummary->proposals_summary,
             'other_summary' => $synthesisSummary->other_summary,
+            'submitted_drafts_count' => $synthesisSummary->submitted_drafts_count,
             'status' => $synthesisSummary->status,
             'is_successful' => $synthesisSummary->is_successful,
             'provider' => $synthesisSummary->provider,
@@ -355,6 +382,7 @@ class SynthesisController extends Controller
             'groups' => $groups,
             'responses' => $groups->flatMap->responses,
             'consensusSubmissions' => $consensusSubmissions,
+            'isSynthesizer' => true,
             'currentUser' => [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -748,8 +776,20 @@ class SynthesisController extends Controller
             ['conversation_id' => $conversation->id, 'user_id' => $user->id]
         );
 
+        $isSynthesizer = $this->isSynthesizerForConversation($user, $conversation);
+        $redirectUrl = $isSynthesizer
+            ? route('synthesis.collaborate', ['conversation' => $conversation])
+            : route('synthesis.dashboard');
+
         if ($draft->is_submitted) {
-            return back()->withErrors(['submission' => 'Draft already submitted.']);
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Synthesis draft already submitted.',
+                    'redirect_url' => $redirectUrl,
+                ]);
+            }
+            return redirect($redirectUrl)->with('info', 'Synthesis draft already submitted.');
         }
 
         // Update with text inputs if provided, and mark draft as submitted
@@ -763,8 +803,16 @@ class SynthesisController extends Controller
         // Auto-trigger summary check
         $this->checkAndAutoTriggerSummary($request, $conversation);
 
-        // Redirect to collaborative review page
-        return redirect()->route('synthesis.collaborate', ['conversation' => $conversation])->with('success', 'Synthesis submitted successfully.');
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Synthesis submitted successfully.',
+                'redirect_url' => $redirectUrl,
+            ]);
+        }
+
+        // Redirect to collaborative review page (for synthesizers) or dashboard
+        return redirect($redirectUrl)->with('success', 'Synthesis submitted successfully.');
     }
 
     /**
@@ -849,7 +897,7 @@ class SynthesisController extends Controller
     }
 
     /**
-     * Synchronous LLM synthesis summary — returns parsed JSON directly for immediate display.
+     * Synchronous LLM synthesis summary — generates summaries for all categories from submitted drafts.
      */
     public function summarySync(Request $request, Conversation $conversation)
     {
@@ -857,11 +905,6 @@ class SynthesisController extends Controller
 
         // Authorization
         $this->authorizeConversationAccess($user, $conversation);
-
-        $validated = $request->validate([
-            'master_synthesis_id' => 'required|integer',
-            'category' => 'required|in:convergence,consideration,proposals,other',
-        ]);
 
         $drafts = SynthesisDraft::where('conversation_id', $conversation->id)
             ->where('is_submitted', true)
@@ -885,56 +928,25 @@ class SynthesisController extends Controller
             );
         })->implode("\n\n---\n\n");
 
-        $systemPrompt = match ($validated['category']) {
-            'convergence' => <<<'PROMPT'
+        $systemPrompt = <<<'PROMPT'
 You are a senior synthesis analyst. You will receive multiple submitted synthesis drafts from different participants in a consultative process.
 
-Your task is to generate a concise summary of the points of convergence/agreement across all submitted drafts.
+Your task is to generate a comprehensive and concise summary for each of the following 4 categories across all submitted drafts:
+1. Convergence: Points of agreement, common ground, and emerging unified conclusions.
+2. Matters for Consideration: Concerns, dissenting opinions, unheard-of ideas, or objections.
+3. Proposals: Actionable recommendations, practical suggestions, or required next steps.
+4. Others: Any other themes or notable points not covered in the above 3 categories.
 
-Return your response as a JSON object with exactly this key:
+Return your response as a JSON object with exactly these keys:
 {
-  "convergence_summary": "Summary of convergences/agreements across all drafts"
-}
-
-Be concise but thorough. Preserve the original meaning and intent of all participants. Highlight areas of consensus.
-PROMPT,
-            'consideration' => <<<'PROMPT'
-You are a senior synthesis analyst. You will receive multiple submitted synthesis drafts from different participants in a consultative process.
-
-Your task is to generate a concise summary of the matters for consideration/concerns across all submitted drafts.
-
-Return your response as a JSON object with exactly this key:
-{
-  "consideration_summary": "Summary of matters for consideration/concerns across all drafts"
-}
-
-Be concise but thorough. Preserve the original meaning and intent of all participants. Highlight areas of concern while acknowledging agreements.
-PROMPT,
-            'proposals' => <<<'PROMPT'
-You are a senior synthesis analyst. You will receive multiple submitted synthesis drafts from different participants in a consultative process.
-
-Your task is to generate a concise summary of the proposals/recommendations across all submitted drafts.
-
-Return your response as a JSON object with exactly this key:
-{
-  "proposals_summary": "Summary of proposals/recommendations across all drafts"
-}
-
-Be concise but thorough. Preserve the original meaning and intent of all participants. Group similar proposals together.
-PROMPT,
-            'other' => <<<'PROMPT'
-You are a senior synthesis analyst. You will receive multiple submitted synthesis drafts from different participants in a consultative process.
-
-Your task is to generate a concise summary of any other themes or topics across all submitted drafts that don't fit the main categories.
-
-Return your response as a JSON object with exactly this key:
-{
-  "other_summary": "Summary of any other themes or topics across all drafts"
+  "convergence_summary": "Summary of convergences/agreements across all drafts",
+  "consideration_summary": "Summary of matters for consideration/concerns across all drafts",
+  "proposals_summary": "Summary of proposals/recommendations across all drafts",
+  "other_summary": "Summary of other themes across all drafts"
 }
 
 Be concise but thorough. Preserve the original meaning and intent of all participants.
-PROMPT,
-        };
+PROMPT;
 
         $llm = app(LlmService::class);
         $result = $llm->query($systemPrompt, $draftContent);
@@ -957,30 +969,37 @@ PROMPT,
             ], 500);
         }
 
-        $summaryField = $validated['category'] . '_summary';
-        $existingSummary = SynthesisSummary::where('conversation_id', $conversation->id)->first();
+        $summaryData = [
+            'convergence_summary' => $content['convergence_summary'] ?? null,
+            'consideration_summary' => $content['consideration_summary'] ?? null,
+            'proposals_summary' => $content['proposals_summary'] ?? null,
+            'other_summary' => $content['other_summary'] ?? null,
+            'submitted_drafts_count' => $drafts->count(),
+            'status' => 'completed',
+            'is_successful' => true,
+            'provider' => $result['provider'],
+            'generated_at' => now(),
+        ];
 
-        if ($existingSummary) {
-            $existingSummary->update([
-                $summaryField => $content[$summaryField] ?? null,
-                'provider' => $result['provider'],
-                'is_successful' => true,
-                'generated_at' => now(),
-            ]);
-        } else {
-            $summaryData = [
-                'conversation_id' => $conversation->id,
-                $summaryField => $content[$summaryField] ?? null,
-                'provider' => $result['provider'],
-                'is_successful' => true,
-                'generated_at' => now(),
-            ];
-            SynthesisSummary::create($summaryData);
-        }
+        $summary = SynthesisSummary::updateOrCreate(
+            ['conversation_id' => $conversation->id],
+            $summaryData
+        );
 
         return response()->json([
             'success' => true,
-            $summaryField => $content[$summaryField] ?? null,
+            'summary' => [
+                'id' => $summary->id,
+                'convergence_summary' => $summary->convergence_summary,
+                'consideration_summary' => $summary->consideration_summary,
+                'proposals_summary' => $summary->proposals_summary,
+                'other_summary' => $summary->other_summary,
+                'submitted_drafts_count' => $summary->submitted_drafts_count,
+                'status' => $summary->status,
+                'is_successful' => $summary->is_successful,
+                'provider' => $summary->provider,
+                'generated_at' => $summary->generated_at?->toIso8601String(),
+            ],
             'provider' => $result['provider'],
         ]);
     }
@@ -1004,6 +1023,7 @@ PROMPT,
                 'consideration_summary' => $synthesisSummary->consideration_summary,
                 'proposals_summary' => $synthesisSummary->proposals_summary,
                 'other_summary' => $synthesisSummary->other_summary,
+                'submitted_drafts_count' => $synthesisSummary->submitted_drafts_count,
                 'status' => $synthesisSummary->status,
                 'is_successful' => $synthesisSummary->is_successful,
                 'provider' => $synthesisSummary->provider,

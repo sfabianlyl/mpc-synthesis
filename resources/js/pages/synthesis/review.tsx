@@ -55,6 +55,7 @@ interface PageProps {
     allConsensusSubmitted: boolean;
     success?: string;
     canTrigger?: boolean;
+    isSynthesizer?: boolean;
 }
 
 export default function Review({
@@ -66,6 +67,7 @@ export default function Review({
     allConsensusSubmitted,
     success: initialSuccess,
     canTrigger: initialCanTrigger,
+    isSynthesizer,
 }: PageProps) {
     const [isExtracting, setIsExtracting] = useState(false);
     const [isSynthesizing, setIsSynthesizing] = useState(false);
@@ -303,13 +305,21 @@ export default function Review({
                 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
                 'Accept': 'application/json',
             },
+            body: JSON.stringify({
+                convergence_text: convergenceText,
+                consideration_text: considerationText,
+                proposals_text: proposalsText,
+                other_text: othersText,
+            }),
         }).then(res => res.json()).then(data => {
             if (data.success) {
                 setAnalysisStatus('success');
                 setAnalysisMessage(data.message || 'Synthesis submitted successfully.');
-                setTimeout(() => setAnalysisStatus('idle'), 3000);
-                // Reload page to reflect changes
-                window.location.href = `/synthesis/collaborate/${conversation.id}`;
+                // Redirect to collaborate page (for synthesizers) or dashboard
+                const redirectTarget = data.redirect_url || (isSynthesizer ? `/synthesis/collaborate/${conversation.id}` : '/synthesis');
+                setTimeout(() => {
+                    window.location.href = redirectTarget;
+                }, 500);
             } else {
                 setAnalysisStatus('error');
                 setAnalysisMessage(data.message || 'Failed to submit synthesis.');
@@ -362,11 +372,13 @@ export default function Review({
                         )}
                     </div>
                     <div className="flex gap-2 pb-2">
-                        <a href={`/synthesis/collaborate/${conversation.id}`}>
-                            <Button variant="outline" className="flex items-center gap-2">
-                                <Users className="size-4" /> Collaborative Review
-                            </Button>
-                        </a>
+                        {isSynthesizer && (
+                            <a href={`/synthesis/collaborate/${conversation.id}`}>
+                                <Button variant="outline" className="flex items-center gap-2">
+                                    <Users className="size-4" /> Collaborative Review
+                                </Button>
+                            </a>
+                        )}
                         {draft && (
                             <>
                                 {/* Download PDF button - shown when booklet is open */}

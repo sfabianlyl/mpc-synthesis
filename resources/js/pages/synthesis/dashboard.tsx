@@ -14,6 +14,7 @@ interface PageProps {
     assignedGroups?: any[];
     responses?: Response[];
     selectedConversationId: number | null;
+    isSynthesizer?: boolean;
 }
 
 export default function Dashboard({ 
@@ -21,6 +22,7 @@ export default function Dashboard({
     assignedGroups,
     responses,
     selectedConversationId, 
+    isSynthesizer,
 }: PageProps) {
     const { flash } = usePage().props as any;
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -108,11 +110,13 @@ export default function Dashboard({
                                         <FileCheck className="size-4" /> Begin Synthesis
                                     </Button>
                                 </Link>
-                                <Link href={`/synthesis/collaborate/${selectedConversationId}`} className="w-full">
-                                    <Button variant="outline" className="w-full sm:w-auto flex items-center justify-center gap-2">
-                                        <Users className="size-4" /> Collaborative Review
-                                    </Button>
-                                </Link>
+                                {isSynthesizer && (
+                                    <Link href={`/synthesis/collaborate/${selectedConversationId}`} className="w-full">
+                                        <Button variant="outline" className="w-full sm:w-auto flex items-center justify-center gap-2">
+                                            <Users className="size-4" /> Collaborative Review
+                                        </Button>
+                                    </Link>
+                                )}
                                 {/* Export Booklet with Download PDF */}
                                 {bookletUrl && bookletWindow ? (
                                     <Button

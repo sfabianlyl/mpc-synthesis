@@ -122,9 +122,11 @@ class User extends Authenticatable
     /**
      * Get the groups assigned to this synthesis team member.
      */
-    public function assignedConversationGroups() 
+    public function assignedConversationGroups(): BelongsToMany
     {
-        return $this->belongsToMany(ConversationGroup::class, 'conversation_group_user');
+        return $this->belongsToMany(ConversationGroup::class, 'conversation_group_user')
+            ->withPivot('is_synthesizer')
+            ->withTimestamps();
     }
 
     // Get all responses the user is allowed to view
