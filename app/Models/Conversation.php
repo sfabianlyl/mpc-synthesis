@@ -27,6 +27,8 @@ use Illuminate\Support\Carbon;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Extraction> $extractions
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisDraft> $synthesisDrafts
  * @property-read SynthesisSummary $synthesisSummary
+ * @property-read DioceseDecisionPart|null $dioceseDecisionPart
+ * @property-read NationalDecisionPart|null $nationalDecisionPart
  */
 class Conversation extends Model
 {
@@ -114,19 +116,36 @@ class Conversation extends Model
     }
 
     /**
-     * Get the individual pastoral decision drafts for this conversation.
+     * Get the diocese-level decision drafts for this conversation.
      */
-    public function decisionDrafts(): HasMany
+    public function dioceseDecisionDrafts(): HasMany
     {
-        return $this->hasMany(DecisionDraft::class);
+        return $this->hasMany(DioceseDecisionDraft::class);
     }
 
     /**
-     * Get the shared decision part for this conversation.
+     * Get the national-level decision drafts for this conversation.
      */
-    public function decisionPart(): HasOne
+    public function nationalDecisionDrafts(): HasMany
     {
-        return $this->hasOne(DecisionPart::class);
+        return $this->hasMany(NationalDecisionDraft::class);
+    }
+
+    /**
+     * Get the diocese-level decision part for this conversation.
+     */
+    public function dioceseDecisionPart(): HasOne
+    {
+        return $this->hasOne(DioceseDecisionPart::class);
+    }
+
+    /**
+     * Get the national-level decision part for this conversation.
+     */
+    public function nationalDecisionPart(): HasOne
+    {
+        return $this->hasOne(NationalDecisionPart::class);
     }
 }
+
 

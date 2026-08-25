@@ -30,7 +30,11 @@ interface ConversationItem {
     submitted_drafts_count: number;
     total_pastoral_count: number;
     all_drafts_submitted: boolean;
-    decision_part_exists: boolean;
+    diocese_decision_part_exists?: boolean;
+    diocese_decision_part_submitted?: boolean;
+    national_decision_part_exists?: boolean;
+    national_decision_part_submitted?: boolean;
+    decision_part_exists?: boolean;
     decision_part_submitted: boolean;
     media_files: Array<{ name: string; path: string; size: number }>;
 }

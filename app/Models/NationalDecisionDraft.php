@@ -9,7 +9,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property int $event_id
+ * @property int $conversation_id
  * @property int $user_id
  * @property int|null $diocese_id
  * @property string|null $draft_text
@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $submitted_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read Event $event
+ * @property-read Conversation $conversation
  * @property-read User $user
  * @property-read Diocese|null $diocese
  */
@@ -26,7 +26,7 @@ class NationalDecisionDraft extends Model
     use HasFactory;
 
     protected $fillable = [
-        'event_id',
+        'conversation_id',
         'user_id',
         'diocese_id',
         'draft_text',
@@ -43,11 +43,11 @@ class NationalDecisionDraft extends Model
     }
 
     /**
-     * Get the event this national decision draft belongs to.
+     * Get the conversation this national decision draft belongs to.
      */
-    public function event(): BelongsTo
+    public function conversation(): BelongsTo
     {
-        return $this->belongsTo(Event::class);
+        return $this->belongsTo(Conversation::class);
     }
 
     /**
@@ -66,3 +66,4 @@ class NationalDecisionDraft extends Model
         return $this->belongsTo(Diocese::class);
     }
 }
+

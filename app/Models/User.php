@@ -170,10 +170,18 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the decision drafts created by this user.
+     * Get the national decision drafts created by this user.
      */
-    public function decisionDrafts(): HasMany
+    public function nationalDecisionDrafts(): HasMany
     {
-        return $this->hasMany(DecisionDraft::class, 'user_id');
+        return $this->hasMany(NationalDecisionDraft::class, 'user_id');
+    }
+
+    /**
+     * Get the diocese decision drafts created by this user.
+     */
+    public function dioceseDecisionDrafts(): HasMany
+    {
+        return $this->hasMany(DioceseDecisionDraft::class, 'user_id');
     }
 }

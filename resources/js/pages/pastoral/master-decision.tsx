@@ -11,6 +11,8 @@ import {
     Save,
     Printer,
     Layers,
+    Globe,
+    Building2,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -20,12 +22,22 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 
+interface DecisionPartItem {
+    id: number;
+    diocesan_text?: string | null;
+    national_text?: string | null;
+    is_submitted: boolean;
+    submitted_at: string | null;
+}
+
 interface ConversationPartItem {
     id: number;
     title: string;
     description: string | null;
     status: string;
-    decision_part: {
+    diocese_decision_part: DecisionPartItem | null;
+    national_decision_part: DecisionPartItem | null;
+    decision_part?: {
         id: number;
         consolidated_text: string | null;
         is_submitted: boolean;
@@ -110,6 +122,10 @@ export default function MasterDecisionPage({
                 preserveScroll: true,
                 onSuccess: (page: any) => {
                     setIsGenerating(false);
+                    const respProps = page.props as any;
+                    if (respProps.masterDecision?.master_text) {
+                        setMasterText(respProps.masterDecision.master_text);
+                    }
                     if (page.props.flash?.success) {
                         setStatusMessage({ type: 'success', text: page.props.flash.success });
                     }
@@ -191,7 +207,7 @@ export default function MasterDecisionPage({
                             Event: <span className="font-semibold text-foreground">{event.title}</span>
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            Consolidate and finalize the official event-wide pastoral statement from all session Decision Parts.
+                            Consolidate and finalize the official event-wide pastoral statement from all session National and Diocese Decision Parts.
                         </p>
                     </div>
 
@@ -219,7 +235,7 @@ export default function MasterDecisionPage({
                     <div
                         className={`flex items-center gap-2 p-4 rounded-lg border ${
                             statusMessage.type === 'success'
-                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                                 : 'bg-destructive/10 border-destructive/20 text-destructive'
                         }`}
                     >
@@ -242,7 +258,7 @@ export default function MasterDecisionPage({
                             <div className="space-y-1">
                                 <h3 className="text-lg font-semibold">Master Decision Locked</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    All session Decision Parts within this event must be finalized before the Master Pastoral Decision can be produced.
+                                    All session Decision Parts (National and Diocese) within this event must be finalized before the Master Pastoral Decision can be produced.
                                 </p>
                             </div>
 
@@ -251,25 +267,31 @@ export default function MasterDecisionPage({
                                 <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
                                     Session Decision Parts Status:
                                 </p>
-                                {conversationsWithParts.map((c) => (
-                                    <div
-                                        key={c.id}
-                                        className="flex items-center justify-between p-2.5 rounded-md border bg-background text-sm"
-                                    >
-                                        <span className="font-medium">{c.title}</span>
-                                        {c.decision_part?.is_submitted ? (
-                                            <Badge variant="default" className="bg-emerald-600 text-xs flex items-center gap-1">
-                                                <CheckCircle2 className="size-3" /> Finalized
-                                            </Badge>
-                                        ) : (
-                                            <Link href={`/pastoral/collaborate/${c.id}`}>
-                                                <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
-                                                    Collaborate <ArrowRight className="size-3" />
-                                                </Button>
-                                            </Link>
-                                        )}
-                                    </div>
-                                ))}
+                                {conversationsWithParts.map((c) => {
+                                    const isPartsSubmitted = Boolean(
+                                        (c.diocese_decision_part?.is_submitted && c.national_decision_part?.is_submitted) ||
+                                        c.decision_part?.is_submitted
+                                    );
+                                    return (
+                                        <div
+                                            key={c.id}
+                                            className="flex items-center justify-between p-2.5 rounded-md border bg-background text-sm"
+                                        >
+                                            <span className="font-medium">{c.title}</span>
+                                            {isPartsSubmitted ? (
+                                                <Badge variant="default" className="bg-emerald-600 text-xs flex items-center gap-1">
+                                                    <CheckCircle2 className="size-3" /> Finalized
+                                                </Badge>
+                                            ) : (
+                                                <Link href={`/pastoral/collaborate/${c.id}`}>
+                                                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                                                        Collaborate <ArrowRight className="size-3" />
+                                                    </Button>
+                                                </Link>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <Link href="/pastoral/dashboard">
@@ -311,24 +333,47 @@ export default function MasterDecisionPage({
 
                             {/* Active Session Content */}
                             {selectedConversation && (
-                                <Card className="border-sidebar-border/60">
-                                    <CardHeader className="pb-3 bg-muted/20 border-b">
-                                        <div className="flex items-center justify-between">
-                                            <CardTitle className="text-base">{selectedConversation.title}</CardTitle>
-                                            <Badge variant="default" className="bg-emerald-600 text-xs">
-                                                Part Finalized
-                                            </Badge>
-                                        </div>
-                                        {selectedConversation.decision_part?.submitted_by && (
-                                            <CardDescription className="text-xs">
-                                                Finalized by {selectedConversation.decision_part.submitted_by}
-                                            </CardDescription>
-                                        )}
-                                    </CardHeader>
-                                    <CardContent className="pt-4 text-sm leading-relaxed max-h-[600px] overflow-y-auto font-mono text-xs whitespace-pre-wrap">
-                                        {selectedConversation.decision_part?.consolidated_text || 'No content provided.'}
-                                    </CardContent>
-                                </Card>
+                                <div className="space-y-3">
+                                    {/* National Part */}
+                                    <Card className="border-sidebar-border/60 shadow-xs">
+                                        <CardHeader className="py-2.5 px-3 bg-muted/20 border-b flex flex-row items-center justify-between">
+                                            <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-indigo-700 dark:text-indigo-400">
+                                                <Globe className="size-3.5" />
+                                                National Decision Part
+                                            </CardTitle>
+                                            {selectedConversation.national_decision_part?.is_submitted && (
+                                                <Badge variant="default" className="bg-emerald-600 text-[10px] px-1.5 py-0">
+                                                    Finalized
+                                                </Badge>
+                                            )}
+                                        </CardHeader>
+                                        <CardContent className="p-3 text-xs leading-relaxed max-h-[300px] overflow-y-auto font-mono whitespace-pre-wrap">
+                                            {selectedConversation.national_decision_part?.national_text || (
+                                                <span className="text-muted-foreground italic">No national decision part content.</span>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Diocese Part */}
+                                    <Card className="border-sidebar-border/60 shadow-xs">
+                                        <CardHeader className="py-2.5 px-3 bg-muted/20 border-b flex flex-row items-center justify-between">
+                                            <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-violet-700 dark:text-violet-400">
+                                                <Building2 className="size-3.5" />
+                                                Diocese Decision Part
+                                            </CardTitle>
+                                            {selectedConversation.diocese_decision_part?.is_submitted && (
+                                                <Badge variant="default" className="bg-emerald-600 text-[10px] px-1.5 py-0">
+                                                    Finalized
+                                                </Badge>
+                                            )}
+                                        </CardHeader>
+                                        <CardContent className="p-3 text-xs leading-relaxed max-h-[300px] overflow-y-auto font-mono whitespace-pre-wrap">
+                                            {selectedConversation.diocese_decision_part?.diocesan_text || (
+                                                <span className="text-muted-foreground italic">No diocese decision part content.</span>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </div>
                             )}
                         </div>
 

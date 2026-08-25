@@ -288,15 +288,14 @@ export interface DecisionSummary {
 }
 
 /**
- * DecisionDraft represents an individual's decision draft submission per conversation.
+ * DioceseDecisionDraft represents an individual's diocese-level decision draft submission per conversation.
  */
-export interface DecisionDraft {
+export interface DioceseDecisionDraft {
     id: number;
     conversation_id: number;
     user_id: number;
     diocese_id: number | null;
-    national_text: string | null;
-    diocesan_text: string | null;
+    draft_text: string | null;
     is_submitted: boolean;
     submitted_at: string | null;
     created_at: string;
@@ -314,27 +313,54 @@ export interface DecisionDraft {
 }
 
 /**
- * DecisionPart represents the shared decision part for a conversation.
+ * NationalDecisionDraft represents an individual's national-level decision draft submission per conversation.
  */
-export interface DecisionPart {
+export interface NationalDecisionDraft {
     id: number;
     conversation_id: number;
-    submitted_by_user_id: number | null;
-    national_text: string | null;
-    diocesan_text: string | null;
-    consolidated_text: string | null;
+    user_id: number;
+    diocese_id: number | null;
+    draft_text: string | null;
     is_submitted: boolean;
     submitted_at: string | null;
-    generated_by: string | null;
-    generated_at: string | null;
     created_at: string;
     updated_at: string;
-    conversation?: Conversation;
-    submitted_by?: {
+    user?: {
         id: number;
         name: string;
         email: string;
-    } | string;
+    };
+    diocese?: {
+        id: number;
+        name: string;
+        code: string;
+    };
+}
+
+/**
+ * DioceseDecisionPart represents the diocese-level decision part for a conversation.
+ */
+export interface DioceseDecisionPart {
+    id: number;
+    conversation_id: number;
+    diocesan_text: string | null;
+    is_submitted: boolean;
+    submitted_at: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * NationalDecisionPart represents the national-level decision part for a conversation.
+ */
+export interface NationalDecisionPart {
+    id: number;
+    conversation_id: number;
+    national_text: string | null;
+    is_submitted: boolean;
+    submitted_at: string | null;
+    created_at: string;
+    updated_at: string;
 }
 
 /**
@@ -376,40 +402,6 @@ export type Stats = {
     draft_reports: number;
     documents_created: number;
 };
-
-/**
- * NationalDecisionDraft represents a national-level decision draft by a pastoral member for an event.
- */
-export interface NationalDecisionDraft {
-    id: number;
-    event_id: number;
-    user_id: number;
-    diocese_id: number | null;
-    draft_text: string | null;
-    is_submitted: boolean;
-    submitted_at: string | null;
-    created_at: string;
-    updated_at: string;
-    user?: { id: number; name: string; email: string };
-    diocese?: { id: number; name: string; code: string };
-}
-
-/**
- * DioceseDecisionDraft represents a diocese-level decision draft by a pastoral member for an event.
- */
-export interface DioceseDecisionDraft {
-    id: number;
-    event_id: number;
-    user_id: number;
-    diocese_id: number | null;
-    draft_text: string | null;
-    is_submitted: boolean;
-    submitted_at: string | null;
-    created_at: string;
-    updated_at: string;
-    user?: { id: number; name: string; email: string };
-    diocese?: { id: number; name: string; code: string };
-}
 
 /**
  * MasterDecisionSummary represents the consolidated master decision summary for an event.

@@ -47,19 +47,19 @@ class Event extends Model
     }
 
     /**
-     * Get the national decision drafts for this event.
+     * Get the national decision drafts for this event through conversations.
      */
-    public function nationalDecisionDrafts(): HasMany
+    public function nationalDecisionDrafts()
     {
-        return $this->hasMany(NationalDecisionDraft::class);
+        return $this->hasManyThrough(NationalDecisionDraft::class, Conversation::class);
     }
 
     /**
-     * Get the diocese decision drafts for this event.
+     * Get the diocese decision drafts for this event through conversations.
      */
-    public function dioceseDecisionDrafts(): HasMany
+    public function dioceseDecisionDrafts()
     {
-        return $this->hasMany(DioceseDecisionDraft::class);
+        return $this->hasManyThrough(DioceseDecisionDraft::class, Conversation::class);
     }
 
     /**
@@ -79,10 +79,18 @@ class Event extends Model
     }
 
     /**
-     * Get all decision parts for the conversations of this event.
+     * Get all diocese decision parts for the conversations of this event.
      */
-    public function decisionParts()
+    public function dioceseDecisionParts()
     {
-        return $this->hasManyThrough(DecisionPart::class, Conversation::class);
+        return $this->hasManyThrough(DioceseDecisionPart::class, Conversation::class);
+    }
+
+    /**
+     * Get all national decision parts for the conversations of this event.
+     */
+    public function nationalDecisionParts()
+    {
+        return $this->hasManyThrough(NationalDecisionPart::class, Conversation::class);
     }
 }

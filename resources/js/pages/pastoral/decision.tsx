@@ -31,10 +31,9 @@ interface ConversationData {
     } | null;
 }
 
-interface DraftData {
+interface IndividualDraftItem {
     id: number | null;
-    national_text: string | null;
-    diocesan_text: string | null;
+    draft_text: string | null;
     is_submitted: boolean;
     submitted_at: string | null;
 }
@@ -49,7 +48,14 @@ interface MemberProgress {
 interface DecisionPageProps {
     conversation: ConversationData;
     eventConversations: Array<{ id: number; title: string; event_id: number | null }>;
-    draft: DraftData | null;
+    dioceseDraft?: IndividualDraftItem | null;
+    nationalDraft?: IndividualDraftItem | null;
+    draft?: {
+        national_text?: string | null;
+        diocesan_text?: string | null;
+        is_submitted?: boolean;
+        submitted_at?: string | null;
+    } | null;
     submissionProgress: {
         total: number;
         submitted_count: number;
@@ -60,21 +66,26 @@ interface DecisionPageProps {
 export default function Decision({
     conversation,
     eventConversations = [],
+    dioceseDraft,
+    nationalDraft,
     draft,
     submissionProgress,
 }: DecisionPageProps) {
     const { flash } = usePage().props as any;
-    const [nationalText, setNationalText] = useState(draft?.national_text ?? '');
-    const [diocesanText, setDiocesanText] = useState(draft?.diocesan_text ?? '');
+    const initialNationalText = nationalDraft?.draft_text ?? draft?.national_text ?? '';
+    const initialDiocesanText = dioceseDraft?.draft_text ?? draft?.diocesan_text ?? '';
+
+    const [nationalText, setNationalText] = useState(initialNationalText);
+    const [diocesanText, setDiocesanText] = useState(initialDiocesanText);
     const [isSaving, setIsSaving] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-    // Sync state when draft prop changes
+    // Sync state when draft props change
     useEffect(() => {
-        setNationalText(draft?.national_text ?? '');
-        setDiocesanText(draft?.diocesan_text ?? '');
-    }, [draft]);
+        setNationalText(nationalDraft?.draft_text ?? draft?.national_text ?? '');
+        setDiocesanText(dioceseDraft?.draft_text ?? draft?.diocesan_text ?? '');
+    }, [nationalDraft, dioceseDraft, draft]);
 
     // Handle flash messages
     useEffect(() => {
@@ -91,7 +102,8 @@ export default function Decision({
         }
     }, [flash]);
 
-    const isSubmitted = Boolean(draft?.is_submitted);
+    const isSubmitted = Boolean(dioceseDraft?.is_submitted || nationalDraft?.is_submitted || draft?.is_submitted);
+    const submittedAt = nationalDraft?.submitted_at || dioceseDraft?.submitted_at || draft?.submitted_at;
 
     const handleSaveDraft = (submitFinal: boolean = false) => {
         if (submitFinal) {
@@ -104,8 +116,8 @@ export default function Decision({
         router.post(
             `/pastoral/decision/${conversation.id}`,
             {
-                national_text: nationalText || null,
-                diocesan_text: diocesanText || null,
+                diocese_draft_text: diocesanText || null,
+                national_draft_text: nationalText || null,
                 is_submitted: submitFinal,
             },
             {
@@ -274,10 +286,10 @@ export default function Decision({
                 </Card>
 
                 {/* ─── Submission Timestamp ───────────────────────── */}
-                {draft?.submitted_at && (
+                {submittedAt && (
                     <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <CheckCircle2 className="size-3.5 text-emerald-600" />
-                        Submitted on {new Date(draft.submitted_at).toLocaleString()}
+                        Submitted on {new Date(submittedAt).toLocaleString()}
                     </div>
                 )}
 
