@@ -25,12 +25,17 @@ interface MasterDecision {
 interface ConversationPartItem {
     id: number;
     title: string;
-    decision_part: {
+    diocese_decision_part: {
         id: number;
-        consolidated_text: string | null;
+        diocesan_text: string | null;
         is_submitted: boolean;
         submitted_at: string | null;
-        submitted_by: string | null;
+    } | null;
+    national_decision_part: {
+        id: number;
+        national_text: string | null;
+        is_submitted: boolean;
+        submitted_at: string | null;
     } | null;
 }
 
@@ -108,11 +113,11 @@ export default function BishopOverview({ event, masterDecision, conversationsWit
                     </CardContent>
                 </Card>
 
-                {/* Session Decision Parts */}
+                {/* DioceseDecisionParts */}
                 <div className="space-y-4">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
                         <BookOpen className="size-5 text-indigo-600 print:text-black" />
-                        Session Decision Parts
+                        DioceseDecisionParts
                     </h2>
 
                     {conversationsWithParts.length > 0 ? (
@@ -122,7 +127,7 @@ export default function BishopOverview({ event, masterDecision, conversationsWit
                                     <CardHeader className="pb-2 bg-muted/15 print:bg-transparent">
                                         <div className="flex items-center justify-between">
                                             <CardTitle className="text-sm font-semibold">{item.title}</CardTitle>
-                                            {item.decision_part?.is_submitted && (
+                                            {(item.diocese_decision_part?.is_submitted || item.national_decision_part?.is_submitted) && (
                                                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                                                     <CheckCircle2 className="size-3" /> Finalized
                                                 </span>
@@ -130,10 +135,25 @@ export default function BishopOverview({ event, masterDecision, conversationsWit
                                         </div>
                                     </CardHeader>
                                     <CardContent className="pt-3">
-                                        {item.decision_part?.consolidated_text ? (
-                                            <div className="whitespace-pre-wrap text-xs leading-relaxed text-foreground p-3 bg-muted/20 print:bg-transparent rounded-md font-mono">
-                                                {item.decision_part.consolidated_text}
-                                            </div>
+                                        {item.diocese_decision_part?.diocesan_text || item.national_decision_part?.national_text ? (
+                                            <>
+                                                {item.diocese_decision_part?.diocesan_text && (
+                                                    <div className="mb-3">
+                                                        <p className="text-xs font-medium text-muted-foreground mb-1">Diocesan Text</p>
+                                                        <div className="whitespace-pre-wrap text-xs leading-relaxed text-foreground p-3 bg-muted/20 print:bg-transparent rounded-md font-mono">
+                                                            {item.diocese_decision_part.diocesan_text}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {item.national_decision_part?.national_text && (
+                                                    <div>
+                                                        <p className="text-xs font-medium text-muted-foreground mb-1">National Text</p>
+                                                        <div className="whitespace-pre-wrap text-xs leading-relaxed text-foreground p-3 bg-muted/20 print:bg-transparent rounded-md font-mono">
+                                                            {item.national_decision_part.national_text}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
                                         ) : (
                                             <p className="text-xs italic text-muted-foreground">
                                                 No decision part finalized for this session.

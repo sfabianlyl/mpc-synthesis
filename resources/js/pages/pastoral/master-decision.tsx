@@ -176,6 +176,7 @@ export default function MasterDecisionPage({
                 preserveScroll: true,
                 onSuccess: () => {
                     setIsFinalizing(false);
+                    window.location.href = `/pastoral/bishop-overview/${event.id}`;
                 },
                 onError: (errors: any) => {
                     setIsFinalizing(false);
