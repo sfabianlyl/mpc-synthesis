@@ -55,6 +55,20 @@ class PastoralController extends Controller
 
         return $submittedCount >= $totalMembers;
     }
+    private function areAllDecisionPartsSubmittedForEvent(Event $event): bool
+    {
+        $conversationIds = $event->conversations()->pluck('id');
+        if ($conversationIds->isEmpty()) {
+            return false;
+        }
+
+
+        $submittedNationalCount = NationalDecisionPart::whereIn('conversation_id', $conversationIds)
+            ->where('is_submitted', true)
+            ->count();
+
+        return $submittedNationalCount === $conversationIds->count();
+    }
 public function index(Request $request): Response
     {
         $this->authorizePastoralAccess($request);
