@@ -140,7 +140,7 @@ public function index(Request $request): Response
                     // Stage 2: Shared Decision Parts (split per level)
                     'national_decision_part_exists' => (bool) $nationalDecisionPart,
                     'national_decision_part_submitted' => (bool) $nationalDecisionPart?->is_submitted,
-                    'decision_part_submitted' => (bool) ($dioceseDecisionPart?->is_submitted && $nationalDecisionPart?->is_submitted),
+                    'decision_part_submitted' => (bool) ($nationalDecisionPart?->is_submitted),
 
                     'media_files' => $mediaFiles,
                 ];
