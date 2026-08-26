@@ -90,7 +90,7 @@ class PastoralAndDiscernmentMembersSeeder extends Seeder
                 ]
             );
         User::firstOrCreate(
-                ['email' => "richard@gerejakatolik.my",
+                ['email' => "richard@gerejakatolik.my"],
                 [
                     'name' => "Bishop Richard Ng",
                     'role' => 'pastoral',
