@@ -62,22 +62,19 @@ public function index(Request $request): Response
         $user = $request->user();
         $totalPastoralCount = $this->getTotalPastoralMembersCount();
 
-        $conversations = Conversation::with(['event', 'masterSynthesis', 'dioceseDecisionPart', 'nationalDecisionPart'])
+        $conversations = Conversation::with(['event', 'masterSynthesis',  'nationalDecisionPart'])
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($conversation) use ($user, $totalPastoralCount) {
                 $masterSynthesis = $conversation->masterSynthesis;
 
                 // Check conversation-level submission status for this user
-                $dioceseDraft = DioceseDecisionDraft::where('conversation_id', $conversation->id)
-                    ->where('user_id', $user->id)
-                    ->first();
+                
                 $nationalDraft = NationalDecisionDraft::where('conversation_id', $conversation->id)
                     ->where('user_id', $user->id)
                     ->first();
 
-                $userDraftSubmitted = ($dioceseDraft && $dioceseDraft->is_submitted) ||
-                                      ($nationalDraft && $nationalDraft->is_submitted);
+                $userDraftSubmitted = ($nationalDraft && $nationalDraft->is_submitted);
 
                 // Count submitted drafts for this specific conversation
                 $submittedCount = 0;
@@ -96,7 +93,6 @@ public function index(Request $request): Response
 
                 $allDraftsSubmitted = $totalPastoralCount > 0 && $submittedCount >= $totalPastoralCount;
 
-                $dioceseDecisionPart = $conversation->dioceseDecisionPart;
                 $nationalDecisionPart = $conversation->nationalDecisionPart;
 
                 // Check media files
@@ -145,8 +141,6 @@ public function index(Request $request): Response
                     'all_drafts_submitted' => $allDraftsSubmitted,
 
                     // Stage 2: Shared Decision Parts (split per level)
-                    'diocese_decision_part_exists' => (bool) $dioceseDecisionPart,
-                    'diocese_decision_part_submitted' => (bool) $dioceseDecisionPart?->is_submitted,
                     'national_decision_part_exists' => (bool) $nationalDecisionPart,
                     'national_decision_part_submitted' => (bool) $nationalDecisionPart?->is_submitted,
                     'decision_part_submitted' => (bool) ($dioceseDecisionPart?->is_submitted && $nationalDecisionPart?->is_submitted),
