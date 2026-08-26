@@ -81,10 +81,7 @@ public function index(Request $request): Response
                 if ($totalPastoralCount > 0) {
                     $submittedCount = User::whereIn('role', ['pastoral', 'discernment'])
                         ->where(function ($query) use ($conversation) {
-                            $query->whereHas('dioceseDecisionDrafts', function ($q) use ($conversation) {
-                                $q->where('conversation_id', $conversation->id)->where('is_submitted', true);
-                            })
-                            ->orWhereHas('nationalDecisionDrafts', function ($q) use ($conversation) {
+                            $query->whereHas('nationalDecisionDrafts', function ($q) use ($conversation) {
                                 $q->where('conversation_id', $conversation->id)->where('is_submitted', true);
                             });
                         })
