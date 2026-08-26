@@ -17,13 +17,11 @@ export type {
     EnrichedDocumentChunk,
     DocumentRetrievalResponse,
     Event,
-    DioceseDecisionPart,
     NationalDecisionPart,
     MasterDecision,
     Diocese,
     Stats,
     NationalDecisionDraft,
-    DioceseDecisionDraft,
     MasterDecisionSummary,
     MediaFile,
 } from './models';

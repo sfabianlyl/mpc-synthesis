@@ -21,7 +21,6 @@ use Illuminate\Support\Carbon;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Conversation> $conversations
  * @property-read \Illuminate\Database\Eloquent\Collection<int, NationalDecisionDraft> $nationalDecisionDrafts
- * @property-read \Illuminate\Database\Eloquent\Collection<int, DioceseDecisionDraft> $dioceseDecisionDrafts
  * @property-read MasterDecisionSummary|null $masterDecisionSummary
  */
 class Event extends Model
@@ -55,14 +54,6 @@ class Event extends Model
     }
 
     /**
-     * Get the diocese decision drafts for this event through conversations.
-     */
-    public function dioceseDecisionDrafts()
-    {
-        return $this->hasManyThrough(DioceseDecisionDraft::class, Conversation::class);
-    }
-
-    /**
      * Get the master decision summary for this event.
      */
     public function masterDecisionSummary(): HasOne
@@ -77,18 +68,6 @@ class Event extends Model
     {
         return $this->hasOne(MasterDecision::class);
     }
-
-    /**
-     * Get all diocese decision parts for the conversations of this event.
-     */
-    public function dioceseDecisionParts()
-    {
-        return $this->hasManyThrough(DioceseDecisionPart::class, Conversation::class);
-    }
-
-    /**
-     * Get all national decision parts for the conversations of this event.
-     */
     public function nationalDecisionParts()
     {
         return $this->hasManyThrough(NationalDecisionPart::class, Conversation::class);

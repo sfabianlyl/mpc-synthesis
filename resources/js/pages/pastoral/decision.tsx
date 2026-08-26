@@ -7,7 +7,6 @@ import {
     Shield,
     Sparkles,
     Users,
-    ChevronRight,
     ArrowRight,
     Save,
     FolderOpen,
@@ -58,11 +57,9 @@ interface DecisionPageProps {
         is_submitted: boolean;
         submitted_at: string | null;
     } | null;
-    dioceseDraft?: IndividualDraftItem | null;
     nationalDraft?: IndividualDraftItem | null;
     draft?: {
         national_text?: string | null;
-        diocesan_text?: string | null;
         is_submitted?: boolean;
         submitted_at?: string | null;
     } | null;
@@ -77,17 +74,14 @@ export default function Decision({
     conversation,
     eventConversations = [],
     masterSynthesis,
-    dioceseDraft,
     nationalDraft,
     draft,
     submissionProgress,
 }: DecisionPageProps) {
     const { flash } = usePage().props as any;
     const initialNationalText = nationalDraft?.draft_text ?? draft?.national_text ?? '';
-    const initialDiocesanText = dioceseDraft?.draft_text ?? draft?.diocesan_text ?? '';
 
     const [nationalText, setNationalText] = useState(initialNationalText);
-    const [diocesanText, setDiocesanText] = useState(initialDiocesanText);
     const [isSaving, setIsSaving] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -95,8 +89,7 @@ export default function Decision({
     // Sync state when draft props change
     useEffect(() => {
         setNationalText(nationalDraft?.draft_text ?? draft?.national_text ?? '');
-        setDiocesanText(dioceseDraft?.draft_text ?? draft?.diocesan_text ?? '');
-    }, [nationalDraft, dioceseDraft, draft]);
+    }, [nationalDraft, draft]);
 
     // Handle flash messages
     useEffect(() => {
@@ -113,8 +106,8 @@ export default function Decision({
         }
     }, [flash]);
 
-    const isSubmitted = Boolean(dioceseDraft?.is_submitted || nationalDraft?.is_submitted || draft?.is_submitted);
-    const submittedAt = nationalDraft?.submitted_at || dioceseDraft?.submitted_at || draft?.submitted_at;
+    const isSubmitted = Boolean(nationalDraft?.is_submitted || draft?.is_submitted);
+    const submittedAt = nationalDraft?.submitted_at || draft?.submitted_at;
 
     const handleSaveDraft = (submitFinal: boolean = false) => {
         if (submitFinal) {
@@ -127,7 +120,6 @@ export default function Decision({
         router.post(
             `/pastoral/decision/${conversation.id}`,
             {
-                diocese_draft_text: diocesanText || null,
                 national_draft_text: nationalText || null,
                 is_submitted: submitFinal,
             },
@@ -148,7 +140,6 @@ export default function Decision({
     };
 
     const nationalCharCount = nationalText.length;
-    const diocesanCharCount = diocesanText.length;
 
     return (
         <>
@@ -158,7 +149,7 @@ export default function Decision({
                 {eventConversations.length > 1 && (
                     <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b">
                         <span className="text-xs font-semibold uppercase text-muted-foreground mr-2 shrink-0">
-                            Sessions:
+                            Conversations:
                         </span>
                         {eventConversations.map((conv) => {
                             const isCurrent = conv.id === conversation.id;
@@ -184,9 +175,9 @@ export default function Decision({
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-3xl font-bold tracking-tight">Pastoral Decision Draft</h1>
+                            <h1 className="text-3xl font-bold tracking-tight">Pastoral Discernment Pathways</h1>
                             <Badge variant="outline" className="text-xs">
-                                Step 1 of 3: Individual Draft
+                                Step 1 of 3: Individual
                             </Badge>
                         </div>
                         <p className="text-muted-foreground mt-1 text-base">
@@ -350,7 +341,7 @@ export default function Decision({
                     <div className="space-y-4">
                         <h2 className="text-xl font-semibold flex items-center gap-2 text-foreground pb-1 border-b">
                             <Shield className="size-5 text-indigo-600" />
-                            Individual Decision Draft
+                            Individual
                         </h2>
 
                         {/* ─── National Level Implementation ─────────── */}
@@ -358,10 +349,10 @@ export default function Decision({
                             <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <Shield className="size-5 text-indigo-600" />
-                                    National Level Implementation
+                                    Pastoral Pathways
                                 </CardTitle>
                                 <CardDescription>
-                                    Provide your strategic discernment and proposals for the national church for this session ({conversation.title}).
+                                    Provide your strategic discernment and proposals for the Malaysian church for this session ({conversation.title}).
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="pt-6 space-y-3">
@@ -380,33 +371,7 @@ export default function Decision({
                                 </div>
                             </CardContent>
                         </Card>
-                        {/* ─── Diocesan Level Implementation ─────────── */}
-                        <Card className={isSubmitted ? 'border-emerald-500/30' : ''}>
-                            <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 py-4">
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                    <Shield className="size-5 text-indigo-600" />
-                                    Diocesan Level Implementation
-                                </CardTitle>
-                                <CardDescription>
-                                    Provide your diocesan-level pastoral proposals and considerations for this session ({conversation.title}).
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="pt-6 space-y-3">
-                                <textarea
-                                    value={diocesanText}
-                                    onChange={(e) => setDiocesanText(e.target.value)}
-                                    placeholder="Enter your diocesan-level proposals and pastoral considerations..."
-                                    rows={8}
-                                    disabled={isSubmitted}
-                                    className="w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-75"
-                                />
-                                <div className="flex justify-end">
-                                    <span className="text-xs text-muted-foreground">
-                                        {diocesanCharCount} character{diocesanCharCount !== 1 ? 's' : ''}
-                                    </span>
-                                </div>
-                            </CardContent>
-                        </Card>
+
 
                         {/* ─── Submission Timestamp ───────────────────── */}
                         {submittedAt && (
@@ -442,7 +407,7 @@ export default function Decision({
                                 </Button>
                                 <Button
                                     onClick={() => handleSaveDraft(true)}
-                                    disabled={isSaving || isSubmitting || (!nationalText.trim() && !diocesanText.trim())}
+                                    disabled={isSaving || isSubmitting || !nationalText.trim()}
                                     className="gap-2 bg-indigo-600 hover:bg-indigo-700"
                                 >
                                     {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}

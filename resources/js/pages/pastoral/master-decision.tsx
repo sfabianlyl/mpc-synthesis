@@ -4,27 +4,21 @@ import {
     Loader2,
     CheckCircle2,
     XCircle,
-    FileText,
-    Shield,
-    Lock,
-    ArrowRight,
     Save,
     Printer,
     Layers,
     Globe,
-    Building2,
+    Shield,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 
 interface DecisionPartItem {
     id: number;
-    diocesan_text?: string | null;
     national_text?: string | null;
     is_submitted: boolean;
     submitted_at: string | null;
@@ -35,7 +29,6 @@ interface ConversationPartItem {
     title: string;
     description: string | null;
     status: string;
-    diocese_decision_part: DecisionPartItem | null;
     national_decision_part: DecisionPartItem | null;
     decision_part?: {
         id: number;
@@ -78,9 +71,6 @@ export default function MasterDecisionPage({
     const [isSaving, setIsSaving] = useState(false);
     const [isFinalizing, setIsFinalizing] = useState(false);
     const [masterText, setMasterText] = useState(masterDecision?.master_text ?? '');
-    const [selectedSessionTab, setSelectedSessionTab] = useState<number>(
-        conversationsWithParts[0]?.id ?? 0
-    );
 
     useEffect(() => {
         if (masterDecision?.master_text) {
@@ -187,7 +177,6 @@ export default function MasterDecisionPage({
         );
     };
 
-    const selectedConversation = conversationsWithParts.find((c) => c.id === selectedSessionTab) || conversationsWithParts[0];
 
     return (
         <>
@@ -197,16 +186,16 @@ export default function MasterDecisionPage({
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-3xl font-bold tracking-tight">Master Pastoral Decision</h1>
+                            <h1 className="text-3xl font-bold tracking-tight">Overall Pastoral Pathways</h1>
                             <Badge variant="outline" className="text-xs">
-                                Step 3 of 3: Event Master Consolidation
+                                Step 3 of 3: Overall
                             </Badge>
                         </div>
                         <p className="text-muted-foreground mt-1 text-base">
                             Event: <span className="font-semibold text-foreground">{event.title}</span>
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            Consolidate and finalize the official event-wide pastoral statement from all session National and Diocese Decision Parts.
+                            Consolidate and finalize the Overall Pastoral Pathways
                         </p>
                     </div>
 
@@ -214,12 +203,12 @@ export default function MasterDecisionPage({
                         {isFinalized ? (
                             <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1">
                                 <CheckCircle2 className="h-4 w-4" />
-                                Master Decision Finalized
+                                Overall Pathway Finalized
                             </Badge>
                         ) : (
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <Layers className="size-3" />
-                                Sessions: {conversationsWithParts.filter(c => c.diocese_decision_part?.is_submitted && c.national_decision_part?.is_submitted).length}/{conversationsWithParts.length} parts finalized
+                                Conversations: {conversationsWithParts.filter(c => c.national_decision_part?.is_submitted).length}/{conversationsWithParts.length} pathways finalized
                             </div>
                         )}
                     </div>
@@ -245,77 +234,41 @@ export default function MasterDecisionPage({
 
                 {/* ─── Full Editor View (Always Accessible) ─────────── */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* ─── Left Column: Session Decision Parts Review ─ */}
+                        {/* ─── Left Column: All Conversation Pathways ─ */}
                         <div className="lg:col-span-5 flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-lg font-semibold flex items-center gap-2">
                                     <Layers className="size-5 text-indigo-600" />
-                                    Session Decision Parts ({conversationsWithParts.length})
+                                    Conversation Pathways ({conversationsWithParts.length})
                                 </h2>
                             </div>
 
-                            {/* Session Tabs */}
-                            <div className="flex gap-1.5 overflow-x-auto pb-1">
-                                {conversationsWithParts.map((conv) => (
-                                    <Button
-                                        key={conv.id}
-                                        variant={selectedSessionTab === conv.id ? 'default' : 'outline'}
-                                        size="sm"
-                                        onClick={() => setSelectedSessionTab(conv.id)}
-                                        className={`text-xs gap-1 ${
-                                            selectedSessionTab === conv.id ? 'bg-indigo-600 hover:bg-indigo-700' : ''
-                                        }`}
-                                    >
-                                        <CheckCircle2 className="size-3 text-emerald-400" />
-                                        {conv.title}
-                                    </Button>
-                                ))}
+                            <div className="space-y-4 max-h-[700px] overflow-y-auto pr-1">
+                                {conversationsWithParts.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground italic">No conversations found for this event.</p>
+                                ) : (
+                                    conversationsWithParts.map((conv) => (
+                                        <Card key={conv.id} className="border-sidebar-border/60 shadow-xs">
+                                            <CardHeader className="py-2.5 px-3 bg-muted/20 border-b flex flex-row items-center justify-between">
+                                                <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-indigo-700 dark:text-indigo-400">
+                                                    <Globe className="size-3.5" />
+                                                    {conv.title}
+                                                </CardTitle>
+                                                {conv.national_decision_part?.is_submitted && (
+                                                    <Badge variant="default" className="bg-emerald-600 text-[10px] px-1.5 py-0">
+                                                        Finalized
+                                                    </Badge>
+                                                )}
+                                            </CardHeader>
+                                            <CardContent className="p-3 text-xs leading-relaxed max-h-[250px] overflow-y-auto font-mono whitespace-pre-wrap">
+                                                {conv.national_decision_part?.national_text || (
+                                                    <span className="text-muted-foreground italic">No pathway content yet.</span>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    ))
+                                )}
                             </div>
-
-                            {/* Active Session Content */}
-                            {selectedConversation && (
-                                <div className="space-y-3">
-                                    {/* National Part */}
-                                    <Card className="border-sidebar-border/60 shadow-xs">
-                                        <CardHeader className="py-2.5 px-3 bg-muted/20 border-b flex flex-row items-center justify-between">
-                                            <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-indigo-700 dark:text-indigo-400">
-                                                <Globe className="size-3.5" />
-                                                National Decision Part
-                                            </CardTitle>
-                                            {selectedConversation.national_decision_part?.is_submitted && (
-                                                <Badge variant="default" className="bg-emerald-600 text-[10px] px-1.5 py-0">
-                                                    Finalized
-                                                </Badge>
-                                            )}
-                                        </CardHeader>
-                                        <CardContent className="p-3 text-xs leading-relaxed max-h-[300px] overflow-y-auto font-mono whitespace-pre-wrap">
-                                            {selectedConversation.national_decision_part?.national_text || (
-                                                <span className="text-muted-foreground italic">No national decision part content.</span>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-
-                                    {/* Diocese Part */}
-                                    <Card className="border-sidebar-border/60 shadow-xs">
-                                        <CardHeader className="py-2.5 px-3 bg-muted/20 border-b flex flex-row items-center justify-between">
-                                            <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-violet-700 dark:text-violet-400">
-                                                <Building2 className="size-3.5" />
-                                                Diocese Decision Part
-                                            </CardTitle>
-                                            {selectedConversation.diocese_decision_part?.is_submitted && (
-                                                <Badge variant="default" className="bg-emerald-600 text-[10px] px-1.5 py-0">
-                                                    Finalized
-                                                </Badge>
-                                            )}
-                                        </CardHeader>
-                                        <CardContent className="p-3 text-xs leading-relaxed max-h-[300px] overflow-y-auto font-mono whitespace-pre-wrap">
-                                            {selectedConversation.diocese_decision_part?.diocesan_text || (
-                                                <span className="text-muted-foreground italic">No diocese decision part content.</span>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            )}
                         </div>
 
                         {/* ─── Right Column: Master Decision Editor ───── */}
@@ -323,7 +276,7 @@ export default function MasterDecisionPage({
                             <div className="flex items-center justify-between">
                                 <h2 className="text-lg font-semibold flex items-center gap-2">
                                     <Shield className="size-5 text-indigo-600" />
-                                    Official Master Decision
+                                    Overall Pastoral Pathways
                                 </h2>
 
                                 <Button
@@ -389,7 +342,7 @@ export default function MasterDecisionPage({
                                                 className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
                                             >
                                                 {isFinalizing ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
-                                                Finalize Master Decision
+                                                Finalize Overall Pathways
                                             </Button>
                                         </div>
                                     )}
@@ -397,7 +350,7 @@ export default function MasterDecisionPage({
                                     {isFinalized && (
                                         <div className="pt-4 border-t flex justify-between items-center">
                                             <p className="text-xs text-muted-foreground">
-                                                Master Decision finalized and ready for the Bishop's presentation.
+                                                Overall finalized and ready for the Bishop's presentation.
                                             </p>
                                             <Link href={`/pastoral/bishop-overview/${event.id}`}>
                                                 <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700">

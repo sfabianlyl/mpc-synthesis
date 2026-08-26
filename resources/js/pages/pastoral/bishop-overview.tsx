@@ -25,12 +25,6 @@ interface MasterDecision {
 interface ConversationPartItem {
     id: number;
     title: string;
-    diocese_decision_part: {
-        id: number;
-        diocesan_text: string | null;
-        is_submitted: boolean;
-        submitted_at: string | null;
-    } | null;
     national_decision_part: {
         id: number;
         national_text: string | null;
@@ -113,13 +107,6 @@ export default function BishopOverview({ event, masterDecision, conversationsWit
                     </CardContent>
                 </Card>
 
-                {/* DioceseDecisionParts */}
-                <div className="space-y-4">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
-                        <BookOpen className="size-5 text-indigo-600 print:text-black" />
-                        DioceseDecisionParts
-                    </h2>
-
                     {conversationsWithParts.length > 0 ? (
                         <div className="flex flex-col gap-4">
                             {conversationsWithParts.map((item) => (
@@ -127,7 +114,7 @@ export default function BishopOverview({ event, masterDecision, conversationsWit
                                     <CardHeader className="pb-2 bg-muted/15 print:bg-transparent">
                                         <div className="flex items-center justify-between">
                                             <CardTitle className="text-sm font-semibold">{item.title}</CardTitle>
-                                            {(item.diocese_decision_part?.is_submitted || item.national_decision_part?.is_submitted) && (
+                                            {(item.national_decision_part?.is_submitted) && (
                                                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                                                     <CheckCircle2 className="size-3" /> Finalized
                                                 </span>
@@ -135,16 +122,8 @@ export default function BishopOverview({ event, masterDecision, conversationsWit
                                         </div>
                                     </CardHeader>
                                     <CardContent className="pt-3">
-                                        {item.diocese_decision_part?.diocesan_text || item.national_decision_part?.national_text ? (
+                                        {item.national_decision_part?.national_text ? (
                                             <>
-                                                {item.diocese_decision_part?.diocesan_text && (
-                                                    <div className="mb-3">
-                                                        <p className="text-xs font-medium text-muted-foreground mb-1">Diocesan Text</p>
-                                                        <div className="whitespace-pre-wrap text-xs leading-relaxed text-foreground p-3 bg-muted/20 print:bg-transparent rounded-md font-mono">
-                                                            {item.diocese_decision_part.diocesan_text}
-                                                        </div>
-                                                    </div>
-                                                )}
                                                 {item.national_decision_part?.national_text && (
                                                     <div>
                                                         <p className="text-xs font-medium text-muted-foreground mb-1">National Text</p>
@@ -170,7 +149,6 @@ export default function BishopOverview({ event, masterDecision, conversationsWit
                             </CardContent>
                         </Card>
                     )}
-                </div>
             </div>
         </>
     );

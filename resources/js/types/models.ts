@@ -288,38 +288,12 @@ export interface DecisionSummary {
 }
 
 /**
- * DioceseDecisionDraft represents an individual's diocese-level decision draft submission per conversation.
- */
-export interface DioceseDecisionDraft {
-    id: number;
-    conversation_id: number;
-    user_id: number;
-    diocese_id: number | null;
-    draft_text: string | null;
-    is_submitted: boolean;
-    submitted_at: string | null;
-    created_at: string;
-    updated_at: string;
-    user?: {
-        id: number;
-        name: string;
-        email: string;
-    };
-    diocese?: {
-        id: number;
-        name: string;
-        code: string;
-    };
-}
-
-/**
  * NationalDecisionDraft represents an individual's national-level decision draft submission per conversation.
  */
 export interface NationalDecisionDraft {
     id: number;
     conversation_id: number;
     user_id: number;
-    diocese_id: number | null;
     draft_text: string | null;
     is_submitted: boolean;
     submitted_at: string | null;
@@ -335,19 +309,6 @@ export interface NationalDecisionDraft {
         name: string;
         code: string;
     };
-}
-
-/**
- * DioceseDecisionPart represents the diocese-level decision part for a conversation.
- */
-export interface DioceseDecisionPart {
-    id: number;
-    conversation_id: number;
-    diocesan_text: string | null;
-    is_submitted: boolean;
-    submitted_at: string | null;
-    created_at: string;
-    updated_at: string;
 }
 
 /**

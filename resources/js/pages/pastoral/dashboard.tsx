@@ -157,7 +157,7 @@ export default function Dashboard({ conversations = [], events = [] }: PageProps
                                                     }`}
                                                 >
                                                     <FileText className="size-3.5" />
-                                                    {conv.user_draft_submitted ? 'Edit Your Draft' : 'Submit Decision Draft'}
+                                                    Begin Discernment
                                                 </Button>
                                             </Link>
 

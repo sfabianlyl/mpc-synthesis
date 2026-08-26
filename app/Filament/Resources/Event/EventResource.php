@@ -36,8 +36,7 @@ class EventResource extends Resource
     public static function getRelations(): array
     {
         return [
-            \App\Filament\Resources\Event\RelationManagers\NationalDecisionDrafts::class,
-            \App\Filament\Resources\Event\RelationManagers\DioceseDecisionDrafts::class,
+            \App\Filament\Resources\Event\RelationManagers\NationalDecisionDrafts::class
         ];
     }
 
