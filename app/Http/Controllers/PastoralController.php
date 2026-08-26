@@ -55,6 +55,124 @@ class PastoralController extends Controller
 
         return $submittedCount >= $totalMembers;
     }
+public function index(Request $request): Response
+    {
+        $this->authorizePastoralAccess($request);
+
+        $user = $request->user();
+        $totalPastoralCount = $this->getTotalPastoralMembersCount();
+
+        $conversations = Conversation::with(['event', 'masterSynthesis', 'dioceseDecisionPart', 'nationalDecisionPart'])
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($conversation) use ($user, $totalPastoralCount) {
+                $masterSynthesis = $conversation->masterSynthesis;
+
+                // Check conversation-level submission status for this user
+                $dioceseDraft = DioceseDecisionDraft::where('conversation_id', $conversation->id)
+                    ->where('user_id', $user->id)
+                    ->first();
+                $nationalDraft = NationalDecisionDraft::where('conversation_id', $conversation->id)
+                    ->where('user_id', $user->id)
+                    ->first();
+
+                $userDraftSubmitted = ($dioceseDraft && $dioceseDraft->is_submitted) ||
+                                      ($nationalDraft && $nationalDraft->is_submitted);
+
+                // Count submitted drafts for this specific conversation
+                $submittedCount = 0;
+                if ($totalPastoralCount > 0) {
+                    $submittedCount = User::whereIn('role', ['pastoral', 'discernment'])
+                        ->where(function ($query) use ($conversation) {
+                            $query->whereHas('dioceseDecisionDrafts', function ($q) use ($conversation) {
+                                $q->where('conversation_id', $conversation->id)->where('is_submitted', true);
+                            })
+                            ->orWhereHas('nationalDecisionDrafts', function ($q) use ($conversation) {
+                                $q->where('conversation_id', $conversation->id)->where('is_submitted', true);
+                            });
+                        })
+                        ->count();
+                }
+
+                $allDraftsSubmitted = $totalPastoralCount > 0 && $submittedCount >= $totalPastoralCount;
+
+                $dioceseDecisionPart = $conversation->dioceseDecisionPart;
+                $nationalDecisionPart = $conversation->nationalDecisionPart;
+
+                // Check media files
+                $mediaFiles = [];
+                $folder = strtolower(str_replace(' ', '', $conversation->title));
+                $storagePath = 'media/' . $folder;
+                $newPath = storage_path('app/public/' . $storagePath);
+                $oldPath = public_path($folder);
+
+                $files = [];
+                if (is_dir($newPath)) {
+                    $files = scandir($newPath);
+                } elseif (is_dir($oldPath)) {
+                    $files = scandir($oldPath);
+                }
+
+                if ($files) {
+                    foreach ($files as $file) {
+                        if ($file !== '.' && $file !== '..' && is_file(
+                            is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
+                        )) {
+                            $mediaFiles[] = [
+                                'name' => $file,
+                                'path' => '/storage/' . $storagePath . '/' . $file,
+                                'size' => filesize(
+                                    is_dir($newPath) ? "{$newPath}/{$file}" : "{$oldPath}/{$file}"
+                                ),
+                            ];
+                        }
+                    }
+                }
+
+                return [
+                    'id' => $conversation->id,
+                    'title' => $conversation->title,
+                    'status' => $conversation->status,
+                    'description' => $conversation->description,
+                    'event_id' => $conversation->event_id,
+                    'event_title' => $conversation->event?->title,
+                    'has_master_synthesis' => $masterSynthesis !== null,
+
+                    // Stage 1: Individual Draft (conversation-level scope)
+                    'user_draft_submitted' => (bool) $userDraftSubmitted,
+                    'submitted_drafts_count' => $submittedCount,
+                    'total_pastoral_count' => $totalPastoralCount,
+                    'all_drafts_submitted' => $allDraftsSubmitted,
+
+                    // Stage 2: Shared Decision Parts (split per level)
+                    'diocese_decision_part_exists' => (bool) $dioceseDecisionPart,
+                    'diocese_decision_part_submitted' => (bool) $dioceseDecisionPart?->is_submitted,
+                    'national_decision_part_exists' => (bool) $nationalDecisionPart,
+                    'national_decision_part_submitted' => (bool) $nationalDecisionPart?->is_submitted,
+                    'decision_part_submitted' => (bool) ($dioceseDecisionPart?->is_submitted && $nationalDecisionPart?->is_submitted),
+
+                    'media_files' => $mediaFiles,
+                ];
+            });
+
+        $events = Event::with('conversations')->get()->map(function ($event) {
+            $allPartsSubmitted = $this->areAllDecisionPartsSubmittedForEvent($event);
+            $masterDecision = MasterDecision::where('event_id', $event->id)->first();
+
+            return [
+                'id' => $event->id,
+                'title' => $event->title,
+                'conversations_count' => $event->conversations->count(),
+                'all_decision_parts_submitted' => $allPartsSubmitted,
+                'master_decision_submitted' => (bool) $masterDecision?->is_submitted,
+            ];
+        });
+
+        return Inertia::render('pastoral/dashboard', [
+            'conversations' => $conversations,
+            'events' => $events,
+        ]);
+    }
 
     /**
      * GET Per-Conversation Decision Draft (Member Scope - conversation-level scope).
