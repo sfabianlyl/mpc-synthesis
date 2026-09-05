@@ -53,6 +53,14 @@ class SynthesisController extends Controller
                 $q->where('users.id', $user->id);
             });
         })->get();
+        
+        $withoutResponse = Group::whereHas('conversationGroups', function ($query) use ($selectedConversationId, $user) {
+            $query->where('conversation_id', $selectedConversationId)
+                ->whereDoesntHave('responses')
+                ->whereHas('synthesisMembers', function ($memberQuery) use ($user) {
+                    $memberQuery->where('users.id', $user->id);
+                });
+        })->pluck('name')->toArray();
         $assignedGroups=$user->assignedConversationGroups()->where("conversation_id",$selectedConversationId)->get();
 
         $selectedConversation = $conversations->firstWhere('id', $selectedConversationId)
@@ -68,6 +76,7 @@ class SynthesisController extends Controller
             'selectedConversationId' => $selectedConversationId,
             'assignedGroups' => $assignedGroups,
             'isSynthesizer' => $isSynthesizer,
+            'withoutResponse' => $withoutResponse,
         ]);
     }
 

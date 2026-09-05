@@ -15,6 +15,7 @@ interface PageProps {
     responses?: Response[];
     selectedConversationId: number | null;
     isSynthesizer?: boolean;
+    withoutResponse?: string[];
 }
 
 export default function Dashboard({ 
@@ -23,6 +24,7 @@ export default function Dashboard({
     responses,
     selectedConversationId, 
     isSynthesizer,
+    withoutResponse,
 }: PageProps) {
     const { flash } = usePage().props as any;
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -209,6 +211,31 @@ export default function Dashboard({
                                     ))}
                                 </div>
                             )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Groups without responses */}
+                {withoutResponse && withoutResponse.length > 0 && (
+                    <Card className="border-sidebar-border/50">
+                        <CardHeader className="bg-muted/15 border-b border-sidebar-border/30 flex flex-row items-center justify-between pb-4">
+                            <div>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Users className="size-5" />
+                                    Groups without Responses
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <ul>
+                                        {withoutResponse.map((groupName) => (
+                                            <li>{groupName}</li>
+                                        ))}
+
+                                    </ul>
+                                </div>
                         </CardContent>
                     </Card>
                 )}
