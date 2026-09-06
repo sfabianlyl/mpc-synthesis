@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Conversation;
+use App\Models\ConversationGroup;
 use App\Models\Event;
 use App\Models\Group;
 use App\Models\Response;
@@ -27,6 +28,14 @@ class ResponseController extends Controller
             ->where('status', 'active')
             ->get(['id', 'title', 'description']);
 
+        // Check which conversations already have an existing response for this group
+        $existingResponses = ConversationGroup::where('group_id', $group->id)
+            ->whereIn('conversation_id', $conversations->pluck('id'))
+            ->whereHas('responses')
+            ->pluck('conversation_id')
+            ->mapWithKeys(fn ($id) => [(string) $id => true])
+            ->all();
+
         return Inertia::render('public/respond', [
             'event_id' => $event->id,
             'group_id' => $group->id,
@@ -41,6 +50,7 @@ class ResponseController extends Controller
                 'name' => $group->name,
             ],
             'conversations' => $conversations,
+            'existing_responses' => $existingResponses,
         ]);
     }
 
@@ -58,23 +68,36 @@ class ResponseController extends Controller
         $validated = $request->validate([
             'conversation_id' => 'required|exists:conversations,id',
             'consensus_text' => 'required|string|max:5000',
+            'confirm_overwrite' => 'nullable|boolean',
         ]);
 
-        // Check if a response already exists for this conversation and group
-        $existing = Response::where('conversation_id', $validated['conversation_id'])
-            ->where('group_id', $group->id)
-            ->first();
-
-        if ($existing) {
-            return back()->withErrors(['consensus_text' => 'A response has already been submitted for this group in this session.']);
-        }
-
-        Response::create([
+        // Find or create ConversationGroup for this conversation and group
+        $conversationGroup = ConversationGroup::firstOrCreate([
             'conversation_id' => $validated['conversation_id'],
             'group_id' => $group->id,
-            'consensus_text' => $validated['consensus_text'],
-            'submitted_at' => now(),
         ]);
+
+        // Check if a response already exists for this ConversationGroup
+        $existing = Response::where('conversation_group_id', $conversationGroup->id)->latest()->first();
+
+        if ($existing && empty($validated['confirm_overwrite'])) {
+            return back()->withErrors([
+                'existing_response' => 'A response has already been submitted for this group in this session.',
+            ]);
+        }
+
+        if ($existing) {
+            $existing->update([
+                'consensus_text' => $validated['consensus_text'],
+                'submitted_at' => now(),
+            ]);
+        } else {
+            Response::create([
+                'conversation_group_id' => $conversationGroup->id,
+                'consensus_text' => $validated['consensus_text'],
+                'submitted_at' => now(),
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Your response has been submitted successfully.');
     }
@@ -109,23 +132,35 @@ class ResponseController extends Controller
             'conversation_id' => 'required|exists:conversations,id',
             'group_id' => 'required|exists:groups,id',
             'consensus_text' => 'required|string|max:5000',
+            'confirm_overwrite' => 'nullable|boolean',
+        ]);
+
+        $conversationGroup = ConversationGroup::firstOrCreate([
+            'conversation_id' => $validated['conversation_id'],
+            'group_id' => $validated['group_id'],
         ]);
 
         // Check if a response already exists for this session and group
-        $existing = Response::where('conversation_id', $validated['conversation_id'])
-            ->where('group_id', $validated['group_id'])
-            ->first();
+        $existing = Response::where('conversation_group_id', $conversationGroup->id)->latest()->first();
 
-        if ($existing) {
-            return back()->withErrors(['consensus_text' => 'A response has already been submitted for this group in this session.']);
+        if ($existing && empty($validated['confirm_overwrite'])) {
+            return back()->withErrors([
+                'existing_response' => 'A response has already been submitted for this group in this session.',
+            ]);
         }
 
-        Response::create([
-            'conversation_id' => $validated['conversation_id'],
-            'group_id' => $validated['group_id'],
-            'consensus_text' => $validated['consensus_text'],
-            'submitted_at' => now(),
-        ]);
+        if ($existing) {
+            $existing->update([
+                'consensus_text' => $validated['consensus_text'],
+                'submitted_at' => now(),
+            ]);
+        } else {
+            Response::create([
+                'conversation_group_id' => $conversationGroup->id,
+                'consensus_text' => $validated['consensus_text'],
+                'submitted_at' => now(),
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Your response has been submitted successfully.');
     }

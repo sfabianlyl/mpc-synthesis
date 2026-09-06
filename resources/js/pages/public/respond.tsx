@@ -1,7 +1,15 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { AlertCircle, CheckCircle2, Send, Loader2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { AlertCircle, CheckCircle2, Send, Loader2, HelpCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,14 +38,24 @@ interface RespondProps {
     event: EventData;
     group: GroupData;
     conversations: ConversationData[];
+    existing_responses?: Record<string, boolean>;
 }
 
-export default function Respond({ event_id, group_id, event, group, conversations }: RespondProps) {
+export default function Respond({ event_id, group_id, event, group, conversations, existing_responses = {} }: RespondProps) {
     const { flash } = usePage().props as { flash?: { success?: string; error?: string } };
 
-    const { data, setData, post, processing, errors, wasSuccessful } = useForm({
+    const [existingResponses, setExistingResponses] = useState<Record<string, boolean>>(existing_responses);
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+    const { data, setData, post, processing, errors, wasSuccessful, transform } = useForm<{
+        conversation_id: string;
+        consensus_text: string;
+        confirm_overwrite?: boolean;
+        existing_response?: string;
+    }>({
         conversation_id: conversations.length > 0 ? String(conversations[0].id) : '',
         consensus_text: '',
+        confirm_overwrite: false,
     });
 
     // Ensure first conversation is selected
@@ -46,6 +64,13 @@ export default function Respond({ event_id, group_id, event, group, conversation
             setData('conversation_id', String(conversations[0].id));
         }
     }, [conversations, data.conversation_id]);
+
+    // Show confirm dialog if server returned existing_response error
+    useEffect(() => {
+        if (errors.existing_response) {
+            setShowConfirmDialog(true);
+        }
+    }, [errors.existing_response]);
 
     // Handle success redirect after submission
     const isSuccess = wasSuccessful;
@@ -58,19 +83,48 @@ export default function Respond({ event_id, group_id, event, group, conversation
         });
     };
 
+    const submitForm = (confirmOverwrite: boolean) => {
+        transform((currentData) => ({
+            ...currentData,
+            confirm_overwrite: confirmOverwrite,
+        }));
+
+        post(`/respond/${event_id}/${group_id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setExistingResponses((prev) => ({
+                    ...prev,
+                    [data.conversation_id]: true,
+                }));
+            },
+        });
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!data.conversation_id || !data.consensus_text.trim()) {
-return;
-}
+            return;
+        }
 
-        post(`/respond/${event_id}/${group_id}`, {
-            onSuccess: () => {
-                // Show success message
-            },
-        });
+        if (existingResponses[data.conversation_id] || errors.existing_response) {
+            setShowConfirmDialog(true);
+            return;
+        }
+
+        submitForm(false);
     };
+
+    const handleConfirmSubmit = () => {
+        setShowConfirmDialog(false);
+        submitForm(true);
+    };
+
+    const selectedConversation = conversations.find(
+        (c) => String(c.id) === String(data.conversation_id)
+    );
+
+    const visibleErrors = Object.entries(errors).filter(([key]) => key !== 'existing_response');
 
     // Success state
     if (isSuccess) {
@@ -108,15 +162,15 @@ return;
             <Head title={`Submit Response - ${event.title}`} />
 
             {/* Error Alert */}
-            {(Object.keys(errors).length > 0 || flash?.error) && (
+            {(visibleErrors.length > 0 || flash?.error) && (
                 <div className="mb-8 rounded-xl border-2 border-red-300 bg-red-50 p-5 dark:border-red-800 dark:bg-red-950/40">
                     <div className="flex items-start gap-4">
                         <AlertCircle className="mt-1 size-6 text-red-600 dark:text-red-400" />
                         <div className="flex-1">
-                            {Object.keys(errors).length > 0 && (
+                            {visibleErrors.length > 0 && (
                                 <ul className="list-disc pl-5 text-lg text-red-800 dark:text-red-300" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
-                                    {Object.values(errors).map((error, index) => (
-                                        <li key={index}>{error}</li>
+                                    {visibleErrors.map(([key, error]) => (
+                                        <li key={key}>{error}</li>
                                     ))}
                                 </ul>
                             )}
@@ -129,6 +183,54 @@ return;
                     </div>
                 </div>
             )}
+
+            {/* Confirmation Dialog for Resubmissions */}
+            <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+                <DialogContent className="sm:max-w-md rounded-2xl p-6 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 shadow-2xl">
+                    <DialogHeader className="space-y-3">
+                        <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700">
+                            <HelpCircle className="size-7 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <DialogTitle className="text-center text-2xl font-bold text-slate-900 dark:text-slate-50" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+                            Confirm Resubmission
+                        </DialogTitle>
+                        <DialogDescription className="text-center text-base text-slate-700 dark:text-slate-300" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+                            A response has already been submitted for <strong className="text-slate-900 dark:text-slate-50">{group.name}</strong> for{' '}
+                            <strong>{selectedConversation?.title || 'this session'}</strong>.
+                            <br /><br />
+                            Submitting again will update and overwrite your group's previous response. Are you sure you want to proceed?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowConfirmDialog(false)}
+                            disabled={processing}
+                            className="h-12 px-6 text-base rounded-xl font-medium"
+                            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleConfirmSubmit}
+                            disabled={processing}
+                            className="h-12 px-6 text-base bg-blue-700 hover:bg-blue-800 text-white rounded-xl shadow-md font-semibold"
+                            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+                        >
+                            {processing ? (
+                                <>
+                                    <Loader2 className="size-5 animate-spin mr-2" />
+                                    Updating...
+                                </>
+                            ) : (
+                                'Yes, Update Response'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <form onSubmit={handleSubmit} className="p-6">
                 {/* Event & Group Info */}
