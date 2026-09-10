@@ -300,6 +300,18 @@ export default function Respond({ event_id, group_id, event, group, conversation
                     <p className="mb-3 text-base text-slate-600 dark:text-slate-400" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
                         Please type your group's consensus in a single paragraph below, in not more than 200 words OR 10 sentences. This will be recorded as your group's official response.
                     </p>
+
+                    {selectedConversation?.description && (
+                        <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+                            <p className="mb-1 text-sm font-semibold uppercase tracking-wider text-blue-900 dark:text-blue-300" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+                                Conversation Details
+                            </p>
+                            <div className="whitespace-pre-wrap text-base leading-relaxed text-slate-700 dark:text-slate-300" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+                                {selectedConversation.description}
+                            </div>
+                        </div>
+                    )}
+
                     <Textarea
                         id="consensus_text"
                         value={data.consensus_text}
