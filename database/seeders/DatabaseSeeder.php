@@ -40,7 +40,7 @@ class DatabaseSeeder extends Seeder
         $conversations = [
             Conversation::create([
                 'event_id' => $event->id,
-                'title' => 'CIS 1 - Afternoon of 10th September Afternoon',
+                'title' => 'CIS 1 - Afternoon of 10th September',
                 'description' => 'As a catholic faithful, identify ONE area where the Catholic Church of Malaysia is able to contribute to the wellbeing of the country? How may we, the Catholic Church of Malaysia achieve this? What do you think the Holy Spirit is saying to the Church of Malaysia? ',
                 'status' => 'active',
             ]),
