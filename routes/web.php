@@ -141,6 +141,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['auth', 'role:pastoral,discernment'])->prefix('pastoral')->name('pastoral.')->group(function () {
         Route::get('/dashboard', [PastoralController::class, 'index'])->name('dashboard');
         Route::get('/reports/{conversation}', [PastoralController::class, 'reports'])->name('reports');
+        Route::get('/consensus-paragraphs/{conversation}', [PastoralController::class, 'consensusParagraphs'])->name('consensus-paragraphs');
 
         // Step 1: Per-Conversation Decision Draft (Member Scope)
         Route::get('/decision/{conversation}', [PastoralController::class, 'conversationDecision'])->name('decision');

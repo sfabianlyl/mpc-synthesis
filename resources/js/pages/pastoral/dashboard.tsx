@@ -12,6 +12,7 @@ import {
     Shield,
     Users,
     Layers,
+    MessageSquare,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -174,6 +175,18 @@ export default function Dashboard({ conversations = [], events = [] }: PageProps
                                                 >
                                                     <Users className="size-3.5" />
                                                     Collaborate on Decision Part
+                                                </Button>
+                                            </Link>
+
+                                            {/* Consensus Paragraphs button */}
+                                            <Link href={`/pastoral/consensus-paragraphs/${conv.id}`}>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="gap-1.5 text-xs"
+                                                >
+                                                    <MessageSquare className="size-3.5" />
+                                                    Consensus Paragraphs
                                                 </Button>
                                             </Link>
 

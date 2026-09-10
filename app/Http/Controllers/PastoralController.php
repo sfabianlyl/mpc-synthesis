@@ -7,6 +7,7 @@ use App\Models\NationalDecisionDraft;
 use App\Models\NationalDecisionPart;
 use App\Models\Event;
 use App\Models\MasterDecision;
+use App\Models\Response as ResponseModel;
 use App\Models\User;
 use App\Services\LlmService;
 use Illuminate\Http\JsonResponse;
@@ -328,7 +329,7 @@ public function index(Request $request): Response
     /**
      * POST Generate AI summary for National Decision Part of a conversation.
      */
-    public function generateDecisionPartSummary(Request $request, Conversation $conversation, LlmService $llmService): JsonResponse
+    public function generateDecisionPartSummary(Request $request, Conversation $conversation, LlmService $llmService)
     {
         $this->authorizePastoralAccess($request);
 
@@ -338,7 +339,7 @@ public function index(Request $request): Response
             ->get();
 
         if ($nationalDrafts->isEmpty()) {
-            return response()->json(['success' => false, 'error' => 'No submitted national decision drafts found for this conversation.'], 422);
+            return back()->withErrors(['error' => 'No submitted national decision drafts found for this conversation.']);
         }
 
         $systemPromptNational = "You are a pastoral synthesis assistant for a consultative synodal process. Synthesize the submitted individual national decision drafts into a cohesive, structured national decision part for the wider church. Highlight strategic priorities, common national themes, and actionable proposals. Format your output in clean Markdown.";
@@ -359,20 +360,16 @@ public function index(Request $request): Response
                 ['national_text' => $generatedNationalText]
             );
         } else {
-            return response()->json(['success' => false, 'error' => 'LLM generation failed: ' . $resultNational['error']], 500);
+            return back()->withErrors(['error' => 'LLM generation failed: ' . $resultNational['error']]);
         }
 
-        return response()->json([
-            'success' => true,
-            'national_text' => $generatedNationalText,
-            'generated_by' => $provider,
-        ]);
+        return back()->with('success', 'AI synthesized draft for this session successfully.');
     }
 
     /**
      * PATCH Save shared national decision part draft.
      */
-    public function saveDecisionPart(Request $request, Conversation $conversation): JsonResponse
+    public function saveDecisionPart(Request $request, Conversation $conversation)
     {
         $this->authorizePastoralAccess($request);
 
@@ -386,12 +383,8 @@ public function index(Request $request): Response
                 ['national_text' => $validated['national_text']]
             );
         }
-        $nationalPart = NationalDecisionPart::where('conversation_id', $conversation->id)->first();
 
-        return response()->json([
-            'success' => true,
-            'national_decision_part' => $nationalPart,
-        ]);
+        return back()->with('success', 'Decision Part draft saved.');
     }
 
     /**
@@ -479,7 +472,7 @@ public function index(Request $request): Response
     /**
      * POST Generate Master Decision Summary via LLM from all session DecisionParts.
      */
-    public function generateMasterDecisionSummary(Request $request, Event $event, LlmService $llmService): JsonResponse
+    public function generateMasterDecisionSummary(Request $request, Event $event, LlmService $llmService)
     {
         $this->authorizePastoralAccess($request);
 
@@ -489,7 +482,7 @@ public function index(Request $request): Response
             ->get();
 
         if ($nationalDecisionParts->isEmpty()) {
-            return response()->json(['success' => false, 'error' => 'No finalized Decision Parts found.'], 422);
+            return back()->withErrors(['error' => 'No finalized Decision Parts found.']);
         }
 
         $combinedText = $nationalDecisionParts->map(function ($part) {
@@ -502,10 +495,10 @@ public function index(Request $request): Response
         $result = $llmService->query($systemPrompt, $userPrompt);
 
         if (!$result['success']) {
-            return response()->json(['success' => false, 'error' => 'LLM generation failed: ' . $result['error']], 500);
+            return back()->withErrors(['error' => 'LLM generation failed: ' . $result['error']]);
         }
 
-        $master = MasterDecision::updateOrCreate(
+        MasterDecision::updateOrCreate(
             ['event_id' => $event->id],
             [
                 'master_text' => $result['content'],
@@ -514,18 +507,13 @@ public function index(Request $request): Response
             ]
         );
 
-        return response()->json([
-            'success' => true,
-            'master_text' => $result['content'],
-            'generated_by' => $result['provider'],
-            'master_id' => $master->id,
-        ]);
+        return back()->with('success', 'Master Pastoral Decision generated successfully.');
     }
 
     /**
      * PATCH Save Master Decision draft.
      */
-    public function saveMasterDecision(Request $request, Event $event): JsonResponse
+    public function saveMasterDecision(Request $request, Event $event)
     {
         $this->authorizePastoralAccess($request);
 
@@ -533,12 +521,12 @@ public function index(Request $request): Response
             'master_text' => 'required|string',
         ]);
 
-        $master = MasterDecision::updateOrCreate(
+        MasterDecision::updateOrCreate(
             ['event_id' => $event->id],
             ['master_text' => $validated['master_text']]
         );
 
-        return response()->json(['success' => true, 'master' => $master]);
+        return back()->with('success', 'Master Decision draft saved.');
     }
 
     /**
@@ -605,6 +593,44 @@ public function index(Request $request): Response
                 'generated_at' => $masterDecision->generated_at?->toIso8601String(),
             ] : null,
             'conversationsWithParts' => $conversationsWithParts,
+        ]);
+    }
+
+    /**
+     * GET View all consensus paragraph responses for a conversation.
+     */
+    public function consensusParagraphs(Request $request, Conversation $conversation): Response
+    {
+        $this->authorizePastoralAccess($request);
+
+        $responses = ResponseModel::whereHas('conversationGroup', function ($query) use ($conversation) {
+            $query->where('conversation_id', $conversation->id);
+        })
+        ->with(['conversationGroup.group'])
+        ->get()
+        ->map(function ($response) {
+            return [
+                'id' => $response->id,
+                'group_name' => $response->conversationGroup?->group?->name ?? 'Group ' . $response->conversation_group_id,
+                'consensus_text' => $response->consensus_text ?? '',
+                'submitted_at' => $response->submitted_at?->toIso8601String() ?? $response->created_at?->toIso8601String(),
+            ];
+        })
+        ->sortBy('group_name', SORT_NATURAL)
+        ->values();
+
+        return Inertia::render('pastoral/consensus-paragraphs', [
+            'conversation' => [
+                'id' => $conversation->id,
+                'title' => $conversation->title,
+                'description' => $conversation->description,
+                'status' => $conversation->status,
+                'event' => $conversation->event ? [
+                    'id' => $conversation->event->id,
+                    'title' => $conversation->event->title,
+                ] : null,
+            ],
+            'responses' => $responses,
         ]);
     }
 }
