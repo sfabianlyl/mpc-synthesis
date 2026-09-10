@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
@@ -46,9 +47,9 @@ class Conversation extends Model
     /**
      * Get the responses for this conversation.
      */
-    public function responses(): HasMany
+    public function responses(): HasManyThrough
     {
-        return $this->hasMany(Response::class);
+        return $this->hasManyThrough(Response::class, ConversationGroup::class);
     }
 
     /**

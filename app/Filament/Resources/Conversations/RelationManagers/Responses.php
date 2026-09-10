@@ -36,9 +36,27 @@ class Responses extends RelationManager
         return $table
             ->recordTitleAttribute('id')
             ->columns([
-                TextColumn::make('conversationGroup.group.name')
-                    ->label('Group')
+                TextColumn::make('id')
+                    ->label('ID')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('conversation_group_id')
+                    ->label('Conv. Group ID')
+                    ->sortable()
                     ->searchable(),
+                TextColumn::make('conversationGroup.group.name')
+                    ->label('Group Name')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('consensus_text')
+                    ->label('Consensus Text')
+                    ->limit(50)
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('submitted_at')
+                    ->label('Submitted At')
+                    ->dateTime()
+                    ->sortable(),
             ])
             ->headerActions([
                 //

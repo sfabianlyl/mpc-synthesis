@@ -13,17 +13,17 @@ class ResponseForm
     {
         return $schema
             ->components([
-                Select::make('conversation_id')
-                    ->relationship('conversation', 'title')
-                    ->required(),
-                Select::make('group_id')
-                    ->relationship('group', 'name')
+                Select::make('conversation_group_id')
+                    ->label('Conversation Group')
+                    ->relationship('conversationGroup', 'id')
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "#{$record->id} - " . ($record->group?->name ?? 'Group') . " (" . ($record->conversation?->title ?? 'Conversation') . ")")
+                    ->searchable()
+                    ->preload()
                     ->required(),
                 Textarea::make('consensus_text')
-                    ->required()
                     ->columnSpanFull(),
                 DateTimePicker::make('submitted_at')
-                    ->required(),
+                    ->nullable(),
             ]);
     }
 }

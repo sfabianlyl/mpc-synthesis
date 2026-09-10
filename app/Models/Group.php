@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Carbon;
 
 /**
@@ -31,9 +32,9 @@ class Group extends Model
     /**
      * Get the responses submitted for this group.
      */
-    public function responses(): HasMany
+    public function responses(): HasManyThrough
     {
-        return $this->hasMany(Response::class);
+        return $this->hasManyThrough(Response::class, ConversationGroup::class);
     }
 
     public function conversationGroups() 

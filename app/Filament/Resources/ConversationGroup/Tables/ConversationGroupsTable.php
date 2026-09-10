@@ -14,14 +14,17 @@ class ConversationGroupsTable
     {
         return $table
             ->columns([
+                TextColumn::make('id')
+                    ->label('ID')
+                    ->sortable(),
                 TextColumn::make('conversation.title')
                     ->label('Conversation')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('group.name')
-                    ->label('Group')
+                    ->label('Group Name')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
                 TextColumn::make('responses_count')
                     ->label('Responses')
                     ->counts('responses')

@@ -9,14 +9,12 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property int $conversation_id
- * @property int $group_id
- * @property string $consensus_text
- * @property Carbon $submitted_at
+ * @property int|null $conversation_group_id
+ * @property string|null $consensus_text
+ * @property Carbon|null $submitted_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read Conversation $conversation
- * @property-read Group $group
+ * @property-read ConversationGroup|null $conversationGroup
  */
 class Response extends Model
 {
