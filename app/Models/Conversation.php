@@ -29,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisDraft> $synthesisDrafts
  * @property-read SynthesisSummary $synthesisSummary
  * @property-read NationalDecisionPart|null $nationalDecisionPart
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisGroupAssignment> $synthesisGroupAssignments
  */
 class Conversation extends Model
 {
@@ -129,6 +130,14 @@ class Conversation extends Model
     public function nationalDecisionPart(): HasOne
     {
         return $this->hasOne(NationalDecisionPart::class);
+    }
+
+    /**
+     * Get the synthesis group assignments for this conversation.
+     */
+    public function synthesisGroupAssignments(): HasMany
+    {
+        return $this->hasMany(SynthesisGroupAssignment::class);
     }
 }
 
