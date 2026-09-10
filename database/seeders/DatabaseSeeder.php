@@ -40,19 +40,19 @@ class DatabaseSeeder extends Seeder
         $conversations = [
             Conversation::create([
                 'event_id' => $event->id,
-                'title' => 'CIS 1',
+                'title' => 'CIS 1 - Afternoon of 10th September Afternoon',
                 'description' => 'As a catholic faithful, identify ONE area where the Catholic Church of Malaysia is able to contribute to the wellbeing of the country? How may we, the Catholic Church of Malaysia achieve this? What do you think the Holy Spirit is saying to the Church of Malaysia? ',
                 'status' => 'active',
             ]),
             Conversation::create([
                 'event_id' => $event->id,
-                'title' => 'CIS 2',
+                'title' => 'CIS 2 - Morning of 11th September',
                 'description' => 'As I listen to the realities of families and the Church today, with all its opportunities and challenges, what is the Holy Spirit inviting me to let go, to continue, or to begin so that I can become an instrument of God’s love to everyone? ',
                 'status' => 'active',
             ]),
             Conversation::create([
                 'event_id' => $event->id,
-                'title' => 'CIS 3',
+                'title' => 'CIS 3 - Afternoon of 11th September',
                 'description' => 'As I listen to the realities of the Rakyat, how can the outreach of the church make the mission of Jesus more visible and move us from information to implementation that brings sustainable benefits for the future generation?',
                 'status' => 'active',
             ]),
