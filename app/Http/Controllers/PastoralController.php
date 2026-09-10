@@ -328,7 +328,7 @@ public function index(Request $request): Response
     /**
      * POST Generate AI summary for National Decision Part of a conversation.
      */
-    public function generateCollaborateSummary(Request $request, Conversation $conversation, LlmService $llmService): JsonResponse
+    public function generateDecisionPartSummary(Request $request, Conversation $conversation, LlmService $llmService): JsonResponse
     {
         $this->authorizePastoralAccess($request);
 
