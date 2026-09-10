@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Extraction> $extractions
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisDraft> $synthesisDrafts
  * @property-read SynthesisSummary $synthesisSummary
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisSummary> $synthesisSummaries
  * @property-read NationalDecisionPart|null $nationalDecisionPart
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SynthesisGroupAssignment> $synthesisGroupAssignments
  */
@@ -109,6 +110,14 @@ class Conversation extends Model
     public function synthesisSummary(): HasOne
     {
         return $this->hasOne(SynthesisSummary::class, 'conversation_id');
+    }
+
+    /**
+     * Get all synthesis summaries for this conversation.
+     */
+    public function synthesisSummaries(): HasMany
+    {
+        return $this->hasMany(SynthesisSummary::class, 'conversation_id');
     }
 
     public function conversationGroups() 
