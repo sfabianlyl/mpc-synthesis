@@ -30,7 +30,7 @@ class LlmService
         $this->geminiApiKey = config('services.llm.gemini_api_key', '');
         $this->geminiModel = config('services.llm.gemini_model', 'gemini-2.5-flash');
 
-        $this->categoryDefinitions = "1. **Convergence (A)**: independent data points, signs, or lines of evidence coming together to point toward one clear, unified conclusion or emerging conclusion. It serves as a strong validation method where separate inputs align to reduce uncertainty that gives confidence for decision takers to act
+        $this->categoryDefinitions = "1. **Convergence (A)**: compile independent data points, signs, lines of evidence, or causes that contribute to the same effect or outcome, currently or potential occurence.
 
 2. **Matters for Consideration (B)**: a dissenting statement, an alternative prediction, or a  record of totally new and unheard of ideas or new and improved ways of doing existing ideas or objections. It describes the opinion and discernment by members of a group who do not agree with the main or majority decision
 
@@ -278,7 +278,7 @@ You are a synthesis assistant for a consultative process. You will receive one o
 
 Your task is to analyze the text and extract information into exactly three categories. For each category, provide the content as bullet points using dashes (-) with concise phrases (not full sentences).
 
-CRITICAL JSON FORMAT REQUIREMENTS:
+====== CRITICAL JSON FORMAT REQUIREMENTS ======
 - Return a RAW JSON object with exactly these three keys: "convergence", "consideration", "proposals"
 - Each value must be a SINGLE LINE string (no actual newlines inside the string values)
 - Use \n (backslash-n escape sequence) to separate bullet points within each value
@@ -298,17 +298,28 @@ WRONG format (do NOT do this):
 - phrase three"
 }
 
-CATEGORIES AND DEFINITIONS:
+====== END OF CRITICAL JSON FORMAT REQUIREMENTS ======
+
+====== CATEGORIES AND DEFINITIONS ========
 
 $this->categoryDefinitions
 
-OUTPUT LANGUAGE AND TONE:
+====== END OF CATEGORIES AND DEFINITIONS. =======
+
+====== OUTPUT LANGUAGE AND TONE ======
 
 $this->outputTone
 
-IMPORTANT: Do NOT wrap the response in markdown code blocks (no ```json or ```). Do NOT include any explanatory text before or after the JSON. The response must be valid JSON only. Each value string must contain \n escape sequences, not actual newlines.
+====== END OF OUTPUT LANGUAGE AND TONE ======
+
+====== IMPORTANT ====== 
+
+Do NOT wrap the response in markdown code blocks (no ```json or ```). Do NOT include any explanatory text before or after the JSON. The response must be valid JSON only. Each value string must contain \n escape sequences, not actual newlines.
 
 Be concise but thorough. Use short phrases, not full sentences. Preserve the original meaning and intent of the participants.
+
+====== END OF IMPORTANT ======
+
 PROMPT;
     }
 
