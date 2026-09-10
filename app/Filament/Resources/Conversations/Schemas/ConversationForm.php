@@ -2,9 +2,6 @@
 
 namespace App\Filament\Resources\Conversations\Schemas;
 
-use App\Models\Conversation;
-use App\Models\User;
-use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -34,23 +31,6 @@ class ConversationForm
                         'completed' => 'Completed',
                         'archived' => 'Archived',
                     ]),
-                CheckboxList::make('synthesis_members')
-                    ->label('Synthesis Members')
-                    ->options(User::where('role', 'synthesis')->pluck('name', 'id'))
-                    ->searchable()
-                    ->bulkToggleable()
-                    ->required(),
-            ])
-            ->mutateFormDataBeforeSave(function (array $data): array {
-                if (isset($data['synthesis_members'])) {
-                    $data['_synthesis_members_sync'] = true;
-                }
-                return $data;
-            })
-            ->afterSaved(function (Conversation $record, array $data) {
-                if (isset($data['_synthesis_members_sync'])) {
-                    $record->synthesisMembers()->sync($data['synthesis_members'] ?? []);
-                }
-            });
+            ]);
     }
 }
