@@ -176,7 +176,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 $query->where("conversation_id",2);
             })->get();
             $david=User::where("email","david@gerejakatolik.my")->first();
-            foreach($david->assignedConversationGroups as $conversationGroup) $conversationGroup->synthesisMembers()->syncWithoutDetaching([
+            foreach($dominic->assignedConversationGroups as $conversationGroup) $conversationGroup->synthesisMembers()->syncWithoutDetaching([
                 $david->id=>["is_synthesizer"=>true]
             ]);
             // $convGroups=$conversation[0]->conversationGroups;
