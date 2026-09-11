@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Conversation;
 use App\Models\Group;
+use App\Models\NationalDecisionDraft;
 use App\Models\Response;
 use App\Models\User;
 use App\Services\LlmService;
@@ -189,7 +190,7 @@ class AdminController extends Controller
     public function generateKeyThemes(Request $request, LlmService $llmService)
     {
         // $this->authorizePastoralAccess($request);
-        $collection=NationalDecisionDrafts::get();
+        $collection=NationalDecisionDraft::get();
         $column="draft_text";
 
         $systemPrompt = "
