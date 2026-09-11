@@ -427,16 +427,7 @@ export default function Collaborate({
                     </div>
                 </div>
 
-                {conversation?.description && (
-                    <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
-                        <p className="mb-1 text-sm font-semibold uppercase tracking-wider text-blue-900 dark:text-blue-300">
-                            Conversation Details
-                        </p>
-                        <div className="whitespace-pre-wrap text-base leading-relaxed text-slate-700 dark:text-slate-300">
-                            {conversation.description}
-                        </div>
-                    </div>
-                )}
+                
 
                  <section className="space-y-4">
                         {/* Instructions for synthesis members */}
@@ -456,6 +447,17 @@ export default function Collaborate({
                             <li>3. Complete in full and proper sentences under Master Content your Convergence + Matters for consideration + Proposal for further discussion and discernment under collaborative review</li>
                         </ol>
                 </section>
+
+                {conversation?.description && (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+                        <p className="mb-1 text-sm font-semibold uppercase tracking-wider text-blue-900 dark:text-blue-300">
+                            Conversation Question
+                        </p>
+                        <div className="whitespace-pre-wrap text-base leading-relaxed text-slate-700 dark:text-slate-300">
+                            {conversation.description}
+                        </div>
+                    </div>
+                )}
 
                 {/* ─── Online Users & Collaboration Indicators ────── */}
                 {onlineMembers.length > 0 && (
