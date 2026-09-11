@@ -189,13 +189,13 @@ class AdminController extends Controller
     public function generateKeyThemes(Request $request, LlmService $llmService)
     {
         // $this->authorizePastoralAccess($request);
-        $conversation=Conversation::where("id",3)->with("responses")->get();
-        
+        $collection=NationalDecisionDrafts::get();
+        $column="draft_text";
 
         $systemPrompt = "
-            You are an objective and unbiased summarizer. The context of the texts that you receive here are consensus of group discussions. \n\n
+            You are an objective and unbiased summarizer. The context of the texts that you receive here are notes. \n\n
             
-            Your task is to go through the texts, and then come up with three key themes, which are the top three most repeated themes mentioned accross the group discussions.\n\n
+            Your task is to go through the texts, and then come up with three most reoccuring themes.\n\n
 
             ====== Language and Tone ======\n\n
             Stick to original vocabulary used by the contents. \n\n
@@ -210,11 +210,9 @@ class AdminController extends Controller
         ";
         $userPrompt = "====== Texts ======\n\n";
         $count=1;
-        foreach ($conversation[0]->responses as $response) {
-            $userPrompt .= "[{$count}]\n{$response->consensus_text}\n\n---\n\n";
-                
-                $count++;
-
+        foreach ($collection as $object) {
+            $userPrompt .= "[{$count}]\n{$object->$column}\n\n---\n\n";
+            $count++;
         }
         $userPrompt.="====== End of Texts ======";
 
