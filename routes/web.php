@@ -171,20 +171,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [AdminController::class, 'chat'])->name('index');
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('details');
         Route::get('/update-db', function(){
-            $conversation=Conversation::where("id",1)->with("conversationGroups")->get();
-            $convGroups=$conversation[0]->conversationGroups;
-            $convGroupsIds=$convGroups->pluck("id")->toArray();
-            $users=User::where("role","synthesis")->whereIn("email",
-                ["gerald@gerejakatolik.my","ramesh@gerejakatolik.my","feona@gerejakatolik.my","christina@gerejakatolik.my","adrian@gerejakatolik.my","sandra@gerejakatolik.my"]
-            )->pluck("id")->toArray();
-            foreach($convGroups as $conversationGroup) $conversationGroup->synthesisMembers()->syncWithoutDetaching([
-                $users[0]=>["is_synthesizer"=>true],
-                $users[1]=>["is_synthesizer"=>true],
-                $users[2]=>["is_synthesizer"=>true],
-                $users[3]=>["is_synthesizer"=>true],
-                $users[4]=>["is_synthesizer"=>true],
-                $users[5]=>["is_synthesizer"=>true]
-            ]);
+            // $conversation=Conversation::where("id",1)->with("conversationGroups")->get();
+            // $convGroups=$conversation[0]->conversationGroups;
+            // $convGroupsIds=$convGroups->pluck("id")->toArray();
+            // $users=User::where("role","synthesis")->whereIn("email",
+            //     ["gerald@gerejakatolik.my","ramesh@gerejakatolik.my","feona@gerejakatolik.my","christina@gerejakatolik.my","adrian@gerejakatolik.my","sandra@gerejakatolik.my"]
+            // )->pluck("id")->toArray();
+            // foreach($convGroups as $conversationGroup) $conversationGroup->synthesisMembers()->syncWithoutDetaching([
+            //     $users[0]=>["is_synthesizer"=>true],
+            //     $users[1]=>["is_synthesizer"=>true],
+            //     $users[2]=>["is_synthesizer"=>true],
+            //     $users[3]=>["is_synthesizer"=>true],
+            //     $users[4]=>["is_synthesizer"=>true],
+            //     $users[5]=>["is_synthesizer"=>true]
+            // ]);
             
             return response()->json([
                 "success"=>true
