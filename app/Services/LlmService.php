@@ -77,9 +77,9 @@ class LlmService
             Log::warning('LLM: Both providers failed, using development mock data.');
             return [
                 'content' => json_encode([
-                    'convergence' => "[Mock Data] Based on the submitted responses, there appears to be general agreement on the core principles. Participants emphasized the need for clear guidelines and structured approaches.",
-                    'consideration' => "[Mock Data] Key areas of concern include resource allocation, timeline feasibility, and stakeholder engagement strategies that require further clarification.",
-                    'proposals' => "[Mock Data] Recommended actions:\n1. Establish a working group to address identified gaps\n2. Develop a phased implementation plan\n3. Schedule follow-up consultations with key stakeholders",
+                    'convergence' => "",
+                    'consideration' => "",
+                    'proposals' => "",
                 ], JSON_PRETTY_PRINT),
                 'provider' => 'mock',
                 'success' => true,
