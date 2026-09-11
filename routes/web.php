@@ -171,48 +171,48 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [AdminController::class, 'chat'])->name('index');
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('details');
         Route::get('/update-db', function(){
-            $conversation=Conversation::where("id",2)->with("conversationGroups")->get();
-            $convGroups=$conversation[0]->conversationGroups;
-            $convGroupsIds=$convGroups->pluck("id")->toArray();
-            $users=User::where("role","synthesis")->whereNotIn("email",
-                ["gerald@gerejakatolik.my","ramesh@gerejakatolik.my","feona@gerejakatolik.my","christina@gerejakatolik.my","adrian@gerejakatolik.my","sandra@gerejakatolik.my"]
-            )->pluck("id")->toArray();
-            foreach($convGroups->slice(0,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[0]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(8,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[1]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(16,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[2]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(24,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[3]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(32,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[4]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(40,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[5]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(48,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[6]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(56,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[7]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(64,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[8]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(72,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[9]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(80,7) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[10]=>["is_synthesizer"=>true]
-            ]);
-            foreach($convGroups->slice(87,7) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
-                $users[11]=>["is_synthesizer"=>true]
-            ]);
+            // $conversation=Conversation::where("id",2)->with("conversationGroups")->get();
+            // $convGroups=$conversation[0]->conversationGroups;
+            // $convGroupsIds=$convGroups->pluck("id")->toArray();
+            // $users=User::where("role","synthesis")->whereNotIn("email",
+            //     ["gerald@gerejakatolik.my","ramesh@gerejakatolik.my","feona@gerejakatolik.my","christina@gerejakatolik.my","adrian@gerejakatolik.my","sandra@gerejakatolik.my"]
+            // )->pluck("id")->toArray();
+            // foreach($convGroups->slice(0,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[0]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(8,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[1]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(16,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[2]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(24,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[3]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(32,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[4]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(40,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[5]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(48,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[6]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(56,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[7]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(64,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[8]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(72,8) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[9]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(80,7) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[10]=>["is_synthesizer"=>true]
+            // ]);
+            // foreach($convGroups->slice(87,7) as $conversationGroup) $conversationGroup->synthesisMembers()->sync([
+            //     $users[11]=>["is_synthesizer"=>true]
+            // ]);
 
             
             return response()->json([

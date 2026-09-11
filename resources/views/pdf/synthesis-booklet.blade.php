@@ -307,7 +307,7 @@
     <div class="cover-page">
         <h1>Synthesis Booklet</h1>
         <div class="subtitle">{{ $document->title ?? 'Consolidated Synthesis Report' }}</div>
-        <div class="date">Generated on {{ now()->format('F j, Y') }}</div>
+        
     </div>
 
     {{-- Event Information --}}
@@ -318,71 +318,25 @@
             <span class="label">Name:</span>
             <span>{{ $event->title }}</span>
         </div>
-        @if($event->location)
-        <div class="detail">
-            <span class="label">Location:</span>
-            <span>{{ $event->location }}</span>
-        </div>
-        @endif
-        <div class="detail">
-            <span class="label">Date:</span>
-            <span>{{ $event->start_date ? \Carbon\Carbon::parse($event->start_date)->format('F j, Y') : 'N/A' }} 
-            @if($event->end_date) - {{ \Carbon\Carbon::parse($event->end_date)->format('F j, Y') }}@endif</span>
-        </div>
+
     </div>
     @endif
 
-    {{-- Emerging Themes (from global synthesis document) --}}
-    @if($document->content_json || $document->emerging_themes)
-    <div class="section">
-        <h2>Executive Summary</h2>
-        
-        @if($document->emerging_themes)
-        <h3>Emerging Themes</h3>
-        <p>{{ $document->emerging_themes }}</p>
-        @endif
-
-        @if(!empty($document->content_json))
-            @php $json = is_string($document->content_json) ? json_decode($document->content_json, true) : $document->content_json; @endphp
-            
-            @if(!empty($json['key_convergences']))
-            <h3>Key Convergences</h3>
-            <p>{{ $json['key_convergences'] }}</p>
-            @endif
-
-            @if(!empty($json['critical_considerations']))
-            <h3>Critical Considerations</h3>
-            <p>{{ $json['critical_considerations'] }}</p>
-            @endif
-
-            @if(!empty($json['priority_proposals']))
-            <h3>Priority Proposals</h3>
-            <p>{{ $json['priority_proposals'] }}</p>
-            @endif
-        @endif
-    </div>
-    @endif
 
     {{-- Key Points Section --}}
     @if(isset($keyPoints) && $keyPoints->count() > 0)
     <div class="section-break"></div>
     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px; margin-bottom: 30px;">
-        <h2 style="color: white !important; border-bottom: 2px solid rgba(255,255,255,0.3) !important; padding-bottom: 10px; margin-top: 0; margin-bottom: 15px;">📋 Key Points Summary</h2>
-        <p style="margin-bottom: 20px; opacity: 0.9;">The following key points were extracted from the synthesis conversation using AI analysis:</p>
+        <h2 style="color: white !important; border-bottom: 2px solid rgba(255,255,255,0.3) !important; padding-bottom: 10px; margin-top: 0; margin-bottom: 15px;">Key Points Summary</h2>
+        <p style="margin-bottom: 20px; opacity: 0.9;">The following key points were extracted from the synthesis conversation:</p>
         
         @foreach($keyPoints as $keyPoint)
             <div style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2);">
-                <div style="font-size: 0.85em; opacity: 0.8; margin-bottom: 10px;">
-                    Extracted on {{ \Carbon\Carbon::parse($keyPoint->created_at)->format('M j, Y g:i A') }}
-                    @if($keyPoint->provider)
-                        · via {{ $keyPoint->provider }}
-                    @endif
-                </div>
+
                 @if(!empty($keyPoint->key_points) && is_array($keyPoint->key_points))
                     @foreach($keyPoint->key_points as $index => $point)
                         @if(is_string($point) && trim($point) !== '')
                         <div style="background: rgba(255,255,255,0.1); padding: 12px 15px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid rgba(255,255,255,0.5);">
-                            <span style="font-weight: bold; margin-right: 8px;">{{ $index + 1 }}.</span>
                             {{ trim($point) }}
                         </div>
                         @endif
@@ -399,7 +353,7 @@
 
     {{-- Master Syntheses by Conversation --}}
     <div class="section-break"></div>
-    <h2>Detailed Syntheses by Conversation</h2>
+    <h2>Full Synthesis</h2>
 
     @if(isset($masterSyntheses) && $masterSyntheses->count() > 0)
         @foreach($masterSyntheses as $masterSynthesis)
@@ -409,16 +363,6 @@
                 <span class="status-badge {{ $masterSynthesis->status === 'submitted' ? 'status-submitted' : 'status-draft' }}">
                     {{ ucfirst($masterSynthesis->status) }}
                 </span>
-                @if($masterSynthesis->is_llm_assisted)
-                <span class="ai-badge">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                        <path d="M2 17l10 5 10-5"/>
-                        <path d="M2 12l10 5 10-5"/>
-                    </svg>
-                    AI-Assisted
-                </span>
-                @endif
             </h3>
 
             {{-- Category Content --}}
@@ -549,23 +493,11 @@
     @elseif(isset($reports) && $reports->count() > 0)
         {{-- Fallback to individual reports if no master syntheses --}}
         <div class="section-break"></div>
-        <h2>Individual Group Reports</h2>
 
         @foreach($reports as $report)
         <div class="group-report">
             <h3>{{ $report->conversation->title ?? 'Report #' . $report->id }}</h3>
-            <p><em>Prepared by: {{ $report->synthesis->name ?? 'Unknown' }}</em></p>
             
-            @if($report->is_llm_assisted || $report->llm_generated)
-            <span class="ai-badge" style="margin-left: 10px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path d="M2 17l10 5 10-5"/>
-                    <path d="M2 12l10 5 10-5"/>
-                </svg>
-                AI-Assisted
-            </span>
-            @endif
 
             <div class="section">
                 <span class="category-label convergence">Convergence</span>
@@ -600,35 +532,7 @@
         @endforeach
     @endif
 
-    {{-- Citation References from Document Chunks --}}
-    @if(isset($documentChunks) && $documentChunks->count() > 0)
-    <div class="page-break"></div>
-    <div class="citation-section">
-        <h3 style="margin-top: 0;">Citation References</h3>
-        <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
-            The following document sources were retrieved and referenced during synthesis generation:
-        </p>
-        
-        @foreach($documentChunks as $chunk)
-        <div class="citation-reference">
-            <div>
-                <span class="doc-name">{{ $chunk->source?->document_name ?? 'Unknown Document' }}</span>
-                @if($chunk->section_heading)
-                <span style="color: #666;"> — {{ $chunk->section_heading }}</span>
-                @endif
-            </div>
-            @if($chunk->page_start || $chunk->page_end)
-            <div class="page-ref">
-                Pages {{ $chunk->page_start ?? '?' }}@if($chunk->page_end && $chunk->page_end !== $chunk->page_start)-{{ $chunk->page_end }}@endif
-            </div>
-            @endif
-            <div style="margin-top: 5px; font-size: 0.85em;">
-                {{ Str::limit($chunk->chunk_content, 200) }}
-            </div>
-        </div>
-        @endforeach
-    </div>
-    @endif
+    
 
     {{-- Footer --}}
     <div class="footer">
