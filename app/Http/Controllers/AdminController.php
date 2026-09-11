@@ -189,7 +189,7 @@ class AdminController extends Controller
     public function generateKeyThemes(Request $request, LlmService $llmService)
     {
         // $this->authorizePastoralAccess($request);
-        $conversation=Conversation::where("id",1)->with("responses")->get();
+        $conversation=Conversation::where("id",2)->with("responses")->get();
         
 
         $systemPrompt = "
