@@ -6,6 +6,7 @@ use App\Models\Conversation;
 use App\Models\Group;
 use App\Models\Response;
 use App\Models\User;
+use App\Services\LlmService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -185,4 +186,53 @@ class AdminController extends Controller
             'conversation_id' => $validated['conversation_id'],
         ]);
     }
+    public function generateKeyThemes(Request $request, LlmService $llmService)
+    {
+        // $this->authorizePastoralAccess($request);
+        $conversation=Conversation::where("id",1)->with("responses")->get();
+        
+
+        $systemPrompt = "
+            You are an objective and unbiased summarizer. The context of the texts that you receive here are consensus of group discussions. \n\n
+            
+            Your task is to go through the texts, and then come up with three key themes, which are the top three most repeated themes mentioned accross the group discussions.\n\n
+
+            ====== Language and Tone ======\n\n
+            Stick to original vocabulary used by the contents. \n\n
+
+            Preserve the original meaning and intent of the texts.\n\n
+            ====== End of Language and Tone ======\n\n
+
+            ====== Output Format ====== \n\n
+            Output in plain text, without markdown, or markdown code blocks. Use next lines instead to format your output, for example, for titles and subtitles. \n\n
+            ====== End of Output Format ======\n\n
+
+        ";
+        $userPrompt = "====== Texts ======\n\n";
+        $count=1;
+        foreach ($conversation[0]->responses as $response) {
+            $userPrompt .= "[{$count}]\n{$response->consensus_text}\n\n---\n\n";
+                
+                $count++;
+
+        }
+        $userPrompt.="====== End of Texts ======";
+
+        $result = $llmService->query($systemPrompt, $userPrompt);
+        if ($result['success']) {
+            $generatedText = $result['content'];
+            
+        } else {
+            return response()->json([
+                "success"=>false,
+                "message"=>$result['error']
+            ], 200);
+        }
+
+        return response()->json([
+                "success"=>true,
+                "message"=>$generatedText
+        ], 200);
+    }
+
 }
