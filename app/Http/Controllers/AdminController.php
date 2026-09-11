@@ -256,19 +256,19 @@ class AdminController extends Controller
 
         ";
         $userPrompt = "====== Texts ======\n\n
-            •	Care for creation needs to be prioritized as ecological problems are intrinsically linked to economic issues and human lives, necessitating a holistic approach that integrates indigenous wisdom and creation justice.
-            •	Address ecological justice issues including poverty, migration, and indigenous rights
-            •	the Church must function as one unified body, transcending the division between East and West Malaysia, to pool resources, share expertise, and demonstrate practical solidarity
-            •	call for the Church to move beyond its comfort zone, becoming a prophetic voice for the Rakyat by courageously speaking up for human dignity, social justice, and the common good.
-            •	Members emphasized a common commitment to addressing critical societal issues such as corruption, injustice, social division, and environmental concerns like haze, while promoting unity through interreligious collaboration and working alongside government agencies, NGOs, and professionals.
-            •	collaboration across various sectors, including NGOs, government agencies, and interdenominational groups, to serve society sustainably.
-            •	holistic formation is imperative for youth, aiming to shape them into faithful disciples of the Lord and responsible citizens of the country to ensure sustainability for future generations.
-            •	the Church to act as a societal leaven and beacon, responding proactively to pressing issues from urban centers to indigenous communities.
-            •	caring for creation and promoting social justice are shared duties
-            •	the Church must foster intergenerational learning and unity, ensuring that future generations inherit a sustainable mission characterized by hope and renewal.
-            •	networking is crucial for reaching those separated by distance, and this is complemented by the sharing of resources and expertise between dioceses and parishes to overcome shortages.
-            •	the Church must move beyond awareness to concrete, sustainable action that transforms the lives of the rakyat and protects creation.
-            •	The groups emphasized that community empowerment, social justice, and environmental stewardship are interconnected, requiring the Church to model solidarity through shared resources, disaster relief, and care for the marginalized.
+            •	Requirement to train staff and pay market-value salaries for quality results
+            •	concerns about the Church’s internal capacity to address complex issues such as mental health, broken families, and legal matters related to Islamisation, suggesting that individual dioceses or parishes lack the specialized resources to handle these alone
+            •	duplication of efforts and the inefficiency of creating new structures when existing ministries like Caritas, SSVP, and Creation Justice Commissions remain underutilized or poorly coordinated.
+            •	the need to cultivate moral integrity and ethical leadership to counteract issues of favoritism and corruption.
+            •	the need for clearer stakeholder engagement strategies.
+            •	tension in navigating the use of new technologies, such as AI, ensuring they support coordination without displacing the centrality of human relationships and mission.
+            •	identifying actions that can be sustained together without overexerting resources , avoid burnout and acknowledging factors beyond our control
+            •	limitations placed on the Malaysian people's voices and the injustices arising from Islamization, which challenge the Church’s ability to speak freely.
+            •	the Church does not remain silent or fearful in the face of these complex socio-political dynamics.
+            •	risk of programs becoming one-off events rather than long-term solutions.
+            •	delicate balance required in navigating complex social and spiritual landscapes, where the safety and effectiveness of mission work depend on balancing moral integrity with practical wisdom.
+            •	the tension between traditional structures and the need for new ways of engaging the younger generation, particularly in preparing them for political involvement and decision-making processes that affect the rakyat's well-being.
+            •	Participants noted tensions around resource allocation, highlighting the need to reduce bureaucracy within the Church to allow better access to assistance and to prioritize spending on people rather than structures or beautification. There was also apprehension about the risk of burnout among volunteers and the need for adequate training budgets and professional support services.
         ====== End of Texts=====
         ";
         
