@@ -171,7 +171,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [AdminController::class, 'chat'])->name('index');
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('details');
         Route::get('/update-db', function(){
-            $conversation=Conversation::where("id",2)->with("converationGroups")->get();
+            $conversation=Conversation::where("id",2)->with("conversationGroups")->get();
             $convGroups=$conversation->conversationGroups;
             $convGroupsIds=$convGroups->pluck("id")->toArray();
             $users=User::where("role","synthesis")->whereNotIn("email",
