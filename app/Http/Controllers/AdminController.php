@@ -235,4 +235,58 @@ class AdminController extends Controller
         ], 200);
     }
 
+    public function generalPrompting(Request $request, LlmService $llmService)
+    {
+        // $this->authorizePastoralAccess($request);
+        // $conversation=Conversation::where("id",3)->with("responses")->get();
+        
+
+        $systemPrompt = "
+            Rearrange the given texts into coherent sentences or paragraphs.
+
+            ====== Language and Tone ======\n\n
+            Stick to original vocabulary used by the texts. \n\n
+
+            Preserve the original meaning and intent of the texts.\n\n
+            ====== End of Language and Tone ======\n\n
+
+            ====== Output Format ====== \n\n
+            Output in plain text, without markdown, or markdown code blocks. Use next lines instead to format your output, for example, for titles and subtitles. \n\n
+            ====== End of Output Format ======\n\n
+
+        ";
+        $userPrompt = "====== Texts ======\n\n
+            •	Care for creation needs to be prioritized as ecological problems are intrinsically linked to economic issues and human lives, necessitating a holistic approach that integrates indigenous wisdom and creation justice.
+            •	Address ecological justice issues including poverty, migration, and indigenous rights
+            •	the Church must function as one unified body, transcending the division between East and West Malaysia, to pool resources, share expertise, and demonstrate practical solidarity
+            •	call for the Church to move beyond its comfort zone, becoming a prophetic voice for the Rakyat by courageously speaking up for human dignity, social justice, and the common good.
+            •	Members emphasized a common commitment to addressing critical societal issues such as corruption, injustice, social division, and environmental concerns like haze, while promoting unity through interreligious collaboration and working alongside government agencies, NGOs, and professionals.
+            •	collaboration across various sectors, including NGOs, government agencies, and interdenominational groups, to serve society sustainably.
+            •	holistic formation is imperative for youth, aiming to shape them into faithful disciples of the Lord and responsible citizens of the country to ensure sustainability for future generations.
+            •	the Church to act as a societal leaven and beacon, responding proactively to pressing issues from urban centers to indigenous communities.
+            •	caring for creation and promoting social justice are shared duties
+            •	the Church must foster intergenerational learning and unity, ensuring that future generations inherit a sustainable mission characterized by hope and renewal.
+            •	networking is crucial for reaching those separated by distance, and this is complemented by the sharing of resources and expertise between dioceses and parishes to overcome shortages.
+            •	the Church must move beyond awareness to concrete, sustainable action that transforms the lives of the rakyat and protects creation.
+            •	The groups emphasized that community empowerment, social justice, and environmental stewardship are interconnected, requiring the Church to model solidarity through shared resources, disaster relief, and care for the marginalized.
+        ====== End of Texts=====
+        ";
+        
+        $result = $llmService->query($systemPrompt, $userPrompt);
+        if ($result['success']) {
+            $generatedText = $result['content'];
+            
+        } else {
+            return response()->json([
+                "success"=>false,
+                "message"=>$result['error']
+            ], 200);
+        }
+
+        return response()->json([
+                "success"=>true,
+                "message"=>$generatedText
+        ], 200);
+    }
+
 }

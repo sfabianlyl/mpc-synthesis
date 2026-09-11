@@ -198,6 +198,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ], 200);
         })->name('update.db');
         Route::get('/key-themes', [AdminController::class, 'generateKeyThemes'])->name('admin.key.themes');
+        Route::get('/general-prompt', [AdminController::class, 'generalPrompting'])->name('admin.prompting');
 
 
         Route::post('/message', [AdminController::class, 'chatMessage'])->name('message');
