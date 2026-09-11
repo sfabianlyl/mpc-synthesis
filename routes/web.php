@@ -197,7 +197,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 "success"=>true
             ], 200);
         })->name('update.db');
-        Route::get('/key-themes', [AdminController::class, 'keyThemes'])->name('admin.key.themes');
+        Route::get('/key-themes', [AdminController::class, 'generateKeyThemes'])->name('admin.key.themes');
 
 
         Route::post('/message', [AdminController::class, 'chatMessage'])->name('message');
