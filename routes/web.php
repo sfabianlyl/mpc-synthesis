@@ -172,7 +172,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('details');
         Route::get('/update-db', function(){
             $conversation=Conversation::where("id",2)->with("conversationGroups")->get();
-            $convGroups=$conversation->conversationGroups;
+            $convGroups=$conversation[0]->conversationGroups;
             $convGroupsIds=$convGroups->pluck("id")->toArray();
             $users=User::where("role","synthesis")->whereNotIn("email",
                 ["gerald@gerejakatolik.my","ramesh@gerejakatolik.my","feona@gerejakatolik.my","christina@gerejakatolik.my","adrian@gerejakatolik.my","sandra@gerejakatolik.my"]
