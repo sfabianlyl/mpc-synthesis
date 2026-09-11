@@ -172,11 +172,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/details', [AdminController::class, 'chatDetails'])->name('details');
         Route::get('/update-db', function(){
             $conversation=Conversation::where("id",2)->with("conversationGroups")->get();
-            $dominic=User::where("email","dominic@gerejakatolik.my")->with("conversationGroups", function($query){
+            $dominic=User::where("email","dominic@gerejakatolik.my")->with("assignedConversationGroups", function($query){
                 $query->where("conversation_id",2);
             })->get();
             $david=User::where("email","david@gerejakatolik.my")->first();
-            foreach($david->conversationGroups as $conversationGroup) $conversationGroup->syntesisMembers()->syncWithoutDetaching([
+            foreach($david->assignedConversationGroups as $conversationGroup) $conversationGroup->syntesisMembers()->syncWithoutDetaching([
                 $david->id=>["is_synthesizer"=>true]
             ]);
             // $convGroups=$conversation[0]->conversationGroups;
