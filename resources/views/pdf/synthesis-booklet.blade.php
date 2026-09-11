@@ -509,14 +509,14 @@
             <div class="section">
                 <span class="category-label consideration">Matters for Consideration</span>
                 <div class="{{ $report->ai_consideration_text ? 'content-block ai-content' : 'content-block mixed-content' }}">
-                    {{ nl2br(e($report->consideration_text)) ?: ($report->ai_consideration_text ?: 'No relevant matters for consideration.') }}
+                    {!! nl2br(e($report->consideration_text)) ?: ($report->ai_consideration_text ?: 'No relevant matters for consideration.') !!}
                 </div>
             </div>
 
             <div class="section">
                 <span class="category-label proposals">Proposals</span>
                 <div class="{{ $report->ai_proposals_text ? 'content-block ai-content' : 'content-block mixed-content' }}">
-                    {{ nl2br(e($report->proposals_text)) ?: ($report->ai_proposals_text ?: 'No relevant proposals.') }}
+                    {!! nl2br(e($report->proposals_text)) ?: ($report->ai_proposals_text ?: 'No relevant proposals.') !!}
                 </div>
             </div>
 
@@ -524,7 +524,7 @@
             <div class="section">
                 <span class="category-label others">Others</span>
                 <div class="{{ $report->ai_other_text ? 'content-block ai-content' : 'content-block mixed-content' }}">
-                    {{ nl2br(e($report->other_text)) ?: ($report->ai_other_text ?? 'No relevant content.') }}
+                    {!! nl2br(e($report->other_text)) ?: ($report->ai_other_text ?? 'No relevant content.') !!}
                 </div>
             </div>
             @endif
