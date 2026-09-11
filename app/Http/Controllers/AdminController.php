@@ -256,20 +256,26 @@ class AdminController extends Controller
 
         ";
         $userPrompt = "====== Texts ======\n\n
-            •	Requirement to train staff and pay market-value salaries for quality results
-            •	concerns about the Church’s internal capacity to address complex issues such as mental health, broken families, and legal matters related to Islamisation, suggesting that individual dioceses or parishes lack the specialized resources to handle these alone
-            •	duplication of efforts and the inefficiency of creating new structures when existing ministries like Caritas, SSVP, and Creation Justice Commissions remain underutilized or poorly coordinated.
-            •	empowering and commissioning others, particularly youth, CARITAS, Creation Justice, and migrant ministries, to take greater responsibility and become agents of positive change.
-            •	the need to cultivate moral integrity and ethical leadership to counteract issues of favoritism and corruption.
-            •	the need for clearer stakeholder engagement strategies.
-            •	tension in navigating the use of new technologies, such as AI, ensuring they support coordination without displacing the centrality of human relationships and mission.
-            •	identifying actions that can be sustained together without overexerting resources , avoid burnout and acknowledging factors beyond our control
-            •	limitations placed on the Malaysian people's voices and the injustices arising from Islamization, which challenge the Church’s ability to speak freely.
-            •	the Church does not remain silent or fearful in the face of these complex socio-political dynamics.
-            •	risk of programs becoming one-off events rather than long-term solutions.
-            •	delicate balance required in navigating complex social and spiritual landscapes, where the safety and effectiveness of mission work depend on balancing moral integrity with practical wisdom.
-            •	the tension between traditional structures and the need for new ways of engaging the younger generation, particularly in preparing them for political involvement and decision-making processes that affect the rakyat's well-being.
-            •	Participants noted tensions around resource allocation, highlighting the need to reduce bureaucracy within the Church to allow better access to assistance and to prioritize spending on people rather than structures or beautification. There was also apprehension about the risk of burnout among volunteers and the need for adequate training budgets and professional support services.
+            •	Members emphasized the importance of gotong royong, community visitation, and fellowship as essential methods for building bridges, focusing on what unites us, and fostering a sense of belonging among all people.
+            •	Participants widely agreed that this preparation requires a holistic approach, combining faith formation with academic education to ensure the youth are equipped for leadership.
+            •	empowering the youth and lay faithful through education and spiritual formation, ensuring they are equipped to carry out ministries and take responsibility for their mission.
+            •	support of programs that care for the environment, educate migrants, and support youth and children in interior regions
+            •	necessity for dynamic and innovative formation programs for children and youth, such as anthropological approaches to catechism and involving them in church outreach activities.
+            •	providing unbiased, accessible, and holistic education, particularly for the poor
+            •	the importance of education and the enhancement of Faith Formation and Catholic Education, alongside the view that young people should act as digital missionaries.
+            •	integrating Catholic Social Teaching into daily life rather than keeping it as theoretical knowledge.
+            •	need for consistent awareness and accountability to ensure that pledges, such as those under Laudato Si’, are not just symbolic but lived out in practice.
+            •	necessity of equipping leaders to serve beyond the Catholic community and the challenge of ensuring that nation-building efforts begin today rather than being deferred to tomorrow.
+            •	having more educational institutions under the Catholic Church while carefully considering the affordability for Catholic parents to send their children to these schools.
+            •	there is a critical requirement for transparency, as the Bishops, Priests, and Parish Pastoral Councils must ensure that financial management and the appropriate utilization of funds for pastoral development are fully disclosed to the Faithful to maintain the Church's upright and trustworthy public image.
+            •	enforcement of ecological laws and the need for deeper knowledge on policies and laws.
+            •	utilizing the See-Judge-Act method to translate discernment into action
+            •	pull resources to support one another in addressing specific needs such as Islamisation, mental health issues, broken families, and the needs of youth, including providing Catholic lawyers in cases of conversion.
+            •	seminary formation must include social and political science to better equip the clergy to understand the nation's current situation and speak the truth without fear.
+            •	establish the first Catholic University in East Malaysia
+            •	conducting training and advocacy programs, and integrating social doctrine and environmental stewardship into homilies and parish programs.
+            •	join with the Government and NGOs regarding environmental issues, educate politicians and businesses on preserving Mother Earth, and empower young people for mission in society and as stewards of the Earth.
+            •	actionable ideas included mobilizing the Migrant Desk to assist stateless children, exercising voting rights to choose leaders with good stewardship, and launching recycling and disaster relief efforts.
         ====== End of Texts=====
         ";
         
