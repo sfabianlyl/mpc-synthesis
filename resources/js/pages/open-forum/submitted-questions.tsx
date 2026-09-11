@@ -27,6 +27,7 @@ export default function SubmittedQuestions({ questions }: SubmittedQuestionsProp
     return (
         <>
             <Head title="Submitted Questions" />
+            <PublicLayout title="Submitted Questions" description="View all submitted questions">
                 <div className="mb-8 flex items-center justify-between">
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">
                         Submitted Questions
@@ -69,6 +70,7 @@ export default function SubmittedQuestions({ questions }: SubmittedQuestionsProp
                         ))}
                     </div>
                 )}
+            </PublicLayout>
         </>
     );
 }

@@ -38,6 +38,7 @@ export default function OpenForumSubmit() {
     return (
         <>
             <Head title="Open Forum" />
+            <PublicLayout title="Open Forum" description="Submit your questions">
                 <h1 className="mb-2 text-center text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">
                     Open Forum
                 </h1>
@@ -88,6 +89,7 @@ export default function OpenForumSubmit() {
                         )}
                     </Button>
                 </form>
+            </PublicLayout>
         </>
     );
 }

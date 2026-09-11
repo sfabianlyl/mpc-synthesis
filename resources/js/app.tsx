@@ -11,11 +11,7 @@ const appName = import.meta.env.VITE_APP_NAME || 'MPC Synthesis';
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     layout: (name, page) => {
-        // Public pages render their own full-page layout
-        if (name.startsWith('public/')) {
-            return page;
-        }
-
+        
         switch (true) {
             case name === 'welcome':
                 return null;
@@ -23,6 +19,9 @@ createInertiaApp({
                 return AuthLayout;
             case name.startsWith('settings/'):
                 return [AppLayout, SettingsLayout];
+            case name.startsWith("public/"):
+            case name.startsWith("open-forum/"):
+                return page;
             default:
                 return AppLayout;
         }
