@@ -502,21 +502,21 @@
             <div class="section">
                 <span class="category-label convergence">Convergence</span>
                 <div class="{{ $report->ai_convergence_text ? 'content-block ai-content' : 'content-block mixed-content' }}">
-                    {{ $report->convergence_text ?: ($report->ai_convergence_text ?: 'Not yet completed.') }}
+                    {{ $report->convergence_text ?: ($report->ai_convergence_text ?: 'No relevant convergence.') }}
                 </div>
             </div>
 
             <div class="section">
                 <span class="category-label consideration">Matters for Consideration</span>
                 <div class="{{ $report->ai_consideration_text ? 'content-block ai-content' : 'content-block mixed-content' }}">
-                    {{ $report->consideration_text ?: ($report->ai_consideration_text ?: 'Not yet completed.') }}
+                    {{ $report->consideration_text ?: ($report->ai_consideration_text ?: 'No relevant matters for consideration.') }}
                 </div>
             </div>
 
             <div class="section">
                 <span class="category-label proposals">Proposals</span>
                 <div class="{{ $report->ai_proposals_text ? 'content-block ai-content' : 'content-block mixed-content' }}">
-                    {{ $report->proposals_text ?: ($report->ai_proposals_text ?: 'Not yet completed.') }}
+                    {{ $report->proposals_text ?: ($report->ai_proposals_text ?: 'No relevant proposals.') }}
                 </div>
             </div>
 
@@ -524,7 +524,7 @@
             <div class="section">
                 <span class="category-label others">Others</span>
                 <div class="{{ $report->ai_other_text ? 'content-block ai-content' : 'content-block mixed-content' }}">
-                    {{ $report->other_text ?: ($report->ai_other_text ?? 'Not yet completed.') }}
+                    {{ $report->other_text ?: ($report->ai_other_text ?? 'No relevant content.') }}
                 </div>
             </div>
             @endif

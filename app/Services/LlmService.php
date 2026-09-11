@@ -316,7 +316,7 @@ $this->outputTone
 
 Do NOT wrap the response in markdown code blocks (no ```json or ```). Do NOT include any explanatory text before or after the JSON. The response must be valid JSON only. Each value string must contain \n escape sequences, not actual newlines.
 
-Be concise but thorough. Use short phrases, not full sentences. Preserve the original meaning and intent of the participants.
+Be concise but thorough. Use full sentences. Preserve the original meaning and intent of the participants.
 
 ====== END OF IMPORTANT ======
 

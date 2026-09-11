@@ -334,22 +334,40 @@ public function index(Request $request): Response
         $this->authorizePastoralAccess($request);
 
         $nationalDrafts = NationalDecisionDraft::where('conversation_id', $conversation->id)
-            ->where('is_submitted', true)
-            ->with('user')
             ->get();
 
         if ($nationalDrafts->isEmpty()) {
             return back()->withErrors(['error' => 'No submitted national decision drafts found for this conversation.']);
         }
 
-        $systemPromptNational = "You are a pastoral synthesis assistant for a consultative synodal process. Synthesize the submitted individual national decision drafts into a cohesive, structured national decision part for the wider church. Highlight strategic priorities, common national themes, and actionable proposals. Format your output in clean Markdown.";
-        $userPromptNational = "Please synthesize the following pastoral national submissions into a consolidated national decision part for session '{$conversation->title}':\n\n";
+        $systemPromptNational = "
+            You are an objective and unbiased summarizer. The context of the texts that you receive here are thoughts and discernments of pastoral workers on areas the Catholic Church in Malaysia should focus/actively work on for the next 10 years. \n\n
+            
+            Your task is to go through the texts, and then come up with paragraphs which summarises the texts. The summary should be thematic, which means, group together ideas that are similar, or regarding the same subject or theme. Individual or unique ideas should not be discarded, but mentioned in another paragraph.\n\n
 
+            ====== Language and Tone ======\n\n
+            Stick to original vocabulary used by the contents as much as possible with minimal refinements towards Malaysian English, and pastoral language, where applicable. \n\n
+
+            Be concise but thorough. Use full sentences. Preserve the original meaning and intent of the texts.\n\n
+            ====== End of Language and Tone ======\n\n
+
+            ====== Output Format ====== \n\n
+            Output in plain text, without markdown, or markdown code blocks. Use next lines instead to format your output, for example, for titles and subtitles. \n\n
+            ====== End of Output Format ======\n\n
+
+            ====== Texts ======\n\n
+        
+        ";
+        $userPromptNational = "";
+        $count=1;
         foreach ($nationalDrafts as $draft) {
             if ($draft->draft_text) {
-                $userPromptNational .= "[Member: {$draft->user?->name}]\n{$draft->draft_text}\n\n---\n\n";
+                $userPromptNational .= "[{$count}]\n{$draft->draft_text}\n\n---\n\n";
+                $count++;
             }
+
         }
+        $userPromptNational.="====== End of Texts ======";
 
         $resultNational = $llmService->query($systemPromptNational, $userPromptNational);
         if ($resultNational['success']) {
