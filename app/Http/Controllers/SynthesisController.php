@@ -52,7 +52,7 @@ class SynthesisController extends Controller
             $query->where("conversation_id",$selectedConversationId)->whereHas('synthesisMembers', function ($q) use ($user){
                 $q->where('users.id', $user->id);
             });
-        })->get();
+        })->with('conversationGroup.group')->get();
         
         $withoutResponse = Group::whereHas('conversationGroups', function ($query) use ($selectedConversationId, $user) {
             $query->where('conversation_id', $selectedConversationId)
