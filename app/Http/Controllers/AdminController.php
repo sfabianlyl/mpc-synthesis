@@ -259,6 +259,7 @@ class AdminController extends Controller
             •	Requirement to train staff and pay market-value salaries for quality results
             •	concerns about the Church’s internal capacity to address complex issues such as mental health, broken families, and legal matters related to Islamisation, suggesting that individual dioceses or parishes lack the specialized resources to handle these alone
             •	duplication of efforts and the inefficiency of creating new structures when existing ministries like Caritas, SSVP, and Creation Justice Commissions remain underutilized or poorly coordinated.
+            •	empowering and commissioning others, particularly youth, CARITAS, Creation Justice, and migrant ministries, to take greater responsibility and become agents of positive change.
             •	the need to cultivate moral integrity and ethical leadership to counteract issues of favoritism and corruption.
             •	the need for clearer stakeholder engagement strategies.
             •	tension in navigating the use of new technologies, such as AI, ensuring they support coordination without displacing the centrality of human relationships and mission.
