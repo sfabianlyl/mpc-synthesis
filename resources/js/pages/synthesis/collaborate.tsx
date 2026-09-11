@@ -403,7 +403,9 @@ export default function Collaborate({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Collaborative Synthesis Review</h1>
-                        
+                        {conversation?.title && (
+                            <p className="text-muted-foreground mt-1 text-lg font-medium">{conversation.title}</p>
+                        )}
                     </div>
                    
 
@@ -424,6 +426,17 @@ export default function Collaborate({
                         )}
                     </div>
                 </div>
+
+                {conversation?.description && (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+                        <p className="mb-1 text-sm font-semibold uppercase tracking-wider text-blue-900 dark:text-blue-300">
+                            Conversation Details
+                        </p>
+                        <div className="whitespace-pre-wrap text-base leading-relaxed text-slate-700 dark:text-slate-300">
+                            {conversation.description}
+                        </div>
+                    </div>
+                )}
 
                  <section className="space-y-4">
                         {/* Instructions for synthesis members */}
