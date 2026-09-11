@@ -438,6 +438,7 @@ class SynthesisController extends Controller
         $keyPoints = SynthesisKeyPoint::where('conversation_id', $conversation->id)
             ->completed()
             ->orderByDesc('created_at')
+            ->limit(1)
             ->get();
 
         $html = view('pdf.synthesis-booklet', [
