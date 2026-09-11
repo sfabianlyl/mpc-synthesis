@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminMediaUploadController;
 use App\Http\Controllers\DocumentRetrievalController;
 use App\Http\Controllers\DrafterController;
+use App\Http\Controllers\OpenForumController;
 use App\Http\Controllers\PastoralController;
 use App\Http\Controllers\ResponseController;
 use App\Http\Controllers\MasterSynthesisController;
@@ -216,5 +217,10 @@ Route::get('respond/{event_id}/{group_id}', [ResponseController::class, 'showPub
     ->name('respond.public.form');
 Route::post('respond/{event_id}/{group_id}', [ResponseController::class, 'storePublicResponse'])
     ->name('respond.public.store');
+
+// ─── Open Forum Routes (No Auth Required) ────────────────────────────────
+Route::get('open-forum', [OpenForumController::class, 'index'])->name('open-forum.index');
+Route::post('open-forum', [OpenForumController::class, 'store'])->name('open-forum.store');
+Route::get('submitted-questions', [OpenForumController::class, 'submittedQuestions'])->name('submitted-questions.index');
 
 require __DIR__.'/settings.php';
