@@ -39,6 +39,6 @@ class Response extends Model
 
     public function responseGroup(): HasOneThrough
     {
-        return $this->hasOneThrough(Group::class,ConversationGroup::class);
+        return $this->hasOneThrough(Group::class,ConversationGroup::class,"id","id","conversation_group_id","group_id");
     }
 }
