@@ -299,9 +299,9 @@ class AdminController extends Controller
     public function responses(Request $request, $conversation_id="all")
     {
         if($conversation_id!="all"){
-            $conversations=Conversation::where("id",$conversation_id)->with("responses.group")->get();
+            $conversations=Conversation::where("id",$conversation_id)->with("responses.responseGroup")->get();
         }else{
-            $conversations=Conversation::with("responses.group")->get();
+            $conversations=Conversation::with("responses.responseGroup")->get();
         }
 
         return view("raw.responses")->with(compact(

@@ -36,7 +36,7 @@ class Response extends Model
         return $this->belongsTo(ConversationGroup::class);
     }
 
-    public function group(): HasOneThrough
+    public function responseGroup(): HasOneThrough
     {
         return $this->through("conversationGroup")->has("group");
     }
