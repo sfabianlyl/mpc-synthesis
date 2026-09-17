@@ -35,4 +35,9 @@ class Response extends Model
     {
         return $this->belongsTo(ConversationGroup::class);
     }
+
+    public function group(): HasManyThrough
+    {
+        return $this->through("conversationGroup")->has("group");
+    }
 }

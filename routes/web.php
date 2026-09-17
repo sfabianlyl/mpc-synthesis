@@ -200,7 +200,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         })->name('update.db');
         Route::get('/key-themes', [AdminController::class, 'generateKeyThemes'])->name('admin.key.themes');
         Route::get('/general-prompt', [AdminController::class, 'generalPrompting'])->name('admin.prompting');
-
+        
 
         Route::post('/message', [AdminController::class, 'chatMessage'])->name('message');
     });
@@ -209,6 +209,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin')->prefix('admin/media-upload')->name('admin.media-upload.')->group(function () {
         Route::get('/', [AdminMediaUploadController::class, 'index'])->name('');
         Route::post('/{conversation}', [AdminMediaUploadController::class, 'store'])->name('store');
+    });
+
+    // ─── Admin Export Raw ──────────────────────────────────────
+    Route::middleware('role:admin')->prefix('admin/raw')->name('admin.raw.')->group(function () {
+        Route::get('/responses/{conversation_id}', [AdminController::class, 'responses'])->name('responses');
     });
 });
 

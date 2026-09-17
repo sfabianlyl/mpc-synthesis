@@ -6,6 +6,7 @@ use App\Models\Conversation;
 use App\Models\Group;
 use App\Models\NationalDecisionDraft;
 use App\Models\Response;
+use App\Models\OpenForumQuestion;
 use App\Models\User;
 use App\Services\LlmService;
 use Illuminate\Http\Request;
@@ -293,6 +294,30 @@ class AdminController extends Controller
                 "success"=>true,
                 "message"=>$generatedText
         ], 200);
+    }
+
+    public function responses(Request $request, $conversation_id="all")
+    {
+        if($conversation_id!="all"){
+            $conversations=Conversation::where("id",$conversation_id)->with("responses.group")->get();
+        }else{
+            $conversations=Conversation::with("responses.group")->get();
+        }
+
+        return view("raw.responses")->with(compact(
+            "conversations"
+        ));
+
+    }
+
+    public function questions(Request $request)
+    {
+        $questions=OpenForumQuestion::get();
+
+        return view("raw.questions")->with(compact(
+            "questions"
+        ));
+
     }
 
 }
