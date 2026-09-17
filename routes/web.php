@@ -214,6 +214,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ─── Admin Export Raw ──────────────────────────────────────
     Route::middleware('role:admin')->prefix('admin/raw')->name('admin.raw.')->group(function () {
         Route::get('/responses/{conversation_id}', [AdminController::class, 'responses'])->name('responses');
+        Route::get('/questions', [AdminController::class, 'questions'])->name('questions');
+    
     });
 });
 
