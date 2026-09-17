@@ -299,9 +299,19 @@ class AdminController extends Controller
     public function responses(Request $request, $conversation_id="all")
     {
         if($conversation_id!="all"){
-            $conversations=Conversation::where("id",$conversation_id)->with("responses.responseGroup")->get();
+            $conversations=Conversation::where("id",$conversation_id)->with([
+                'responses' => function ($query) {
+                    $query->orderBy('conversation_group_id', 'asc'); // or 'desc'
+                },
+                'responses.responseGroup'
+            ])->get();
         }else{
-            $conversations=Conversation::with("responses.responseGroup")->get();
+            $conversations=Conversation::with([
+                'responses' => function ($query) {
+                    $query->orderBy('conversation_group_id', 'asc'); // or 'desc'
+                },
+                'responses.responseGroup'
+            ])->get();
         }
 
         return view("raw.responses")->with(compact(
